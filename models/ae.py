@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 import torch.nn.functional as F
 
@@ -26,6 +27,20 @@ class Autoencoder(nn.Module):
         y = self.encoder(x)
         y = self.decoder(y)
         return {'target': y}
+
+    def inference(self, x):
+        """ Method for inferencing latent vector 
+        
+        Parameters:
+            x (torch.Tensor): input data from which 
+            
+        Return:
+            y ():  latent vector
+        """
+        print(f'x: {x}')
+        y = self.encoder(x)
+        print(f'y: {y}')
+        return y
 
 
 class Encoder(nn.Module):

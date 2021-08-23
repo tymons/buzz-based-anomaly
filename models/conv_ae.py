@@ -1,6 +1,3 @@
-import math
-import torch
-
 from torch import nn
 from functools import reduce
 
@@ -81,9 +78,15 @@ class ConvolutionalAE(nn.Module):
                                             connector_shape=conv_to_mlp_shape)
 
     def forward(self, x):
+        """ forward method for neural network """
         y = self.encoder(x)
         y = self.decoder(y)
         return {'target': y}
+
+    def inference(self, x):
+        """ Method for latent space inference """
+        y = self.encoder(x)
+        return y
 
 
 class ConvolutionalEncoder(nn.Module):

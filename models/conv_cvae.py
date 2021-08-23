@@ -1,25 +1,25 @@
 import torch
-
 from torch import nn
 
-from models.conv_ae import ConvolutionalDecoder, ConvolutionalEncoder, conv_mlp_layer_shape
-from models.vae import reparameterize
+from conv_ae import ConvolutionalDecoder, ConvolutionalEncoder, conv_mlp_layer_shape
+from vae import reparameterize
 
 
 class ConvolutionalCVAE(nn.Module):
     """ Class for convolutional cvae """
-    def __init__(self, encoder_conv_sizes, encoder_mlp_sizes,
-                    decoder_conv_sizes, decoder_mlp_sizes, latent_size, input_shape):
 
-        super().__init__()	
+    def __init__(self, encoder_conv_sizes, encoder_mlp_sizes,
+                 decoder_conv_sizes, decoder_mlp_sizes, latent_size, input_shape):
+        super().__init__()
 
         assert type(encoder_conv_sizes) == list
         assert type(encoder_mlp_sizes) == list
         assert type(latent_size) == int
         assert type(decoder_conv_sizes) == list
         assert type(decoder_mlp_sizes) == list
-        
-        conv_to_mlp_shape = conv_mlp_layer_shape(input_shape, encoder_conv_sizes, kernel=3, stride=1, padding=1, max_pool=(2,2))
+
+        conv_to_mlp_shape = conv_mlp_layer_shape(input_shape, encoder_conv_sizes, kernel=3, stride=1, padding=1,
+                                                 max_pool=(2, 2))
 
         self.latent_size = latent_size
         self.s_encoder = ConvolutionalEncoder(encoder_conv_sizes, encoder_mlp_sizes, conv_to_mlp_shape)
@@ -41,7 +41,7 @@ class ConvolutionalCVAE(nn.Module):
 
         background_z = self.z_encoder(background)
         bg_z_mean, bg_z_log_var = self.z_linear_means(background_z), self.z_linear_log_var(background_z)
-            
+
         tg_s = reparameterize(tg_s_mean, tg_s_log_var)
         tg_z = reparameterize(tg_z_mean, tg_z_log_var)
         bg_z = reparameterize(bg_z_mean, bg_z_log_var)
@@ -57,6 +57,15 @@ class ConvolutionalCVAE(nn.Module):
                 'background': bg_output,
                 'bg_qz_mean': bg_z_mean,
                 'bg_qz_log_var': bg_z_log_var,
-                'latent_qs_target': tg_s,       # we need this for disentangle and ensure that s and z distributions 
-                'latent_qz_target': tg_z}       # for target are independent
+                'latent_qs_target': tg_s,  # we need this for disentangle and ensure that s and z distributions
+                'latent_qz_target': tg_z}  # for target are independent
 
+    def inference_z(self, x):
+        z = self.z_encoder(x)
+        z_mean, z_var = self.z_linear_means(z), self.z_linear_log_var(z)
+        return reparameterize(z_mean, z_var)
+
+    def inference_s(self, x):
+        s = self.s_encoder(x)
+        s_mean, s_var = self.s_linear_means(s), self.s_linear_log_var(s)
+        return reparameterize(s_mean, s_var)

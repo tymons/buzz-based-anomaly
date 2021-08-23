@@ -2,17 +2,13 @@ import torch
 
 from torch import nn
 
-from models.ae import Decoder, Encoder
-from models.vae import reparameterize
+from ae import Decoder, Encoder
+from vae import reparameterize
 
 
 def permutate_latent(latents_batch, inplace=False):
     """ Function for element permutation along specified axis
-    
-    Parameters:
-        latent_batch (torch.tensor): input matrix to be permutated
-        inplace (bool): modify original tensor or not
-    Returns
+    :param latents_batch:
     """
     latents_batch = latents_batch.squeeze()
 
@@ -26,6 +22,12 @@ def permutate_latent(latents_batch, inplace=False):
 
 
 def discriminator_loss(log_ratio_p, log_ratio_q):
+    """
+
+    :param log_ratio_p:
+    :param log_ratio_q:
+    :return:
+    """
     loss_p = nn.functional.binary_cross_entropy_with_logits(log_ratio_p, torch.ones_like(log_ratio_p), reduction='mean')
     loss_q = nn.functional.binary_cross_entropy_with_logits(log_ratio_q, torch.zeros_like(log_ratio_q),
                                                             reduction='mean')
@@ -115,3 +117,13 @@ class cVAE(nn.Module):
                 'bg_qz_log_var': bg_z_log_var,
                 'latent_qs_target': tg_s,  # we need this for disentangle and ensure that s and z distributions
                 'latent_qz_target': tg_z}  # for target are independent
+
+    def inference_z(self, x):
+        z = self.z_encoder(x)
+        z_mean, z_var = self.z_linear_means(z), self.z_linear_log_var(z)
+        return reparameterize(z_mean, z_var)
+
+    def inference_s(self, x):
+        s = self.s_encoder(x)
+        s_mean, s_var = self.s_linear_means(s), self.s_linear_log_var(s)
+        return reparameterize(s_mean, s_var)
