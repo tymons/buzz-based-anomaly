@@ -66,7 +66,7 @@ def create_valid_sounds_datalist(root_folder, valid_file_filename='valid_sounds.
     return valid_dict_count
 
 
-def get_valid_sounds_datalist(folder_list: List[Path], valid_file_filename: str = 'valid_sounds.txt'):
+def get_valid_sounds_datalist(folder_list: List[Path], valid_file_filename: str = 'valid_sounds.txt') -> List[Path]:
     """
     Reads valid sounds files in specific directories. Note that files should exists,
     see create_valid_sounds_datalis method
@@ -87,13 +87,13 @@ def get_valid_sounds_datalist(folder_list: List[Path], valid_file_filename: str 
     return sound_filenames
 
 
-def filter_by_datetime(files: List[Path], start: datetime, end: datetime):
+def filter_by_datetime(files: List[Path], start: datetime, end: datetime) -> List[Path]:
     """
     Filtering list of Path based on their datetime encoded within filename
     :param files:   list of sound files paths which should be filtered
     :param start:   start datetime
     :param end:     end datetime
-    :return: list of paths
+    :return: list of filtered paths
     """
     def _is_within_timerange(elem):
         """ predicate performing filename datetime parsing and checking timerange """
@@ -104,16 +104,14 @@ def filter_by_datetime(files: List[Path], start: datetime, end: datetime):
     return list(filter(_is_within_timerange, files))
 
 
-def filter_string_list(input_str_list, *names):
-    """ Filter sound_filenames as it returns only these files which includes hive_names
-
-    Parameters:
-        input_str_list (list): list of strings to be filtered
-        names (varg): names to be search for inside input_str_list
-
-    Returns:
+def filter_string_list(paths: List[Path], *names: str) -> List[Path]:
     """
-    return list(filter(lambda str_elem: (any(x in str_elem for x in [*names])), input_str_list))
+    Filter sounds based on filenames. Returning only these files which filename contains something from names param
+    :param paths: list of files
+    :param names: unpacked string list containing names to be checked
+    :return: list of filtered paths
+    """
+    return list(filter(lambda str_elem: (any(x in str_elem.stem for x in [*names])), paths))
 
 
 def batch_normalize(batch_data):
