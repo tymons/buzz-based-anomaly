@@ -16,6 +16,7 @@ def _pcm2float(sig: np.ndarray, dynamic_type: str = 'float64') -> np.ndarray:
     :param dynamic_type: string representing dynamic type
     :return: converted samples
     """
+    sig = np.asarray(sig)
     if sig.dtype.kind not in 'iu':
         raise TypeError("'sig' must be an array of integers")
     d_type = np.dtype(dynamic_type)
@@ -35,13 +36,14 @@ def _read_samples(filename: Path, raw: bool = False) -> (np.ndarray, int):
     :param raw: flag for reading only raw samples - skipping float conversion
     :return: list of samples, sampling rate
     """
-    sampling_rate, sound_samples = wavfile.read(filename)
-
+    sampling_rate, sound_samples = wavfile.read(str(filename))
     if len(sound_samples.shape) > 1:
-        # 2-channel recording
-        sound_samples = sound_samples.sum(axis=1) / 2
+        sound_samples = sound_samples.sum(axis=1) // 2
 
-    if not raw:
+    if sound_samples.dtype.kind == 'i':
+        sound_samples = sound_samples.astype(np.uint64)
+
+    if not raw and sound_samples.dtype.kind != 'f':
         sound_samples = _pcm2float(sound_samples, dynamic_type='float64')
 
     return sound_samples, sampling_rate

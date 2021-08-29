@@ -23,13 +23,13 @@ class PeriodogramDataset(SoundDataset):
 
     def get_item(self, idx):
         """ Function for getting periodogram """
-        # read sound samples from file
-        sound_samples, sampling_rate, labels = SoundDataset.read_sound(self, idx=idx, raw=False)
-        sound_samples = sound_samples - sound_samples.mean()
-
+        should_be_integers = self.convert_db
+        print(should_be_integers)
+        sound_samples, sampling_rate, labels = SoundDataset.read_sound(self, idx=idx, raw=should_be_integers)
         periodogram = abs(np.fft.rfft(sound_samples, sampling_rate))[1:]
         if self.convert_db:
             periodogram = 20 * np.log10(periodogram / np.iinfo(sound_samples[0]).max)
+
         frequencies = np.fft.rfftfreq(sampling_rate, d=(1. / sampling_rate))[1:]
 
         if self.slice_freq:
