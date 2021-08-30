@@ -1,10 +1,8 @@
 import unittest
-
-from pathlib import Path
-
 import numpy as np
 
 from utils.feature_factory import SoundFeatureFactory, SoundFeatureType
+from pathlib import Path
 
 
 class TestPeriodogramMethods(unittest.TestCase):
