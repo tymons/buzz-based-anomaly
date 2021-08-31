@@ -1,0 +1,5 @@
+slice_frequency:
+  start: 1
+  stop: 2048
+convert_db: False
+normalize: False
