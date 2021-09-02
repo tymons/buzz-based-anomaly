@@ -2,4 +2,6 @@
 dataset/
 __pycache__/
 .ipynb_checkpoints/
+
 .comet.config
+comet.log
