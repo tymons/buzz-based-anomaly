@@ -1,10 +1,10 @@
 import unittest
 
 from utils.model_factory import HiveModelFactory, HiveModelType, model_check
+from models.base_model import BaseModel
 
 
 class TestModelFactoryMethods(unittest.TestCase):
-
     def test_model_is_build(self):
         input_size = 512
         config = {
@@ -12,8 +12,11 @@ class TestModelFactoryMethods(unittest.TestCase):
             'decoder': {'layers': [16, 32, 64]},
             'latent': 8
         }
-        model = HiveModelFactory.build_model(HiveModelType.from_name('autoencoder'), config, input_size)
+        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('autoencoder'), config, input_size)
         self.assertIsNotNone(model_check(model, (1, 1, input_size)), "Model verification failed!")
+        self.assertListEqual(model.get_params().get('model_encoder_layers'), config['encoder']['layers'])
+        self.assertListEqual(model.get_params().get('model_decoder_layers'), config['decoder']['layers'])
+        self.assertEqual(model.get_params().get('model_latent'), config['latent'])
 
 
 if __name__ == '__main__':
