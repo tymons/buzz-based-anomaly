@@ -89,12 +89,14 @@ def get_valid_sounds_from_folders(folder_list: List[Path], valid_file_filename: 
 
 def filter_by_datetime(files: List[Path], start: datetime, end: datetime) -> List[Path]:
     """
-    Filtering list of Path based on their datetime encoded within filename
+    Filtering list of Path based on their datetime encoded within filename. Note that filename should be of format:
+    "HIVENAME-YYYY-MM-DDTHH-mm-ss" e.g. DEADBEEF94-2020-08-09T22-10-25"
     :param files:   list of sound files paths which should be filtered
     :param start:   start datetime
     :param end:     end datetime
     :return: list of filtered paths
     """
+
     def _is_within_timerange(elem):
         """ predicate performing filename datetime parsing and checking timerange """
         elem = "-".join(elem.stem.split('-')[1:]).split('.')[0]
@@ -107,11 +109,13 @@ def filter_by_datetime(files: List[Path], start: datetime, end: datetime) -> Lis
 def filter_string_list(paths: List[Path], *names: str) -> List[Path]:
     """
     Filter sounds based on filenames. Returning only these files which filename contains something from names param
+    Note that filename should be of format: "HIVENAME-YYYY-MM-DDTHH-mm-ss" e.g. DEADBEEF94-2020-08-09T22-10-25"
     :param paths: list of files
     :param names: unpacked string list containing names to be checked
     :return: list of filtered paths
     """
     return list(filter(lambda str_elem: (any(x in str_elem.stem for x in [*names])), paths))
+
 
 def batch_normalize(batch_data):
     """ Function for data normalization accross batch """

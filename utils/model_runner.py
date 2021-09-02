@@ -132,11 +132,11 @@ class ModelRunner:
 
             loss_float = loss.item()
             mean_loss.append(loss_float)
-            # experiment.log_metric("batch_train_loss", loss_float, step=epoch_no * batch_idx)
+            experiment.log_metric("batch_train_loss", loss_float, step=epoch_no * batch_idx)
 
             if batch_idx % logging_interval == 0:
-                print(f'=== train epoch {epoch_no}, [{batch_idx * len(batch)}/{len(self.train_dataloader)}] '
-                      f'=> loss: {loss_float:.6f}')
+                print(f'=== train epoch {epoch_no}, [{batch_idx * len(batch)}/{len(self.train_dataloader.dataset)}] '
+                      f'-> loss: {loss_float:.10f}')
         return sum(mean_loss) / len(mean_loss)
 
     def _val_step(self, model, experiment, epoch_no, logging_interval):
@@ -156,11 +156,12 @@ class ModelRunner:
 
             loss_float = loss.item()
             val_loss.append(loss_float)
-            # experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
+            experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
 
             if batch_idx % logging_interval == 0:
-                print(f'=== validation epoch {epoch_no}, [{batch_idx * len(batch)}/{len(self.train_dataloader)}] '
-                      f'-> loss: {loss.item():.6f} ===')
+                print(f'=== validation epoch {epoch_no}, '
+                      f'[{batch_idx * len(batch)}/{len(self.train_dataloader.dataset)}]'
+                      f'-> loss: {loss.item():.10f} ===')
 
         return sum(val_loss) / len(val_loss)
 
@@ -173,13 +174,13 @@ class ModelRunner:
         """
         best_val_loss = -1
         patience_counter = config.get('epoch_patience', 10)
-        # experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
-        #                                     {**model.get_params(), **config, **self.feature_config}, [])
-        # checkpoint_path = self.output_folder / f'{experiment.get_name()}-checkpoint.pth'
-        checkpoint_path = self.output_folder / f'temp-checkpoint.pth'
+        experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
+                                            {**model.get_params(), **config, **self.feature_config}, [])
+        checkpoint_path = self.output_folder / f'{experiment.get_name()}-checkpoint.pth'
 
+        print(f'performing train task on {self.device}:{torch.cuda.device_count()}'
+              f' for model {checkpoint_path.stem.upper()} with following config: {config}')
         if torch.cuda.device_count() > 1:
-            print(f"device with many gpus detected - using {torch.cuda.device_count()} GPUs.")
             model = nn.DataParallel(model)
 
         model = model.to(self.device)
@@ -189,11 +190,11 @@ class ModelRunner:
                                                                                              0.0001))
         batch_logging_interval = config.get('logging_batch_interval', 10)
         for epoch in range(1, config.get('epochs', 10) + 1):
-            train_epoch_loss = self._train_step(model, optimizer, None, epoch, batch_logging_interval)
-            # experiment.log_metric('train_epoch_loss', train_epoch_loss, step=epoch)
+            train_epoch_loss = self._train_step(model, optimizer, experiment, epoch, batch_logging_interval)
+            experiment.log_metric('train_epoch_loss', train_epoch_loss, step=epoch)
 
-            val_epoch_loss = self._val_step(model, None, epoch, batch_logging_interval)
-            # experiment.log_metric('val_epoch_loss', val_epoch_loss, step=epoch)
+            val_epoch_loss = self._val_step(model, experiment, epoch, batch_logging_interval)
+            experiment.log_metric('val_epoch_loss', val_epoch_loss, step=epoch)
 
             if val_epoch_loss < best_val_loss or best_val_loss == -1:
                 print(f'*** model checkpoint at epoch {epoch} ***')

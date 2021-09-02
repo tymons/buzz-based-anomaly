@@ -24,8 +24,8 @@ class SoundFeatureFactory:
         convert_db = features_params_dict.get('convert_db', False)
         normalize = features_params_dict.get('normalize', True)
 
-        print(f'building periodogram dataset with params: db_scale({convert_db}), min_max_scale({normalize}),'
-              f' slice_freq({(frequencies.get("start"), frequencies.get("stop"))})')
+        print(f'building periodogram dataset of length {len(sound_filenames)} with params: db_scale({convert_db}),'
+              f' min_max_scale({normalize}), slice_freq({(frequencies.get("start"), frequencies.get("stop"))})')
 
         return PeriodogramDataset(sound_filenames, labels, convert_db, normalize,
                                   slice_freq=(frequencies.get('start'), frequencies.get('stop')))
@@ -50,21 +50,22 @@ class SoundFeatureFactory:
 
     @staticmethod
     def build_train_and_validation_dataloader(dataset: SoundDataset, batch_size: int,
-                                              ratio: float = 0.15, num_workers: int = 0) -> (DataLoader, DataLoader):
+                                              ratio: float = 0.15, num_workers: int = 0, drop_last=False) -> \
+            (DataLoader, DataLoader):
         """
         Building train and validation pytorch loader
         :param dataset: Data
         :param batch_size:
         :param ratio: validation/train ratio
         :param num_workers: pytorch number of dataloader workers
+        :param drop_last: should drop last from dataset when batching
         :return:
         """
-        val_amount = int(dataset.__len__() * ratio)
-        train_dataset, val_dataset = random_split(dataset, [(dataset.__len__() - val_amount), val_amount])
-
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True,
+        val_amount = int(len(dataset) * ratio)
+        train_dataset, val_dataset = random_split(dataset, [(len(dataset) - val_amount), val_amount])
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=drop_last,
                                   num_workers=num_workers)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, drop_last=True,
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, drop_last=drop_last,
                                 num_workers=num_workers)
 
         return train_loader, val_loader

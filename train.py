@@ -1,4 +1,6 @@
 import argparse
+import datetime
+
 import yaml
 import optuna
 
@@ -10,7 +12,7 @@ from features.feature_type import SoundFeatureType
 
 from utils.model_factory import HiveModelFactory
 from utils.feature_factory import SoundFeatureFactory
-from utils.data_utils import get_valid_sounds_from_folders, filter_string_list
+from utils.data_utils import get_valid_sounds_from_folders, filter_string_list, filter_by_datetime
 
 
 def main():
@@ -22,7 +24,9 @@ def main():
                         type=SoundFeatureType.from_name, help='Input feature')
     parser.add_argument('root_folder', metavar='root_folder', type=Path, help='Root folder for data')
     # optional arguments
-    parser.add_argument('--filter', default=[], nargs='+' ,help="Hive names to be excluded from dataset")
+    parser.add_argument('--filter_hives', default=[], nargs='+', help="Hive names to be excluded from dataset")
+    parser.add_argument('--filter_dates', nargs=2, type=datetime.datetime.fromisoformat,
+                        help="Start and end date for sound data with format YYYY-MM-DD", metavar='START_DATE END_DATE')
     parser.add_argument('--model_config', default=Path(__file__).absolute().parent / "model_config.yml", type=Path)
     parser.add_argument('--feature_config', default=Path(__file__).absolute().parent / "feature_config.yml", type=Path)
     parser.add_argument('--learning_config', default=Path(__file__).absolute().parent / "learning_config.yml",
@@ -44,7 +48,9 @@ def main():
 
         # data
         sound_list = get_valid_sounds_from_folders(args.root_folder.glob('*'))
-        sound_list = filter_string_list(sound_list, *args.filter)
+        if args.filter_dates:
+            sound_list = filter_by_datetime(sound_list, args.filter_dates[0], args.filter_dates[1])
+        sound_list = filter_string_list(sound_list, *args.filter_hives)
         available_labels = list(set([path.stem.split("-")[0] for path in sound_list]))
         sound_labels = [list(available_labels).index(sound_name.stem.split('-')[0]) for sound_name in sound_list]
         dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, sound_labels, feature_config)
