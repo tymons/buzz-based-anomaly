@@ -12,6 +12,8 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from typing import Callable
 from datetime import datetime
 from tqdm import tqdm
+from pathlib import Path
+from typing import List
 
 
 def flatten(x):
@@ -64,52 +66,55 @@ def create_valid_sounds_datalist(root_folder, valid_file_filename='valid_sounds.
     return valid_dict_count
 
 
-def get_valid_sounds_datalist(folder_list, valid_file_filename):
-    """Reads valid sounds files in specific directories. Note that files should exists, 
+def get_valid_sounds_from_folders(folder_list: List[Path], valid_file_filename: str = 'valid_sounds.txt') -> List[Path]:
+    """
+    Reads valid sounds files in specific directories. Note that files should exists,
     see create_valid_sounds_datalis method
-    
-    Parameters:
-        folder_list (str): list with folder which will be scanned
-        valid_file_filename (str): filename which will be read from folder_list
-    
-    Returns:
-
+    :param folder_list: list of folders which should be scanned
+    :param valid_file_filename: filename for 'valid' sound filenames file.
+    :return: list of
     """
     sound_filenames = []
 
     for folder in folder_list:
-        summary_file = os.path.join(folder, valid_file_filename)
-        if os.path.isfile(summary_file):
-            with open(summary_file, 'r') as f:
-                sound_filenames += list(map(lambda x: os.path.join(folder, x), f.read().splitlines()))
+        summary_file = folder / valid_file_filename
+        if summary_file.exists():
+            with summary_file.open('r') as f:
+                sound_filenames += list(map(lambda x: folder / x, f.read().splitlines()))
         else:
             logging.warning(f'{valid_file_filename} for folder {folder} does not exists! skipping')
 
     return sound_filenames
 
 
-def filter_by_datetime(str_list, start, end):
-    """ Function for filtering sound samples names by date time """
+def filter_by_datetime(files: List[Path], start: datetime, end: datetime) -> List[Path]:
+    """
+    Filtering list of Path based on their datetime encoded within filename. Note that filename should be of format:
+    "HIVENAME-YYYY-MM-DDTHH-mm-ss" e.g. DEADBEEF94-2020-08-09T22-10-25"
+    :param files:   list of sound files paths which should be filtered
+    :param start:   start datetime
+    :param end:     end datetime
+    :return: list of filtered paths
+    """
 
-    def _is_str_indatetimerage(elem):
-        """ closure for filter_bydatetiem """
-        elem = "-".join(elem.split(os.sep)[-1].split('-')[1:]).split('.')[0]
+    def _is_within_timerange(elem):
+        """ predicate performing filename datetime parsing and checking timerange """
+        elem = "-".join(elem.stem.split('-')[1:]).split('.')[0]
         datetime_elem = datetime.strptime(elem, '%Y-%m-%dT%H-%M-%S')
         return start <= datetime_elem <= end
 
-    return list(filter(_is_str_indatetimerage, str_list))
+    return list(filter(_is_within_timerange, files))
 
 
-def filter_string_list(input_str_list, *names):
-    """ Filter sound_filenames as it returns only these files which includes hive_names
-
-    Parameters:
-        input_str_list (list): list of strings to be filtered
-        names (varg): names to be search for inside input_str_list
-
-    Returns:
+def filter_string_list(paths: List[Path], *names: str) -> List[Path]:
     """
-    return list(filter(lambda str_elem: (any(x in str_elem for x in [*names])), input_str_list))
+    Filter sounds based on filenames. Returning only these files which filename contains something from names param
+    Note that filename should be of format: "HIVENAME-YYYY-MM-DDTHH-mm-ss" e.g. DEADBEEF94-2020-08-09T22-10-25"
+    :param paths: list of files
+    :param names: unpacked string list containing names to be checked
+    :return: list of filtered paths
+    """
+    return list(filter(lambda str_elem: (any(x in str_elem.stem for x in [*names])), paths))
 
 
 def batch_normalize(batch_data):
@@ -186,11 +191,3 @@ def truncate_lists_to_smaller_size(arg1, arg2):
         arg2 = arg2[:len(arg1)]
 
     return arg1, arg2
-
-
-def read_comet_api_key(config_file_fullpath):
-    """ Function for reading comet api key form file """
-    with open(config_file_fullpath, 'r') as f:
-        api_key = [b.split('=')[-1] for b in f.read().splitlines() if b.startswith('api_key')][0]
-
-    return api_key

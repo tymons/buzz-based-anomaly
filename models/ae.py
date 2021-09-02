@@ -1,17 +1,12 @@
 import torch
+
 from torch import nn
+from models.base_model import BaseModel
 import torch.nn.functional as F
 
 
-def ae_loss_fun(data_input, model_output_dict):
-    """ Function for calculating loss for vanilla autoencoders """
-    mse = F.mse_loss(data_input, model_output_dict['target'], reduction='mean')
-    return mse
-
-
-class Autoencoder(nn.Module):
+class Autoencoder(BaseModel):
     """ Vanilla autoencoder """
-
     def __init__(self, encoder_layer_sizes, latent_size, decoder_layer_sizes, input_size):
         super().__init__()
 
@@ -20,27 +15,42 @@ class Autoencoder(nn.Module):
         assert type(decoder_layer_sizes) == list
         assert type(input_size) == int
 
+        self._encoder_sizes = encoder_layer_sizes
+        self._decoder_sizes = decoder_layer_sizes
+        self._latent_size = latent_size
+
         self.encoder = EncoderWithLatent(encoder_layer_sizes, latent_size, input_size)
         self.decoder = Decoder(decoder_layer_sizes, latent_size, input_size)
+
+    def loss_fn(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """
+        Method for calculating loss function for pytorch model
+        :param x: data input
+        :param y: model output data
+        :return: loss
+        """
+        mse = F.mse_loss(x, y, reduction='mean')
+        return mse
 
     def forward(self, x):
         y = self.encoder(x)
         y = self.decoder(y)
-        return {'target': y}
+        return y
 
     def inference(self, x):
-        """ Method for inferencing latent vector 
-        
-        Parameters:
-            x (torch.Tensor): input data from which 
-            
-        Return:
-            y ():  latent vector
-        """
-        print(f'x: {x}')
         y = self.encoder(x)
-        print(f'y: {y}')
         return y
+
+    def get_params(self) -> dict:
+        """
+        Function for returning model layer sizes
+        :return: dictionary with model layer sizes
+        """
+        return {
+            'model_encoder_layers': self._encoder_sizes,
+            'model_decoder_layers': self._decoder_sizes,
+            'model_latent': self._latent_size
+        }
 
 
 class Encoder(nn.Module):

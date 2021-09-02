@@ -1,0 +1,5 @@
+encoder:
+  layers: [1024, 256, 32]
+decoder:
+  layers: [32, 256, 1024]
+latent: 14
