@@ -1,5 +1,6 @@
 from typing import Callable
 
+import optuna
 import torch
 import traceback
 
@@ -23,6 +24,34 @@ def model_check(model, input_shape):
         return None
 
 
+def build_optuna_ae_config(trial: optuna.Trial, input_size: int) -> dict:
+    """
+    Function for building optuna trial config for autoencoder
+    :param trial: optuna trial object
+    :param input_size: data input size
+    :return: config dictionary
+    """
+    n_layers = trial.suggest_int('n_layers', 1, 4)
+    latent = trial.suggest_int('latent', 2, 16)
+
+    layers = []
+    dividers = []
+    dropouts = []
+    last_input_size = input_size
+    for i in range(n_layers):
+        dividers.append(trial.suggest_uniform(f'divider_{i}', 1, 3))
+        last_input_size = last_input_size // dividers[i]
+        layers.append(trial.suggest_int(f'layer_{i}', 1, max(last_input_size, latent)))
+        dropouts.append(trial.suggest_uniform(f'dropout_{i}', 0.1, 0.5))
+
+    return {
+        'encoder': {'layers': layers},
+        'decoder': {'layers': layers[::-1]},
+        'dropout': {'layers': dropouts},
+        'latent': latent
+    }
+
+
 class HiveModelFactory:
     """ Factory for ML models """
 
@@ -36,17 +65,20 @@ class HiveModelFactory:
         """
         encoder_layer_sizes = config.get('encoder', {'layers': [256, 32, 16]})
         decoder_layer_sizes = config.get('decoder', {'layers': [16, 32, 256]})
+        dropout_layer_probabilities = config.get('dropout', {'layers': [0.2, 0.2, 0.2]})
         latent_size = config.get('latent', 2)
 
         print(f'building ae model with config: encoder_layers({encoder_layer_sizes.get("layers")}),'
-              f' decoder_layer_sizes({decoder_layer_sizes.get("layers")}),  latent({latent_size})')
+              f' decoder_layer_sizes({decoder_layer_sizes.get("layers")}), latent({latent_size}),'
+              f' dropout({dropout_layer_probabilities.get("layers")})')
         return Autoencoder(encoder_layer_sizes.get("layers"), latent_size,
-                           decoder_layer_sizes.get("layers"), input_shape)
+                           decoder_layer_sizes.get("layers"), input_shape, dropout_layer_probabilities.get('layers'))
 
     @staticmethod
-    def build_model(model_type: HiveModelType, config: dict, input_shape: int) -> BaseModel:
+    def build_model(model_type: HiveModelType, input_shape: int, config: dict) -> BaseModel:
         """
         Method for building ML models
+        :param trail: optuna trail object
         :param model_type: model type enum
         :param config: dictionary for model config
         :param input_shape: data input shape

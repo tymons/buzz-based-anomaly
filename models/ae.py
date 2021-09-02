@@ -4,23 +4,25 @@ from torch import nn
 from models.base_model import BaseModel
 import torch.nn.functional as F
 
+from typing import Union, List
+
 
 class Autoencoder(BaseModel):
     """ Vanilla autoencoder """
-    def __init__(self, encoder_layer_sizes, latent_size, decoder_layer_sizes, input_size):
+
+    def __init__(self, encoder_layer_sizes: List[int], latent_size: int, decoder_layer_sizes: List[int],
+                 input_size: Union[int, tuple], dropout: Union[List[float], float] = 0.2):
         super().__init__()
 
-        assert type(encoder_layer_sizes) == list
-        assert type(latent_size) == int
-        assert type(decoder_layer_sizes) == list
-        assert type(input_size) == int
+        assert len(decoder_layer_sizes) == len(encoder_layer_sizes)
 
         self._encoder_sizes = encoder_layer_sizes
         self._decoder_sizes = decoder_layer_sizes
         self._latent_size = latent_size
+        self._dropout = [dropout] * len(encoder_layer_sizes) if isinstance(dropout, float) else dropout
 
-        self.encoder = EncoderWithLatent(encoder_layer_sizes, latent_size, input_size)
-        self.decoder = Decoder(decoder_layer_sizes, latent_size, input_size)
+        self.encoder = EncoderWithLatent(encoder_layer_sizes, latent_size, dropout, input_size)
+        self.decoder = Decoder(decoder_layer_sizes, latent_size, dropout, input_size)
 
     def loss_fn(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """
@@ -56,7 +58,7 @@ class Autoencoder(BaseModel):
 class Encoder(nn.Module):
     """ Class for encoder """
 
-    def __init__(self, layer_sizes, input_size):
+    def __init__(self, layer_sizes: List[int], dropout: List[float], input_size: Union[int, tuple]):
         super().__init__()
 
         self.MLP = nn.Sequential()
@@ -64,12 +66,11 @@ class Encoder(nn.Module):
         # input layer
         self.MLP.add_module(name=f"L{0}", module=nn.Linear(input_size, layer_sizes[0]))
         self.MLP.add_module(name=f"A{0}", module=nn.ReLU())
-        self.MLP.add_module(name=f"D{0}", module=nn.Dropout(p=0.1))
         # following layers
         for i, (in_size, out_size) in enumerate(zip(layer_sizes[:-1], layer_sizes[1:]), 1):
             self.MLP.add_module(name=f"L{i}", module=nn.Linear(in_size, out_size))
             self.MLP.add_module(name=f"A{i}", module=nn.ReLU())
-            self.MLP.add_module(name=f"D{i}", module=nn.Dropout(p=0.1))
+            self.MLP.add_module(name=f"D{i}", module=nn.Dropout(p=dropout[i]))
 
     def forward(self, x):
         x = self.MLP(x)
@@ -79,7 +80,8 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     """ Class for decoder """
 
-    def __init__(self, layer_sizes, latent_size, output_size):
+    def __init__(self, layer_sizes: List[int], latent_size: int, dropout: List[float],
+                 output_size: Union[int, tuple]):
         super().__init__()
 
         self.MLP = nn.Sequential()
@@ -88,7 +90,7 @@ class Decoder(nn.Module):
         for i, (in_size, out_size) in enumerate(zip([input_size] + layer_sizes[:-1], layer_sizes)):
             self.MLP.add_module(name=f"L{i}", module=nn.Linear(in_size, out_size))
             self.MLP.add_module(name=f"A{i}", module=nn.ReLU())
-            self.MLP.add_module(name=f"D{i}", module=nn.Dropout(p=0.1))
+            self.MLP.add_module(name=f"D{i}", module=nn.Dropout(p=dropout[i]))
         # output layer
         self.MLP.add_module(name=f"L{len(layer_sizes) + 1}", module=nn.Linear(layer_sizes[-1], output_size))
         self.MLP.add_module(name="sigmoid", module=nn.Sigmoid())
@@ -99,8 +101,9 @@ class Decoder(nn.Module):
 
 
 class EncoderWithLatent(Encoder):
-    def __init__(self, layer_sizes, latent_size, input_size):
-        super().__init__(layer_sizes, input_size)
+    def __init__(self, layer_sizes: List[int], latent_size: int, dropout: List[float],
+                 input_size: Union[int, tuple]):
+        super().__init__(layer_sizes, dropout, input_size)
         # add last fc layer to get latent vector
         self.latent_layer = nn.Linear(layer_sizes[-1], latent_size)
         self.relu = nn.ReLU()

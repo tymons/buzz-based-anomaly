@@ -17,7 +17,8 @@ from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 
 from models.model_type import HiveModelType
-from utils.model_factory import HiveModelFactory
+from utils.model_factory import HiveModelFactory, build_optuna_ae_config
+
 
 def _read_comet_key(path: Path) -> str:
     """
@@ -166,7 +167,7 @@ class ModelRunner:
 
         return sum(val_loss) / len(val_loss)
 
-    def find_best(self, model_type: HiveModelType, model_config:dict, input_shape: Union[int, tuple],
+    def find_best(self, model_type: HiveModelType, input_shape: Union[int, tuple],
                   learning_config: dict, n_trials=10) -> None:
         """
         Method for searching best architecture with oputa
@@ -178,7 +179,7 @@ class ModelRunner:
         """
         study = optuna.create_study(sampler=optuna.samplers.TPESampler(), direction='minimize')
         study.optimize(lambda op_trial: self._optuna_train_objective(
-            op_trial, model_type, model_config, input_shape, learning_config), n_trials=n_trials)
+            op_trial, model_type, input_shape, learning_config), n_trials=n_trials)
 
         pruned_trials = [t for t in study.trials if t.state == optuna.structs.TrialState.PRUNED]
         complete_trials = [t for t in study.trials if t.state == optuna.structs.TrialState.COMPLETE]
@@ -193,10 +194,11 @@ class ModelRunner:
 
         print("  Value: ", trial.value)
         print("  Params: ")
-        print(trial.params.items())
+        for key, value in trial.params.items():
+            print(f'    {key}:{value}')
 
-    def _optuna_train_objective(self, trial: optuna.Trial, model_type: HiveModelType, model_config: dict,
-                                input_shape: Union[int, tuple], learning_config: dict) -> float:
+    def _optuna_train_objective(self, trial: optuna.Trial, model_type: HiveModelType, input_shape: Union[int, tuple],
+                                learning_config: dict) -> float:
         """
         Method for optuna objective
         :param trial: optuna.trial.Trial object
@@ -204,8 +206,12 @@ class ModelRunner:
         :param config: configuration for the model
         :return: final loss
         """
-        model = HiveModelFactory.build_model(model_type, model_config, input_shape)
+        model_config = build_optuna_ae_config(trial, input_shape)
+        model = HiveModelFactory.build_model(model_type, input_shape, model_config)
+
         learning_config['learning_rate'] = trial.suggest_loguniform('lr', 1e-5, 1e-2)
+        learning_config['opitimizer'] = trial.suggest_categorical('optimizer',
+                                                                  ['Adam', 'SGD', 'RMSprop', 'Adagrad', 'Adadelta'])
 
         experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
                                             {**model.get_params(), **learning_config, **self.feature_config},
