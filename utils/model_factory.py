@@ -43,7 +43,6 @@ class HiveModelFactory:
         return Autoencoder(encoder_layer_sizes.get("layers"), latent_size,
                            decoder_layer_sizes.get("layers"), input_shape)
 
-
     @staticmethod
     def build_model(model_type: HiveModelType, config: dict, input_shape: int) -> BaseModel:
         """

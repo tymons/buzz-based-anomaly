@@ -56,10 +56,14 @@ def main():
         dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, sound_labels, feature_config)
         train_loader, val_loader = SoundFeatureFactory.build_train_and_validation_dataloader(dataset, args.batch_size)
 
-        model = HiveModelFactory.build_model(args.model, model_config, dataset[0][0][0].squeeze().shape[0])
         model_runner = ModelRunner(train_loader, val_loader, args.model_output, feature_config=feature_config,
                                    comet_config_file=args.comet_config, comet_project_name="bee-sound-anomaly")
-        model_runner.train(model, learning_config)
+        if args.search_best:
+            model_runner.find_best(args.model, model_config, dataset[0][0][0].squeeze().shape[0],
+                                   learning_config, n_trials=2)
+        else:
+            model = HiveModelFactory.build_model(args.model, model_config, dataset[0][0][0].squeeze().shape[0])
+            model = model_runner.train(model, learning_config)
 
 
 if __name__ == "__main__":
