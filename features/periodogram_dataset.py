@@ -2,14 +2,14 @@ import numpy as np
 
 from sklearn.preprocessing import MinMaxScaler
 
-from utils.features.sound_dataset import SoundDataset
+from features.sound_dataset import SoundDataset
 
 
 class PeriodogramDataset(SoundDataset):
     """ Periodogram dataset """
 
-    def __init__(self, filenames, hives, convert_db=False, normalize=False, slice_freq=None):
-        SoundDataset.__init__(self, filenames, hives)
+    def __init__(self, filenames, labels, convert_db=False, normalize=False, slice_freq=None):
+        SoundDataset.__init__(self, filenames, labels)
         self.slice_freq = slice_freq
         self.normalize = normalize  # should scale data to be within 0 and 1
         self.convert_db = convert_db  # should scale data to log amplitude
@@ -24,7 +24,6 @@ class PeriodogramDataset(SoundDataset):
     def get_item(self, idx):
         """ Function for getting periodogram """
         should_be_integers = self.convert_db
-        print(should_be_integers)
         sound_samples, sampling_rate, labels = SoundDataset.read_sound(self, idx=idx, raw=should_be_integers)
         periodogram = abs(np.fft.rfft(sound_samples, sampling_rate))[1:]
         if self.convert_db:
@@ -45,4 +44,4 @@ class PeriodogramDataset(SoundDataset):
     def __getitem__(self, idx):
         """ Method for pytorch dataloader """
         (periodogram, _), labels = self.get_item(idx)
-        return [periodogram[None, :]], labels
+        return periodogram[None, :], labels

@@ -1,28 +1,17 @@
-from enum import Enum
 from torch.utils.data import DataLoader, Dataset, random_split
 
-from utils.features.sound_dataset import SoundDataset
-from utils.features.periodogram_dataset import PeriodogramDataset
+from features.feature_type import SoundFeatureType
+from features.sound_dataset import SoundDataset
+from features.periodogram_dataset import PeriodogramDataset
 from typing import List, Callable
 from pathlib import Path
-
-
-class SoundFeatureType(Enum):
-    PERIODOGRAM = 'periodogram'
-
-    @classmethod
-    def from_name(cls, name):
-        for _, feature in SoundFeatureType.__members__.items():
-            if feature.value == name:
-                return feature
-        raise ValueError(f"{name} is not a valid feature name")
 
 
 class SoundFeatureFactory:
     """ Factory for data loaders """
 
     @staticmethod
-    def _get_periodogram_dataset(sound_filenames: List[Path], labels: List[str],
+    def _get_periodogram_dataset(sound_filenames: List[Path], labels: List[int],
                                  features_params_dict: dict) -> SoundDataset:
         """
         Function for building periodogram dataset
@@ -42,7 +31,7 @@ class SoundFeatureFactory:
                                   slice_freq=(frequencies.get('start'), frequencies.get('stop')))
 
     @staticmethod
-    def build_dataset(input_type: SoundFeatureType, sound_filenames: List[Path], labels: List[str],
+    def build_dataset(input_type: SoundFeatureType, sound_filenames: List[Path], labels: List[int],
                       features_params_dict: dict) -> (Dataset, dict):
         """
         Function for building dataset object based on given sound list
@@ -53,20 +42,29 @@ class SoundFeatureFactory:
         :return: SoundDataset, used feature params
         """
         method_name = f'_get_{input_type.value.lower()}_dataset'
-        function: Callable[[List[Path], List[str], dict], SoundDataset] \
+        function: Callable[[List[Path], List[int], dict], SoundDataset] \
             = getattr(SoundFeatureFactory, method_name, lambda: 'invalid dataset')
         dataset: SoundDataset = function(sound_filenames, labels, features_params_dict)
-        feature_params_dict = {f"FEATURE_{key}": val for key, val in dataset.get_params().items()}
 
-        return dataset, feature_params_dict
+        return dataset
 
     @staticmethod
-    def build_train_and_validation_dataloader(dataset, batch_size, ratio=0.15, num_workers=0):
+    def build_train_and_validation_dataloader(dataset: SoundDataset, batch_size: int,
+                                              ratio: float = 0.15, num_workers: int = 0) -> (DataLoader, DataLoader):
+        """
+        Building train and validation pytorch loader
+        :param dataset: Data
+        :param batch_size:
+        :param ratio: validation/train ratio
+        :param num_workers: pytorch number of dataloader workers
+        :return:
+        """
         val_amount = int(dataset.__len__() * ratio)
-        train_set, val_set = random_split(dataset, [(dataset.__len__() - val_amount), val_amount])
+        train_dataset, val_dataset = random_split(dataset, [(dataset.__len__() - val_amount), val_amount])
 
-        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, drop_last=True,
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True,
                                   num_workers=num_workers)
-        val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=num_workers)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, drop_last=True,
+                                num_workers=num_workers)
 
         return train_loader, val_loader

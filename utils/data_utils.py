@@ -66,7 +66,7 @@ def create_valid_sounds_datalist(root_folder, valid_file_filename='valid_sounds.
     return valid_dict_count
 
 
-def get_valid_sounds_datalist(folder_list: List[Path], valid_file_filename: str = 'valid_sounds.txt') -> List[Path]:
+def get_valid_sounds_from_folders(folder_list: List[Path], valid_file_filename: str = 'valid_sounds.txt') -> List[Path]:
     """
     Reads valid sounds files in specific directories. Note that files should exists,
     see create_valid_sounds_datalis method
@@ -112,7 +112,6 @@ def filter_string_list(paths: List[Path], *names: str) -> List[Path]:
     :return: list of filtered paths
     """
     return list(filter(lambda str_elem: (any(x in str_elem.stem for x in [*names])), paths))
-
 
 def batch_normalize(batch_data):
     """ Function for data normalization accross batch """
@@ -188,11 +187,3 @@ def truncate_lists_to_smaller_size(arg1, arg2):
         arg2 = arg2[:len(arg1)]
 
     return arg1, arg2
-
-
-def read_comet_api_key(config_file_fullpath):
-    """ Function for reading comet api key form file """
-    with open(config_file_fullpath, 'r') as f:
-        api_key = [b.split('=')[-1] for b in f.read().splitlines() if b.startswith('api_key')][0]
-
-    return api_key

@@ -5,15 +5,8 @@ from models.base_model import BaseModel
 import torch.nn.functional as F
 
 
-def ae_loss_fun(data_input, model_output_dict):
-    """ Function for calculating loss for vanilla autoencoders """
-    mse = F.mse_loss(data_input, model_output_dict['target'], reduction='mean')
-    return mse
-
-
 class Autoencoder(BaseModel):
     """ Vanilla autoencoder """
-
     def __init__(self, encoder_layer_sizes, latent_size, decoder_layer_sizes, input_size):
         super().__init__()
 
@@ -28,6 +21,16 @@ class Autoencoder(BaseModel):
 
         self.encoder = EncoderWithLatent(encoder_layer_sizes, latent_size, input_size)
         self.decoder = Decoder(decoder_layer_sizes, latent_size, input_size)
+
+    def loss_fn(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """
+        Method for calculating loss function for pytorch model
+        :param x: data input
+        :param y: model output data
+        :return: loss
+        """
+        mse = F.mse_loss(x, y, reduction='mean')
+        return mse
 
     def forward(self, x):
         y = self.encoder(x)

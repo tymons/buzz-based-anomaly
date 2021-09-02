@@ -3,21 +3,10 @@ from typing import Callable
 import torch
 import traceback
 
-from enum import Enum
+from models.model_type import HiveModelType
 from torchsummary import summary
-from torch.nn import Module
+from models.base_model import BaseModel
 from models.ae import Autoencoder
-
-
-class HiveModelType(Enum):
-    AE = 'autoencoder'
-
-    @classmethod
-    def from_name(cls, name):
-        for _, feature in HiveModelType.__members__.items():
-            if feature.value == name:
-                return feature
-        raise ValueError(f"{name} is not a valid supported model name")
 
 
 def model_check(model, input_shape):
@@ -38,7 +27,7 @@ class HiveModelFactory:
     """ Factory for ML models """
 
     @staticmethod
-    def _get_autoencoder_model(config: dict, input_shape: int) -> Module:
+    def _get_autoencoder_model(config: dict, input_shape: int) -> BaseModel:
         """
         Method for building vanilla autoencoder model
         :param config: config for model
@@ -54,8 +43,9 @@ class HiveModelFactory:
         return Autoencoder(encoder_layer_sizes.get("layers"), latent_size,
                            decoder_layer_sizes.get("layers"), input_shape)
 
+
     @staticmethod
-    def build_model(model_type: HiveModelType, config: dict, input_shape: int) -> Module:
+    def build_model(model_type: HiveModelType, config: dict, input_shape: int) -> BaseModel:
         """
         Method for building ML models
         :param model_type: model type enum
@@ -63,7 +53,7 @@ class HiveModelFactory:
         :param input_shape: data input shape
         :return:
         """
-        model_func: Callable[[dict, int], (Module, dict)] = \
+        model_func: Callable[[dict, int], (BaseModel, dict)] = \
             getattr(HiveModelFactory, f'_get_{model_type.value.lower()}_model',
                     lambda x, y: print('invalid model type!'))
         model = model_func(config, input_shape)
