@@ -2,7 +2,6 @@ import argparse
 import datetime
 
 import yaml
-import optuna
 
 from pathlib import Path
 from utils.model_runner import ModelRunner
@@ -34,10 +33,8 @@ def main():
     parser.add_argument('--model_output', default=Path(__file__).absolute().parent / "output/model", type=Path)
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--comet_config', default=Path(__file__).absolute().parent / ".comet.config", type=Path)
-    parser.add_argument('--search_best', dest='search_best', action='store_true',
-                        help="should use optuna to tune architecture")
+    parser.add_argument('--search_best', type=int, metavar='N', help="how many trials for searching best architecture")
 
-    parser.set_defaults(search_best=False)
     args = parser.parse_args()
 
     with args.feature_config.open('r') as fc, args.model_config.open('r') as mc, \
@@ -54,12 +51,17 @@ def main():
         available_labels = list(set([path.stem.split("-")[0] for path in sound_list]))
         sound_labels = [list(available_labels).index(sound_name.stem.split('-')[0]) for sound_name in sound_list]
         dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, sound_labels, feature_config)
+        data_shape = dataset[0][0][0].squeeze().shape[0]
         train_loader, val_loader = SoundFeatureFactory.build_train_and_validation_dataloader(dataset, args.batch_size)
 
-        model = HiveModelFactory.build_model(args.model, model_config, dataset[0][0][0].squeeze().shape[0])
         model_runner = ModelRunner(train_loader, val_loader, args.model_output, feature_config=feature_config,
                                    comet_config_file=args.comet_config, comet_project_name="bee-sound-anomaly")
-        model_runner.train(model, learning_config)
+        if args.search_best is not None:
+            model_runner.find_best(args.model, data_shape, learning_config, n_trials=args.search_best,
+                                   output_folder=Path('output/model'))
+        else:
+            model = HiveModelFactory.build_model(args.model, model_config, data_shape)
+            model = model_runner.train(model, learning_config)
 
 
 if __name__ == "__main__":

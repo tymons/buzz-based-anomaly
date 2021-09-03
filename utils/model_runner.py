@@ -1,3 +1,5 @@
+import sys
+
 from comet_ml import Experiment
 
 import torch
@@ -8,11 +10,14 @@ import math
 from pathlib import Path
 
 from models.base_model import BaseModel
-from typing import List, Callable
+from typing import List, Callable, Union
 from torch import nn
 
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
+
+from models.model_type import HiveModelType
+from utils.model_factory import HiveModelFactory, build_optuna_ae_config
 
 
 def _read_comet_key(path: Path) -> str:
@@ -91,9 +96,6 @@ class ModelRunner:
         self.feature_config = feature_config if feature_config is not None else {}
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def find_best(self, model):
-        pass
-
     def _setup_experiment(self, experiment_name: str, log_parameters: dict, tags: List[str]) -> Experiment:
         """
         Method for setting up the comet ml experiment
@@ -134,9 +136,9 @@ class ModelRunner:
             mean_loss.append(loss_float)
             experiment.log_metric("batch_train_loss", loss_float, step=epoch_no * batch_idx)
 
-            if batch_idx % logging_interval == 0:
+            if logging_interval != -1 and batch_idx % logging_interval == 0:
                 print(f'=== train epoch {epoch_no}, [{batch_idx * len(batch)}/{len(self.train_dataloader.dataset)}] '
-                      f'-> loss: {loss_float:.10f}')
+                      f'-> batch loss: {loss_float}')
         return sum(mean_loss) / len(mean_loss)
 
     def _val_step(self, model, experiment, epoch_no, logging_interval):
@@ -158,12 +160,92 @@ class ModelRunner:
             val_loss.append(loss_float)
             experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
 
-            if batch_idx % logging_interval == 0:
+            if logging_interval != -1 and batch_idx % logging_interval == 0:
                 print(f'=== validation epoch {epoch_no}, '
                       f'[{batch_idx * len(batch)}/{len(self.train_dataloader.dataset)}]'
-                      f'-> loss: {loss.item():.10f} ===')
+                      f'-> batch loss: {loss.item()} ===')
 
         return sum(val_loss) / len(val_loss)
+
+    def find_best(self, model_type: HiveModelType, input_shape: Union[int, tuple],
+                  learning_config: dict, n_trials=10,
+                  output_folder: Path = Path(__file__).parents[1].absolute()) -> None:
+        """
+        Method for searching best architecture with oputa
+        :param model_type: autoencoder model type
+        :param input_shape: data input shape
+        :param learning_config: train config
+        :param n_trials: how many trials should be performed for optuna search
+        :param output_folder: folder where best architecture config will be saved
+        """
+        study = optuna.create_study(sampler=optuna.samplers.TPESampler(), direction='minimize')
+        study.optimize(lambda op_trial: self._optuna_train_objective(
+            op_trial, model_type, input_shape, learning_config), n_trials=n_trials)
+
+        pruned_trials = [t for t in study.trials if t.state == optuna.structs.TrialState.PRUNED]
+        complete_trials = [t for t in study.trials if t.state == optuna.structs.TrialState.COMPLETE]
+
+        best_architecture_file = Path(output_folder) / Path(f"{model_type.value.lower()}"
+                                                            f"-{time.strftime('%Y%m%d-%H%M%S')}.config")
+        print("Study statistics: ")
+        print("  Number of finished trials: ", len(study.trials))
+        print("  Number of pruned trials: ", len(pruned_trials))
+        print("  Number of complete trials: ", len(complete_trials))
+
+        print("Best trial:")
+        trial = study.best_trial
+
+        with best_architecture_file.open('w+') as f:
+            f.write(f'Best loss: {str(trial.value)} \r\n')
+            f.write(f'Params: \r\n')
+            print("  Value: ", trial.value)
+            print("  Params: ")
+            for key, value in trial.params.items():
+                print(f'    {key}:{value}')
+                f.write(f'    {key}:{value} \r\n')
+
+    def _optuna_train_objective(self, trial: optuna.Trial, model_type: HiveModelType, input_shape: Union[int, tuple],
+                                learning_config: dict) -> float:
+        """
+        Method for optuna objective
+        :param trial: optuna.trial.Trial object
+        :param model: model to be adjusted
+        :param config: configuration for the model
+        :return: final loss
+        """
+        model_config = build_optuna_ae_config(trial, input_shape)
+        model = HiveModelFactory.build_model(model_type, input_shape, model_config)
+
+        learning_config['learning_rate'] = trial.suggest_loguniform('lr', 1e-5, 1e-2)
+        learning_config['opitimizer'] = trial.suggest_categorical('optimizer',
+                                                                  ['Adam', 'SGD', 'RMSprop', 'Adagrad', 'Adadelta'])
+
+        experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
+                                            {**model.get_params(), **learning_config, **self.feature_config},
+                                            ['optuna'])
+
+        print(f'performing optuna train task on {self.device}(s) ({torch.cuda.device_count()})'
+              f' for model {type(model).__name__.lower()} with following config: {learning_config}')
+        if torch.cuda.device_count() > 1:
+            model = nn.DataParallel(model)
+        model = model.to(self.device)
+
+        optimizer: Optimizer = _parse_optimizer(learning_config['optimizer'].get('type', 'Adam'))(
+            model.parameters(), lr=learning_config['learning_rate'])
+        batch_logging_interval = learning_config.get('logging_batch_interval', 10)
+        train_epoch_loss = sys.maxsize
+        for epoch in range(1, learning_config.get('epochs', 10) + 1):
+            train_epoch_loss = self._train_step(model, optimizer, experiment, epoch, batch_logging_interval)
+            experiment.log_metric('train_epoch_loss', train_epoch_loss, step=epoch)
+            print(f'--- train epoch {epoch} end with train loss: {train_epoch_loss} ---')
+
+            trial.report(train_epoch_loss, epoch)
+            if trial.should_prune():
+                raise optuna.exceptions.TrialPruned()
+
+        del model
+
+        return train_epoch_loss
 
     def train(self, model: BaseModel, config: dict) -> BaseModel:
         """
@@ -178,7 +260,7 @@ class ModelRunner:
                                             {**model.get_params(), **config, **self.feature_config}, [])
         checkpoint_path = self.output_folder / f'{experiment.get_name()}-checkpoint.pth'
 
-        print(f'performing train task on {self.device}:{torch.cuda.device_count()}'
+        print(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
               f' for model {checkpoint_path.stem.upper()} with following config: {config}')
         if torch.cuda.device_count() > 1:
             model = nn.DataParallel(model)
@@ -196,6 +278,7 @@ class ModelRunner:
             val_epoch_loss = self._val_step(model, experiment, epoch, batch_logging_interval)
             experiment.log_metric('val_epoch_loss', val_epoch_loss, step=epoch)
 
+            print(f'--- train epoch {epoch} end with train loss: {train_epoch_loss} and val loss: {val_epoch_loss} ---')
             if val_epoch_loss < best_val_loss or best_val_loss == -1:
                 print(f'*** model checkpoint at epoch {epoch} ***')
                 best_val_loss = val_epoch_loss
