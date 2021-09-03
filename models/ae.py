@@ -51,7 +51,8 @@ class Autoencoder(BaseModel):
         return {
             'model_encoder_layers': self._encoder_sizes,
             'model_decoder_layers': self._decoder_sizes,
-            'model_latent': self._latent_size
+            'model_latent': self._latent_size,
+            'model_dropouts': self._dropout
         }
 
 

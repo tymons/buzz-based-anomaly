@@ -13,15 +13,9 @@ from models.ae import Autoencoder
 def model_check(model, input_shape):
     """ Function for model check """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    try:
-        summary(model.to(device), input_shape)
-        print(f'model check success! {model}')
-        return model
-    except Exception as e:
-        print('model self-check failure!')
-        print(traceback.print_exc())
-        print(e)
-        return None
+    summary(model.to(device), input_shape)
+    print(f'model check success! {model}')
+    return model
 
 
 def build_optuna_ae_config(trial: optuna.Trial, input_size: int) -> dict:
@@ -40,8 +34,9 @@ def build_optuna_ae_config(trial: optuna.Trial, input_size: int) -> dict:
     last_input_size = input_size
     for i in range(n_layers):
         dividers.append(trial.suggest_uniform(f'divider_{i}', 1, 3))
-        last_input_size = last_input_size // dividers[i]
-        layers.append(trial.suggest_int(f'layer_{i}', 1, max(last_input_size, latent)))
+        layer_size = trial.suggest_int(f'layer_{i}', 1, max(int(last_input_size // dividers[i]), latent))
+        last_input_size = layer_size
+        layers.append(layer_size)
         dropouts.append(trial.suggest_uniform(f'dropout_{i}', 0.1, 0.5))
 
     return {
