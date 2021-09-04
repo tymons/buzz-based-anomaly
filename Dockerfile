@@ -23,11 +23,6 @@ RUN conda --version
 
 COPY ./environment.yml /tmp/environment.yml
 RUN conda env create --name pytorch-cuda-env -f /tmp/environment.yml
-
-# manually install pytorch because environmet.yml is not working (reported bug)
-# RUN conda install -n pytorch-cuda-env pytorch cudatoolkit=10.2 -c pytorch
-# RUN conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c conda-forge
-
 RUN echo "conda activate pytorch-cuda-env" >> ~/.bashrc
 
 ENV PATH /opt/conda/envs/pytorch-cuda-env/bin:$PATH
