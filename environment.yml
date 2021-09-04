@@ -7,7 +7,7 @@ channels:
 dependencies:
   - python==3.8.5
   - numpy
-  - cudatoolkit=${CUDA_VERSION}
+  - cudatoolkit=11.1
   - pytorch
   - scikit-learn
   - pyyaml
