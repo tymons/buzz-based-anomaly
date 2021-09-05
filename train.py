@@ -1,5 +1,6 @@
+import os
 import argparse
-import datetime
+import logging
 
 import yaml
 
@@ -12,6 +13,25 @@ from features.feature_type import SoundFeatureType
 from utils.model_factory import HiveModelFactory
 from utils.feature_factory import SoundFeatureFactory
 from utils.data_utils import get_valid_sounds_from_folders, filter_string_list, filter_by_datetime
+from datetime import datetime
+
+
+def logger_setup(log_folder: Path, filename_prefix: str) -> None:
+    """
+    Method for setting up python logger
+    :param log_folder: folder where logs will be saved
+    :param filename_prefix: log file filename prefix
+    """
+    log_level = os.environ.get('LOGLEVEL', 'DEBUG').upper()
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        handlers=[
+            logging.FileHandler(log_folder / f"{filename_prefix}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                                             f"-{log_level}.log"),
+            logging.StreamHandler()
+        ]
+    )
 
 
 def main():
@@ -24,7 +44,7 @@ def main():
     parser.add_argument('root_folder', metavar='root_folder', type=Path, help='Root folder for data')
     # optional arguments
     parser.add_argument('--filter_hives', default=[], nargs='+', help="Hive names to be excluded from dataset")
-    parser.add_argument('--filter_dates', nargs=2, type=datetime.datetime.fromisoformat,
+    parser.add_argument('--filter_dates', nargs=2, type=datetime.fromisoformat,
                         help="Start and end date for sound data with format YYYY-MM-DD", metavar='START_DATE END_DATE')
     parser.add_argument('--model_config', default=Path(__file__).absolute().parent / "model_config.yml", type=Path)
     parser.add_argument('--feature_config', default=Path(__file__).absolute().parent / "feature_config.yml", type=Path)
@@ -34,8 +54,11 @@ def main():
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--comet_config', default=Path(__file__).absolute().parent / ".comet.config", type=Path)
     parser.add_argument('--search_best', type=int, metavar='N', help="how many trials for searching best architecture")
+    parser.add_argument('--log_folder', default=Path(__file__).absolute().parent / "output/", type=Path)
 
     args = parser.parse_args()
+
+    logger_setup(args.log_folder, f"{args.model.value}-{args.feature.value}")
 
     with args.feature_config.open('r') as fc, args.model_config.open('r') as mc, \
             args.learning_config.open('r') as lc:
