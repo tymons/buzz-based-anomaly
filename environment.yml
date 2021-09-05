@@ -13,6 +13,7 @@ dependencies:
   - pyyaml
   - comet_ml
   - optuna
+  - pydub
   - pip
   - pip:
     - torchsummary
