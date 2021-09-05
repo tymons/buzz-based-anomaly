@@ -1,3 +1,5 @@
+import logging
+
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from features.feature_type import SoundFeatureType
@@ -24,8 +26,9 @@ class SoundFeatureFactory:
         convert_db = features_params_dict.get('convert_db', False)
         normalize = features_params_dict.get('normalize', True)
 
-        print(f'building periodogram dataset of length {len(sound_filenames)} with params: db_scale({convert_db}),'
-              f' min_max_scale({normalize}), slice_freq({(frequencies.get("start"), frequencies.get("stop"))})')
+        logging.debug(f'building periodogram dataset of length {len(sound_filenames)}'
+                      f' with params: db_scale({convert_db}), min_max_scale({normalize}),'
+                      f' slice_freq({(frequencies.get("start"), frequencies.get("stop"))})')
 
         return PeriodogramDataset(sound_filenames, labels, convert_db, normalize,
                                   slice_freq=(frequencies.get('start'), frequencies.get('stop')))

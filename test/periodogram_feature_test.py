@@ -21,8 +21,7 @@ class TestPeriodogramMethods(unittest.TestCase):
             'normalize': False
         }
         dataset = SoundFeatureFactory.build_dataset(SoundFeatureType.from_name('periodogram'),
-                                                    [self.filename_10kHz], ['DEADBEEF'],
-                                                    config)
+                                                    [self.filename_10kHz], [1], config)
 
         (periodogram, frequencies), _ = dataset.get_item(0)
         self.assertEqual(10000, frequencies[np.argmax(periodogram)], "fundamental frequency should be 10kHz")
@@ -37,8 +36,7 @@ class TestPeriodogramMethods(unittest.TestCase):
             'normalize': False
         }
         dataset = SoundFeatureFactory.build_dataset(SoundFeatureType.from_name('periodogram'),
-                                                    [self.filename_440Hz], ['DEADBEEF'],
-                                                    config)
+                                                    [self.filename_440Hz], [1], config)
 
         (periodogram, frequencies), _ = dataset.get_item(0)
         self.assertEqual(440, frequencies[np.argmax(periodogram)], "fundamental frequency should be 440Hz")
@@ -53,8 +51,7 @@ class TestPeriodogramMethods(unittest.TestCase):
             'normalize': True
         }
         dataset = SoundFeatureFactory.build_dataset(SoundFeatureType.from_name('periodogram'),
-                                                    [self.filename_10kHz, self.filename_440Hz], ['1', '1'],
-                                                    config)
+                                                    [self.filename_10kHz, self.filename_440Hz], [1, 1], config)
 
         (periodogram_10kHz, frequencies_10kHz), _ = dataset.get_item(0)
         self.assertEqual(10000, frequencies_10kHz[np.argmax(periodogram_10kHz)],
@@ -73,8 +70,7 @@ class TestPeriodogramMethods(unittest.TestCase):
             'normalize': False
         }
         dataset = SoundFeatureFactory.build_dataset(SoundFeatureType.from_name('periodogram'),
-                                                    [self.filename_10kHz, self.filename_440Hz], ['1', '1'],
-                                                    config)
+                                                    [self.filename_10kHz, self.filename_440Hz], [1, 1], config)
 
         (periodogram_10kHz, frequencies_10kHz), _ = dataset.get_item(0)
         self.assertEqual(10000, frequencies_10kHz[np.argmax(periodogram_10kHz)],

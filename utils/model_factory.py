@@ -1,20 +1,19 @@
-from typing import Callable
-
+import logging
 import optuna
 import torch
-import traceback
 
 from models.model_type import HiveModelType
 from torchsummary import summary
 from models.base_model import BaseModel
 from models.ae import Autoencoder
+from typing import Callable
 
 
 def model_check(model, input_shape):
     """ Function for model check """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     summary(model.to(device), input_shape)
-    print(f'model check success! {model}')
+    logging.debug(f'model check success! {model}')
     return model
 
 
@@ -63,9 +62,9 @@ class HiveModelFactory:
         dropout_layer_probabilities = config.get('dropout', {'layers': [0.2, 0.2, 0.2]})
         latent_size = config.get('latent', 2)
 
-        print(f'building ae model with config: encoder_layers({encoder_layer_sizes.get("layers")}),'
-              f' decoder_layer_sizes({decoder_layer_sizes.get("layers")}), latent({latent_size}),'
-              f' dropout({dropout_layer_probabilities.get("layers")})')
+        logging.debug(f'building ae model with config: encoder_layers({encoder_layer_sizes.get("layers")}),'
+                      f' decoder_layer_sizes({decoder_layer_sizes.get("layers")}), latent({latent_size}),'
+                      f' dropout({dropout_layer_probabilities.get("layers")})')
         return Autoencoder(encoder_layer_sizes.get("layers"), latent_size,
                            decoder_layer_sizes.get("layers"), input_shape, dropout_layer_probabilities.get('layers'))
 
@@ -81,7 +80,7 @@ class HiveModelFactory:
         """
         model_func: Callable[[dict, int], (BaseModel, dict)] = \
             getattr(HiveModelFactory, f'_get_{model_type.value.lower()}_model',
-                    lambda x, y: print('invalid model type!'))
+                    lambda x, y: logging.error('invalid model type!'))
         model = model_func(config, input_shape)
 
         return model_check(model, (1, 1, input_shape))
