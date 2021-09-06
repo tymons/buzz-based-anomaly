@@ -69,10 +69,13 @@ class HiveModelFactory:
                            decoder_layer_sizes.get("layers"), input_shape, dropout_layer_probabilities.get('layers'))
 
     @staticmethod
+    def _get_conv1d_autoencoder_model(config: dict, input_shape) -> BaseModel:
+        pass
+
+    @staticmethod
     def build_model(model_type: HiveModelType, input_shape: int, config: dict) -> BaseModel:
         """
         Method for building ML models
-        :param trail: optuna trail object
         :param model_type: model type enum
         :param config: dictionary for model config
         :param input_shape: data input shape
@@ -82,5 +85,14 @@ class HiveModelFactory:
             getattr(HiveModelFactory, f'_get_{model_type.value.lower()}_model',
                     lambda x, y: logging.error('invalid model type!'))
         model = model_func(config, input_shape)
+        return model
 
-        return model_check(model, (1, 1, input_shape))
+    @staticmethod
+    def build_model_and_check(model_type: HiveModelType, input_shape: int, config: dict) -> BaseModel:
+        """
+        Method for building and verifying model
+        :param model_type: model type enum
+        :param config: dictionary for model config
+        :param input_shape: data input shape
+        """
+        return model_check(HiveModelFactory.build_model(model_type, input_shape, config), (1, 1, input_shape))
