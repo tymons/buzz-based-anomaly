@@ -1,18 +1,17 @@
 import logging
 import optuna
-import torch
 
 from models.model_type import HiveModelType
 from torchsummary import summary
 from models.base_model import BaseModel
 from models.ae import Autoencoder
+from models.conv1d_ae import Conv1DAE
 from typing import Callable
 
 
-def model_check(model, input_shape):
+def model_check(model, input_shape, device="cuda"):
     """ Function for model check """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    summary(model.to(device), input_shape)
+    summary(model, input_shape, device=device)
     logging.debug(f'model check success! {model}')
     return model
 
@@ -69,8 +68,22 @@ class HiveModelFactory:
                            decoder_layer_sizes.get("layers"), input_shape, dropout_layer_probabilities.get('layers'))
 
     @staticmethod
-    def _get_conv1d_autoencoder_model(config: dict, input_shape) -> BaseModel:
-        pass
+    def _get_conv1d_autoencoder_model(config: dict, input_size: int) -> BaseModel:
+        """
+        Method for building 1D convolutional Autoencoder
+        :param config: model config
+        :param input_size: input size
+        :return: model
+        """
+        encoder = config.get('layers', [256, 64, 16])
+        dropout = config.get('dropout', [0.1, 0.1, 0.1])
+        latent_size = config.get('latent', 2)
+        kernel = config.get('kernel', 2)
+        padding = config.get('padding', 0)
+        max_pool = config.get('max_pool', 2)
+
+        return Conv1DAE(encoder, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
+                        input_size=input_size, max_pool=max_pool)
 
     @staticmethod
     def build_model(model_type: HiveModelType, input_shape: int, config: dict) -> BaseModel:

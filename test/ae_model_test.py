@@ -13,7 +13,7 @@ class TestModelFactoryMethods(unittest.TestCase):
             'latent': 8
         }
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('autoencoder'), input_size, config)
-        self.assertIsNotNone(model_check(model, (1, 1, input_size)), "model verification failed!")
+        self.assertIsNotNone(model_check(model, (1, input_size)), "model verification failed!")
         self.assertListEqual(model.get_params().get('model_encoder_layers'), config['encoder']['layers'])
         self.assertListEqual(model.get_params().get('model_decoder_layers'), config['decoder']['layers'])
         self.assertEqual(model.get_params().get('model_latent'), config['latent'])
