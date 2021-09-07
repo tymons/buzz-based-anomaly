@@ -1,5 +1,4 @@
 import unittest
-
 import torch
 
 from models.base_model import BaseModel

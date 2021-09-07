@@ -1,7 +1,6 @@
 from models.base_model import BaseModel
 from torch import nn, functional
 from typing import List
-from functools import reduce
 
 
 def _conv1d_block(in_f: int, out_f: int, dropout_prob: float, *args, **kwargs):
