@@ -1,7 +1,5 @@
-encoder:
-  layers: [1024, 256, 32]
-decoder:
-  layers: [32, 256, 1024]
-dropout:
-  layers: [0.3, 0.3, 0.3]
+layers: [1024, 256, 32]
+dropout: [0.3, 0.3, 0.3]
 latent: 14
+kernel: 3
+padding: 1
