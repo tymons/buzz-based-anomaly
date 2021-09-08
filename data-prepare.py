@@ -1,6 +1,7 @@
 # %%
-import errno
 import os
+import errno
+import logging
 import requests
 import argparse
 
@@ -28,7 +29,7 @@ def generate_wav_from_mp3(mp3_filepath: Path, remove_mp3: bool = False):
         try:
             mp3_filepath.unlink()
         except OSError as e:
-            print(f'Error at deleting mp3 file: {mp3_filepath} with {e.strerror}')
+            logging.error(f'Error at deleting mp3 file: {mp3_filepath} with {e.strerror}')
 
     return new_wav_filename
 
@@ -61,7 +62,7 @@ def extract_bees_sounds_from_file(labfile_path: Path, output_folder: Path):
                     output_filenames.append(output_filename)
             return output_filenames
         except IndexError:
-            print(f'file {sound_filenames[0]} not supported for wav conversion! only mp3 format supported!')
+            logging.error(f'file {sound_filenames[0]} not supported for wav conversion! only mp3 format supported!')
             return []
 
 
@@ -71,13 +72,13 @@ def prepare_nuhive_data(path: Path):
     :param path:  where
     """
     files = list(path.glob('**/*.lab'))
-    print(f'got  {len(files)} lab files to process')
+    logging.info(f'got  {len(files)} lab files to process')
     for file_path in files:
         try:
             new_filenames = extract_bees_sounds_from_file(Path(file_path), path.parent / 'nu-hive-processed')
-            print(f'generated {len(new_filenames)} from {file_path} file!')
+            logging.info(f'generated {len(new_filenames)} from {file_path} file!')
         except FileNotFoundError:
-            print(f'missing sound file for {file_path}.')
+            logging.warning(f'missing sound file for {file_path}.')
 
 
 def _download_data(download_folder: Path, start_utc_timestamp: int, end_utc_timestamp: int, hive_sn: str, api_url: str,
@@ -117,7 +118,7 @@ def prepare_smartula_data(dataset_path: Path, start_utc_imestamp: int, end_utc_t
     intervals = list(zip(timestamps[:-1], timestamps[1:]))
 
     for hive_sn in hive_list:
-        print(f'downloading data for {hive_sn} hive...', flush=True)
+        logging.debug(f'downloading data for {hive_sn} hive...', flush=True)
         hive_path = dataset_path / hive_sn
         hive_path.mkdir(parents=True, exist_ok=True)
         for start, end in tqdm(intervals):
@@ -128,7 +129,7 @@ def prepare_smartula_data(dataset_path: Path, start_utc_imestamp: int, end_utc_t
             try:
                 file_path.unlink()
             except OSError as e:
-                print(f'Error: {file_path} : {e.strerror}')
+                logging.error(f'Error: {file_path} : {e.strerror}')
 
     create_valid_sounds_datalist(dataset_path)
 

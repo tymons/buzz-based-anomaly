@@ -2,7 +2,8 @@ from enum import Enum
 
 
 class HiveModelType(Enum):
-    AE = 'autoencoder'
+    AE: str = 'autoencoder'
+    CONV1D_AE: str = 'conv1d_autoencoder'
 
     @classmethod
     def from_name(cls, name):
