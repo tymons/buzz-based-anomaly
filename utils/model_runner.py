@@ -155,6 +155,7 @@ class ModelRunner:
         val_loss = []
         model.eval()
         for batch_idx, (batch, _) in enumerate(self.val_dataloader):
+            batch = batch.to(self.device)
             model_output = model(batch)
             loss = model.loss_fn(batch, model_output)
 
