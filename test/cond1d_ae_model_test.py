@@ -1,23 +1,32 @@
 import unittest
 import torch
+from typing import Tuple
 
 from models.base_model import BaseModel
 from models.model_type import HiveModelType
 from utils.model_factory import HiveModelFactory, model_check
 
 
+def get_default_config() -> Tuple[dict, int]:
+    """
+    Function for getting default config along with default input size
+    :return: config, input_size
+    """
+    return {
+               'layers': [64, 32, 16],
+               'dropout': [0.3, 0.3, 0.3],
+               'latent': 8,
+               'kernel': 4,
+               'padding': 2,
+               'max_pool': 2
+           }, 2048
+
+
 class Conv1DAeModelTest(unittest.TestCase):
 
     def test_model_is_build_basic_setup(self):
-        input_size = 2048
-        config = {
-            'layers': [64, 32, 16],
-            'dropout': [0.3, 0.3, 0.3],
-            'latent': 8,
-            'kernel': 4,
-            'padding': 2,
-            'max_pool': 2
-        }
+        config, input_size = get_default_config()
+
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_autoencoder'), input_size,
                                                         config)
 
@@ -32,15 +41,9 @@ class Conv1DAeModelTest(unittest.TestCase):
         self.assertEqual(model(torch.empty(size=(1, 1, input_size))).shape[2], input_size)
 
     def test_model_is_build_different_input_size(self):
+        config, _ = get_default_config()
         input_size = 4523
-        config = {
-            'layers': [64, 32, 16],
-            'dropout': [0.3, 0.3, 0.3],
-            'latent': 8,
-            'kernel': 4,
-            'padding': 2,
-            'max_pool': 2
-        }
+
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_autoencoder'), input_size,
                                                         config)
 
@@ -55,15 +58,9 @@ class Conv1DAeModelTest(unittest.TestCase):
         self.assertEqual(model(torch.empty(size=(1, 1, input_size))).shape[2], input_size)
 
     def test_model_is_build_bigger_max_pool(self):
-        input_size = 2048
-        config = {
-            'layers': [64, 32, 16],
-            'dropout': [0.3, 0.3, 0.3],
-            'latent': 8,
-            'kernel': 4,
-            'padding': 2,
-            'max_pool': 5
-        }
+        config, input_size = get_default_config()
+        config['max_pool'] = 5
+
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_autoencoder'), input_size,
                                                         config)
 
@@ -78,15 +75,9 @@ class Conv1DAeModelTest(unittest.TestCase):
         self.assertEqual(model(torch.empty(size=(1, 1, input_size))).shape[2], input_size)
 
     def test_model_is_build_different_padding(self):
-        input_size = 2048
-        config = {
-            'layers': [64, 32, 16],
-            'dropout': [0.3, 0.3, 0.3],
-            'latent': 8,
-            'kernel': 4,
-            'padding': 4,
-            'max_pool': 5
-        }
+        config, input_size = get_default_config()
+        config['padding'] = 4
+
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_autoencoder'), input_size,
                                                         config)
 
@@ -101,15 +92,9 @@ class Conv1DAeModelTest(unittest.TestCase):
         self.assertEqual(model(torch.empty(size=(1, 1, input_size))).shape[2], input_size)
 
     def test_model_is_build_different_kernel(self):
-        input_size = 2048
-        config = {
-            'layers': [64, 32, 16],
-            'dropout': [0.3, 0.3, 0.3],
-            'latent': 8,
-            'kernel': 6,
-            'padding': 4,
-            'max_pool': 5
-        }
+        config, input_size = get_default_config()
+        config['kernel'] = 6
+
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_autoencoder'), input_size,
                                                         config)
 

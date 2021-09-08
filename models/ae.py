@@ -10,19 +10,16 @@ from typing import Union, List
 class Autoencoder(BaseModel):
     """ Vanilla autoencoder """
 
-    def __init__(self, encoder_layer_sizes: List[int], latent_size: int, decoder_layer_sizes: List[int],
-                 input_size: Union[int, tuple], dropout: Union[List[float], float] = 0.2):
+    def __init__(self, layers: List[int], latent_size: int, input_size: Union[int, tuple],
+                 dropout: Union[List[float], float] = 0.2):
         super().__init__()
 
-        assert len(decoder_layer_sizes) == len(encoder_layer_sizes)
-
-        self._encoder_sizes = encoder_layer_sizes
-        self._decoder_sizes = decoder_layer_sizes
+        self._layers = layers
         self._latent_size = latent_size
-        self._dropout = [dropout] * len(encoder_layer_sizes) if isinstance(dropout, float) else dropout
+        self._dropout = [dropout] * len(layers) if isinstance(dropout, float) else dropout
 
-        self.encoder = EncoderWithLatent(encoder_layer_sizes, latent_size, dropout, input_size)
-        self.decoder = Decoder(decoder_layer_sizes, latent_size, dropout, input_size)
+        self.encoder = EncoderWithLatent(layers, latent_size, dropout, input_size)
+        self.decoder = Decoder(layers[::-1], latent_size, dropout, input_size)
 
     def loss_fn(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """
@@ -49,8 +46,7 @@ class Autoencoder(BaseModel):
         :return: dictionary with model layer sizes
         """
         return {
-            'model_encoder_layers': self._encoder_sizes,
-            'model_decoder_layers': self._decoder_sizes,
+            'model_layers': self._layers,
             'model_latent': self._latent_size,
             'model_dropouts': self._dropout
         }

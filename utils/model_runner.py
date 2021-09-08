@@ -155,6 +155,7 @@ class ModelRunner:
         val_loss = []
         model.eval()
         for batch_idx, (batch, _) in enumerate(self.val_dataloader):
+            batch = batch.to(self.device)
             model_output = model(batch)
             loss = model.loss_fn(batch, model_output)
 
@@ -215,7 +216,7 @@ class ModelRunner:
         :param config: configuration for the model
         :return: final loss
         """
-        model_config = build_optuna_ae_config(trial, input_shape)
+        model_config = build_optuna_ae_config(model_type, input_shape, trial)
         try:
             model = HiveModelFactory.build_model_and_check(model_type, input_shape, model_config)
             learning_config['learning_rate'] = trial.suggest_loguniform('lr', 1e-5, 1e-2)
