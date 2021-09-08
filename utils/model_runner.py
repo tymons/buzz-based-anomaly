@@ -216,7 +216,7 @@ class ModelRunner:
         :param config: configuration for the model
         :return: final loss
         """
-        model_config = build_optuna_ae_config(trial, input_shape)
+        model_config = build_optuna_ae_config(model_type, input_shape, trial)
         try:
             model = HiveModelFactory.build_model_and_check(model_type, input_shape, model_config)
             learning_config['learning_rate'] = trial.suggest_loguniform('lr', 1e-5, 1e-2)

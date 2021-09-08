@@ -16,9 +16,10 @@ def model_check(model, input_shape, device="cuda"):
     return model
 
 
-def build_optuna_ae_config(trial: optuna.Trial, input_size: int) -> dict:
+def build_optuna_ae_config(model_type: HiveModelType, input_size: int, trial: optuna.Trial) -> dict:
     """
     Function for building optuna trial config for autoencoder
+    :param model_type: model type
     :param trial: optuna trial object
     :param input_size: data input size
     :return: config dictionary
@@ -37,12 +38,19 @@ def build_optuna_ae_config(trial: optuna.Trial, input_size: int) -> dict:
         layers.append(layer_size)
         dropouts.append(trial.suggest_uniform(f'dropout_{i}', 0.1, 0.5))
 
-    return {
-        'encoder': {'layers': layers},
-        'decoder': {'layers': layers[::-1]},
-        'dropout': {'layers': dropouts},
+    config: dict = {
+        'layers': layers,
+        'dropout': dropouts,
         'latent': latent
     }
+
+    if model_type.value.startswith('conv'):
+        kernel: int = trial.suggest_int('kernel', 2, 8)
+        config['padding'] = trial.suggest_int('padding', 0, kernel)
+        config['max_pool'] = trial.suggest_int('max_pool', 2, kernel)
+        config['kernel'] = kernel
+
+    return config
 
 
 class HiveModelFactory:

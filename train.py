@@ -53,7 +53,7 @@ def main():
     parser.add_argument('--model_output', default=Path(__file__).absolute().parent / "output/model", type=Path)
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--comet_config', default=Path(__file__).absolute().parent / ".comet.config", type=Path)
-    parser.add_argument('--search_best', type=int, metavar='N', help="how many trials for searching best architecture")
+    parser.add_argument('--find_best', type=int, metavar='N', help="how many trials for finding best architecture")
     parser.add_argument('--log_folder', default=Path(__file__).absolute().parent / "output/", type=Path)
 
     args = parser.parse_args()
@@ -79,8 +79,8 @@ def main():
 
         model_runner = ModelRunner(train_loader, val_loader, args.model_output, feature_config=feature_config,
                                    comet_config_file=args.comet_config, comet_project_name="bee-sound-anomaly")
-        if args.search_best is not None:
-            model_runner.find_best(args.model, data_shape, learning_config, n_trials=args.search_best,
+        if args.find_best is not None:
+            model_runner.find_best(args.model, data_shape, learning_config, n_trials=args.find_best,
                                    output_folder=Path('output/model'))
         else:
             model = HiveModelFactory.build_model_and_check(args.model, data_shape, model_config)
