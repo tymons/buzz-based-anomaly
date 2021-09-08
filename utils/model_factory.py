@@ -56,16 +56,13 @@ class HiveModelFactory:
         :param input_shape: data input shape
         :return: model, config used
         """
-        encoder_layer_sizes = config.get('encoder', {'layers': [256, 32, 16]})
-        decoder_layer_sizes = config.get('decoder', {'layers': [16, 32, 256]})
-        dropout_layer_probabilities = config.get('dropout', {'layers': [0.2, 0.2, 0.2]})
+        layers = config.get('layers', [256, 32, 16])
+        dropouts = config.get('dropout',[0.2, 0.2, 0.2])
         latent_size = config.get('latent', 2)
 
-        logging.debug(f'building ae model with config: encoder_layers({encoder_layer_sizes.get("layers")}),'
-                      f' decoder_layer_sizes({decoder_layer_sizes.get("layers")}), latent({latent_size}),'
-                      f' dropout({dropout_layer_probabilities.get("layers")})')
-        return Autoencoder(encoder_layer_sizes.get("layers"), latent_size,
-                           decoder_layer_sizes.get("layers"), input_shape, dropout_layer_probabilities.get('layers'))
+        logging.debug(f'building ae model with config: layers({layers}), latent({latent_size}),'
+                      f' dropout({dropouts})')
+        return Autoencoder(layers, latent_size, input_shape, dropouts)
 
     @staticmethod
     def _get_conv1d_autoencoder_model(config: dict, input_size: int) -> BaseModel:
@@ -75,15 +72,17 @@ class HiveModelFactory:
         :param input_size: input size
         :return: model
         """
-        encoder = config.get('layers', [256, 64, 16])
+        layers = config.get('layers', [256, 64, 16])
         dropout = config.get('dropout', [0.1, 0.1, 0.1])
         latent_size = config.get('latent', 2)
         kernel = config.get('kernel', 2)
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
+        stride = config.get('stride', 1)
 
-        return Conv1DAE(encoder, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
-                        input_size=input_size, max_pool=max_pool)
+        logging.debug(f'building conv1d ae model with config: encoder_layers({layers})')
+        return Conv1DAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
+                        input_size=input_size, max_pool=max_pool, stride=stride)
 
     @staticmethod
     def build_model(model_type: HiveModelType, input_shape: int, config: dict) -> BaseModel:

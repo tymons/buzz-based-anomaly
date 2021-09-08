@@ -5,11 +5,11 @@ from torch import nn
 
 class BaseModel(ABC, nn.Module):
     @abstractmethod
-    def loss_fn(self, x, y):
+    def loss_fn(self, x, y) -> nn.Module:
         pass
 
     @abstractmethod
-    def get_params(self):
+    def get_params(self) -> dict:
         pass
 
     @abstractmethod

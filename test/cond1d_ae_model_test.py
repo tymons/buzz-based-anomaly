@@ -16,7 +16,8 @@ class Conv1DAeModelTest(unittest.TestCase):
             'latent': 8,
             'kernel': 4,
             'padding': 2,
-            'max_pool': 2
+            'max_pool': 2,
+            'stride': 1,
         }
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_autoencoder'), input_size,
                                                         config)
@@ -39,7 +40,8 @@ class Conv1DAeModelTest(unittest.TestCase):
             'latent': 8,
             'kernel': 4,
             'padding': 2,
-            'max_pool': 2
+            'max_pool': 2,
+            'stride': 1
         }
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_autoencoder'), input_size,
                                                         config)
@@ -62,7 +64,8 @@ class Conv1DAeModelTest(unittest.TestCase):
             'latent': 8,
             'kernel': 4,
             'padding': 2,
-            'max_pool': 5
+            'max_pool': 5,
+            'stride': 1
         }
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_autoencoder'), input_size,
                                                         config)
@@ -85,7 +88,8 @@ class Conv1DAeModelTest(unittest.TestCase):
             'latent': 8,
             'kernel': 4,
             'padding': 4,
-            'max_pool': 5
+            'max_pool': 5,
+            'stride': 1
         }
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_autoencoder'), input_size,
                                                         config)
@@ -108,7 +112,8 @@ class Conv1DAeModelTest(unittest.TestCase):
             'latent': 8,
             'kernel': 6,
             'padding': 4,
-            'max_pool': 5
+            'max_pool': 5,
+            'stride': 1
         }
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_autoencoder'), input_size,
                                                         config)
