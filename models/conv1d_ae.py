@@ -38,41 +38,37 @@ def _conv1d_transpose_block(in_f: int, out_f: int, dropout_prob: float, *args, *
     )
 
 
-def convolutional_to_mlp(input_size: int, depth: int, kernel: int, padding: int, stride: int, max_pool: int) -> tuple:
+def convolutional_to_mlp(input_size: int, depth: int, kernel: int, padding: int, max_pool: int) -> tuple:
     """
     Function for calculating end of convolutional output size
     :param input_size: input size
     :param depth: depth of layers
     :param kernel: kernel size
     :param padding: padding
-    :param stride: stride
     :param max_pool: maxpool
     :return: output size, temporals
     """
     temporal_values = []
     for _ in range(depth):
-        input_size = int(((input_size - kernel + 2 * padding) + 1)) // stride
+        input_size = int(((input_size - kernel + 2 * padding) + 1))
         temporal_values.append(input_size)
         input_size = input_size // max_pool
     return input_size, temporal_values
 
 
 class Conv1DEncoder(nn.Module):
-    def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int,
-                 stride: int):
+    def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int):
         super().__init__()
         self.conv = nn.Sequential()
 
         self.conv.add_module(name='le-conv-0', module=_conv1d_block(1, features[0], dropout_probs[0],
                                                                     kernel_size=kernel_size,
-                                                                    padding=padding,
-                                                                    stride=stride))
+                                                                    padding=padding))
         self.conv.add_module(name='ae-conv-0', module=nn.MaxPool1d(max_pool))
         for i, (in_size, out_size) in enumerate(zip(features[:-1], features[1:]), 1):
             self.conv.add_module(name=f'le-conv-{i}', module=_conv1d_block(in_size, out_size, dropout_probs[i],
                                                                            kernel_size=kernel_size,
-                                                                           padding=padding,
-                                                                           stride=stride))
+                                                                           padding=padding))
             self.conv.add_module(name=f'ae-conv-{i}', module=nn.MaxPool1d(max_pool))
 
     def forward(self, x):
@@ -82,9 +78,9 @@ class Conv1DEncoder(nn.Module):
 
 class Conv1DEncoderWithLatent(nn.Module):
     def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int,
-                 stride: int, latent: int, conv_to_mlp_size: int):
+                 latent: int, conv_to_mlp_size: int):
         super().__init__()
-        self.encoder = Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool, stride)
+        self.encoder = Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool)
         self.flatten = nn.Flatten()
         self.mlp = nn.Linear(conv_to_mlp_size, latent)
 
@@ -96,8 +92,8 @@ class Conv1DEncoderWithLatent(nn.Module):
 
 
 class Conv1DDecoder(nn.Module):
-    def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, stride: int,
-                 latent: int, conv_to_mlp_size: int, forced_conv_shapes: List[int]):
+    def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, latent: int,
+                 conv_to_mlp_size: int, forced_conv_shapes: List[int]):
         super().__init__()
         self.conv = nn.Sequential()
 
@@ -109,12 +105,11 @@ class Conv1DDecoder(nn.Module):
             self.conv.add_module(name=f'ld-conv-{i}',
                                  module=_conv1d_transpose_block(in_size, out_size, dropout_probs[i],
                                                                 kernel_size=kernel_size,
-                                                                padding=padding,
-                                                                stride=stride))
+                                                                padding=padding))
             self.conv.add_module(name=f'ld-upsample-{i}', module=nn.Upsample(size=forced_conv_shapes[i]))
         self.conv.add_module(name=f"ld-conv-{len(features)}", module=nn.ConvTranspose1d(features[-1], 1,
                                                                                         kernel_size=kernel_size,
-                                                                                        padding=padding, stride=stride))
+                                                                                        padding=padding))
 
     def forward(self, latent):
         x = self.mlp(latent)
@@ -125,7 +120,7 @@ class Conv1DDecoder(nn.Module):
 
 class Conv1DAE(BaseModel):
     def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int,
-                 stride: int, latent: int, input_size: int):
+                 latent: int, input_size: int):
         super().__init__()
         self._feature_map = features
         self._dropout_probs = dropout_probs
@@ -134,12 +129,10 @@ class Conv1DAE(BaseModel):
         self._latent = latent
         self._max_pool = max_pool
 
-        connector_size, conv_temporal = convolutional_to_mlp(input_size, len(features), kernel_size, padding, stride,
-                                                             max_pool)
-
-        self.encoder = Conv1DEncoderWithLatent(features, dropout_probs, kernel_size, padding, max_pool, stride, latent,
+        connector_size, conv_temporal = convolutional_to_mlp(input_size, len(features), kernel_size, padding, max_pool)
+        self.encoder = Conv1DEncoderWithLatent(features, dropout_probs, kernel_size, padding, max_pool, latent,
                                                features[-1]*connector_size)
-        self.decoder = Conv1DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, stride, latent,
+        self.decoder = Conv1DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, latent,
                                      features[-1]*connector_size, conv_temporal[::-1])
 
     def forward(self, x):

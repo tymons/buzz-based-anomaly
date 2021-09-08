@@ -78,11 +78,10 @@ class HiveModelFactory:
         kernel = config.get('kernel', 2)
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
-        stride = config.get('stride', 1)
 
         logging.debug(f'building conv1d ae model with config: encoder_layers({layers})')
         return Conv1DAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
-                        input_size=input_size, max_pool=max_pool, stride=stride)
+                        input_size=input_size, max_pool=max_pool)
 
     @staticmethod
     def build_model(model_type: HiveModelType, input_shape: int, config: dict) -> BaseModel:
