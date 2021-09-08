@@ -83,7 +83,7 @@ def main():
             model_runner.find_best(args.model, data_shape, learning_config, n_trials=args.search_best,
                                    output_folder=Path('output/model'))
         else:
-            model = HiveModelFactory.build_model_and_check(args.model, model_config, data_shape)
+            model = HiveModelFactory.build_model_and_check(args.model, data_shape, model_config)
             model = model_runner.train(model, learning_config)
 
 

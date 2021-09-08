@@ -79,7 +79,9 @@ class HiveModelFactory:
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
 
-        logging.debug(f'building conv1d ae model with config: encoder_layers({layers})')
+        logging.debug(f'building conv1d ae model with config: encoder_layers({layers}),'
+                      f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
+                      f' max_pool({max_pool})')
         return Conv1DAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
                         input_size=input_size, max_pool=max_pool)
 
@@ -106,4 +108,5 @@ class HiveModelFactory:
         :param config: dictionary for model config
         :param input_shape: data input shape
         """
-        return model_check(HiveModelFactory.build_model(model_type, input_shape, config), (1, 1, input_shape))
+        return model_check(HiveModelFactory.build_model(model_type, input_shape, config), (1, input_shape),
+                           device='cpu')
