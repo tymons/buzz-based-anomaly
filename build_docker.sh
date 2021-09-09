@@ -44,5 +44,5 @@ fi
 
 cp environment.yml environment_backup.yml
 awk -v cuda_ver="$PYTORCH_CUDA_VERSION" '{sub(/\${CUDA_TOOLKIT_VERSION}/, cuda_ver)}1' environment_backup.yml > environment.yml
-docker build -t "tymons/buzz-based-anomaly:cuda-$PYTORCH_CUDA_VERSION" . --build-arg CUDA_VERSION="$DOCKER_CUDA_VERSION"
+docker build -t "buzz-based-anomaly:cuda-$PYTORCH_CUDA_VERSION" . --build-arg CUDA_VERSION="$DOCKER_CUDA_VERSION"
 mv environment_backup.yml environment.yml
