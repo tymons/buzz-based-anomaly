@@ -22,6 +22,7 @@ def logger_setup(log_folder: Path, filename_prefix: str) -> None:
     :param log_folder: folder where logs will be saved
     :param filename_prefix: log file filename prefix
     """
+    log_folder.mkdir(parents=True, exist_ok=True)
     log_level = os.environ.get('LOGLEVEL', 'DEBUG').upper()
     logging.basicConfig(
         level=log_level,
@@ -41,7 +42,7 @@ def main():
                         type=HiveModelType.from_name, help="Hive Model Type [AE]")
     parser.add_argument('feature', metavar='feature', choices=list(SoundFeatureType),
                         type=SoundFeatureType.from_name, help='Input feature')
-    parser.add_argument('root_folder', metavar='root_folder', type=Path, help='Root folder for data')
+    parser.add_argument('data_folder', metavar='data_folder', type=Path, help='Root folder for data')
     # optional arguments
     parser.add_argument('--filter_hives', default=[], nargs='+', help="Hive names to be excluded from dataset")
     parser.add_argument('--filter_dates', nargs=2, type=datetime.fromisoformat,
@@ -60,6 +61,11 @@ def main():
 
     logger_setup(args.log_folder, f"{args.model.value}-{args.feature.value}")
 
+    logging.info(f'runing {args.model} model with {args.periodogram}...')
+    logging.info(f'data folder located at: {args.data_folder}')
+    logging.info(f'output folder for ML models located at: {args.model_output}')
+    logging.info(f'output folder for logs located at: {args.log_folder}')
+
     with args.feature_config.open('r') as fc, args.model_config.open('r') as mc, \
             args.learning_config.open('r') as lc:
         feature_config = yaml.load(fc, Loader=yaml.FullLoader)
@@ -67,7 +73,11 @@ def main():
         learning_config = yaml.load(lc, Loader=yaml.FullLoader)
 
         # data
-        sound_list = get_valid_sounds_from_folders(args.root_folder.glob('*'))
+        sound_list = get_valid_sounds_from_folders(args.data_folder.glob('*'))
+        if not sound_list:
+            logging.error('sound list empty!')
+            raise Exception('sound list empty!')
+
         if args.filter_dates:
             sound_list = filter_by_datetime(sound_list, args.filter_dates[0], args.filter_dates[1])
         sound_list = filter_string_list(sound_list, *args.filter_hives)

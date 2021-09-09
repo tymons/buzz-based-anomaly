@@ -25,4 +25,6 @@ RUN echo "conda activate pytorch-cuda-env" >> ~/.bashrc
 ENV PATH /opt/conda/envs/pytorch-cuda-env/bin:$PATH
 ENV CONDA_DEFAULT_ENV $pytorch-cuda-env
 
+COPY . /buzz-based-anomaly
+WORKDIR /buzz-based-anomaly
 ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "pytorch-cuda-env", "python", "train.py"]
