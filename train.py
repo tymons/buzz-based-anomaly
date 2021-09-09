@@ -61,7 +61,7 @@ def main():
 
     logger_setup(args.log_folder, f"{args.model.value}-{args.feature.value}")
 
-    logging.info(f'runing {args.model} model with {args.periodogram}...')
+    logging.info(f'runing {args.model.value} model with {args.feature.value}...')
     logging.info(f'data folder located at: {args.data_folder}')
     logging.info(f'output folder for ML models located at: {args.model_output}')
     logging.info(f'output folder for logs located at: {args.log_folder}')
