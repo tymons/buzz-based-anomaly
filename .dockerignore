@@ -2,3 +2,4 @@ dataset/
 test/
 examples/
 .ipynb_checkpoints
+.comet.config
