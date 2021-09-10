@@ -1,0 +1,15 @@
+name: pytorch-cuda-env
+channels:
+  - defaults
+  - conda-forge
+  - pytorch
+dependencies:
+  - python==3.8.5
+  - numpy
+  - pytorch
+  - scikit-learn
+  - pyyaml
+  - pydub
+  - pip
+  - pip:
+    - torchsummary
