@@ -36,7 +36,7 @@ jobs:
         run: |
           echo " ====== Running code styling check ======"
           conda install flake8
-          flake8 . --count --exit-zero --max-complexity=10 --exclude test/* --max-line-length 127 --statistics
+          flake8 . --exit-zero --exclude test/* --max-line-length 127
 
       # Runs a set of commands using the runners shell
       - name: Run unittests
