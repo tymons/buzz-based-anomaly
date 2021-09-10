@@ -1,4 +1,4 @@
-name: Unittests and code check for 
+name: unittests
 
 # Controls when the workflow will run
 on:
