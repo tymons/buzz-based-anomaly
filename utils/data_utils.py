@@ -30,8 +30,7 @@ def flatten(x):
 
 def create_valid_sounds_datalist(root_folder, valid_file_filename='valid_sounds.txt', prefix="",
                                  upper_rms_threshold=0.8, lower_rms_threshold=0.0000001):
-    """Scans specified folder for files with prefix 
-    
+    """Scans specified folder for files with prefix
     Parameters:
         valid_file_filename (str): file which will be created
         root_folder (str): root folder where scan will be performed
@@ -160,7 +159,6 @@ def closest_power_2(x):
 
 def adjust_matrix(matrix, *lengths):
     """ Function for truncating matrix to lengths
-    
     Parameters:
         matrix: matrix to be truncated or expanded
      """
@@ -183,7 +181,7 @@ def adjust_matrix(matrix, *lengths):
 
 
 def truncate_lists_to_smaller_size(arg1, arg2):
-    """ Function for truncating two lists to smaller size. 
+    """ Function for truncating two lists to smaller size.
     Note that there possibly should be better way to do this operation. """
     if len(arg1) > len(arg2):
         arg1 = arg1[:len(arg2)]
