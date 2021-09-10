@@ -1,5 +1,7 @@
 # Buzz-based anomaly
 
+![unittest](https://github.com/tymons/buzz-based-anomaly/actions/workflows/code-check-anaconda.yml/badge.svg)
+
 This repo contains scripts and utils for buzz-based bee anomaly detection model. We utilize multiple different methods for e.g. swarming, pest attact, queenless detection tasks.
 
 ## Data preparation
