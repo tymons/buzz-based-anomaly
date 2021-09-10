@@ -11,5 +11,6 @@ dependencies:
   - pyyaml
   - pydub
   - pip
+  - optuna
   - pip:
     - torchsummary
