@@ -1,14 +1,16 @@
 name: pytorch-cuda-env
 channels:
+  - anaconda
   - defaults
   - conda-forge
   - comet_ml
   - pytorch
+  - nvidia
 dependencies:
-  - python==3.8.5
+  - python==3.8.10
   - numpy
-  - cudatoolkit=${CUDA_TOOLKIT_VERSION}
-  - pytorch
+  - pytorch==1.9.0
+  - cudatoolkit==${CUDA_TOOLKIT_VERSION}
   - scikit-learn
   - pyyaml
   - comet_ml
