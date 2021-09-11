@@ -8,8 +8,8 @@ from pathlib import Path
 
 class TestPeriodogramMethods(unittest.TestCase):
     def setUp(self):
-        self.filename_10kHz = Path('data/10kHz.wav')
-        self.filename_440Hz = Path('data/440Hz.wav')
+        self.filename_10kHz = Path(Path(__file__).parent.resolve(), 'data/10kHz.wav')
+        self.filename_440Hz = Path(Path(__file__).parent.resolve(), 'data/440Hz.wav')
 
     def test_10kHz(self):
         config = {

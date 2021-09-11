@@ -200,7 +200,7 @@ class ModelRunner:
 
         with best_architecture_file.open('w+') as f:
             f.write(f'Best loss: {str(trial.value)} \r\n')
-            f.write(f'Params: \r\n')
+            f.write('Params: \r\n')
             logging.info("  Value: ", trial.value)
             logging.info("  Params: ")
             for key, value in trial.params.items():

@@ -65,7 +65,7 @@ class HiveModelFactory:
         :return: model, config used
         """
         layers = config.get('layers', [256, 32, 16])
-        dropouts = config.get('dropout',[0.2, 0.2, 0.2])
+        dropouts = config.get('dropout', [0.2, 0.2, 0.2])
         latent_size = config.get('latent', 2)
 
         logging.debug(f'building ae model with config: layers({layers}), latent({latent_size}),'
