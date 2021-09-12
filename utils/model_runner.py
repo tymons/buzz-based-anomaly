@@ -193,10 +193,10 @@ class ModelRunner:
 
         best_architecture_file = Path(output_folder) / Path(f"{model_type.value.lower()}"
                                                             f"-{time.strftime('%Y%m%d-%H%M%S')}.config")
-        logging.info("Study statistics: ")
-        logging.info("  Number of finished trials: ", len(study.trials))
-        logging.info("  Number of pruned trials: ", len(pruned_trials))
-        logging.info("  Number of complete trials: ", len(complete_trials))
+        logging.info('Study statistics: ')
+        logging.info(f'  Number of finished trials: {len(study.trials)}')
+        logging.info(f'  Number of pruned trials: {len(pruned_trials)}')
+        logging.info(f'  Number of complete trials: {len(complete_trials)}')
 
         logging.info("Best trial:")
         trial = study.best_trial
@@ -204,8 +204,8 @@ class ModelRunner:
         with best_architecture_file.open('w+') as f:
             f.write(f'Best loss: {str(trial.value)} \r\n')
             f.write('Params: \r\n')
-            logging.info("  Value: ", trial.value)
-            logging.info("  Params: ")
+            logging.info(f'  Value: {trial.value}')
+            logging.info('  Params: ')
             for key, value in trial.params.items():
                 logging.info(f'    {key}:{value}')
                 f.write(f'    {key}:{value} \r\n')
