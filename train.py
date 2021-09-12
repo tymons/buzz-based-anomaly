@@ -52,7 +52,6 @@ def main():
     parser.add_argument('--learning_config', default=Path(__file__).absolute().parent / "learning_config.yml",
                         type=Path)
     parser.add_argument('--model_output', default=Path(__file__).absolute().parent / "output/model", type=Path)
-    parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--comet_config', default=Path(__file__).absolute().parent / ".comet.config", type=Path)
     parser.add_argument('--find_best', type=int, metavar='N', help="how many trials for finding best architecture")
     parser.add_argument('--log_folder', default=Path(__file__).absolute().parent / "output/", type=Path)
@@ -85,7 +84,9 @@ def main():
         sound_labels = [list(available_labels).index(sound_name.stem.split('-')[0]) for sound_name in sound_list]
         dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, sound_labels, feature_config)
         data_shape = dataset[0][0][0].squeeze().shape[0]
-        train_loader, val_loader = SoundFeatureFactory.build_train_and_validation_dataloader(dataset, args.batch_size)
+        train_loader, val_loader = SoundFeatureFactory.build_train_and_validation_dataloader(dataset,
+                                                                                             learning_config.get(
+                                                                                                 'batch_size', 32))
 
         model_runner = ModelRunner(train_loader, val_loader, args.model_output, feature_config=feature_config,
                                    comet_config_file=args.comet_config, comet_project_name="bee-sound-anomaly")
