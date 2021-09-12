@@ -112,12 +112,13 @@ class ModelRunner:
         experiment.add_tags(tags)
         return experiment
 
-    def _train_step(self, model: nn.Module, optimizer: torch.optim.Optimizer,
+    def _train_step(self, model: nn.Module, optimizer: torch.optim.Optimizer, cost_fn: Callable,
                     experiment: Experiment, epoch_no: int, logging_interval: int = 10) -> float:
         """
         Function for performing epoch step on data
         :param model: model to be trained
         :param optimizer: used optimizer
+        :param cost_fn: cost function
         :param experiment: comet ml experiment where data will be reported
         :param epoch_no: epoch number
         :param logging_interval: after how many batches data will be logged
@@ -129,7 +130,7 @@ class ModelRunner:
             batch = batch.to(self.device)
             optimizer.zero_grad()
             model_output = model(batch)
-            loss = model.loss_fn(batch, model_output)
+            loss = cost_fn(batch, model_output)
             loss.backward()
             optimizer.step()
 
@@ -143,13 +144,15 @@ class ModelRunner:
                              f'-> batch loss: {loss_float}')
         return sum(mean_loss) / len(mean_loss)
 
-    def _val_step(self, model, experiment, epoch_no, logging_interval):
+    def _val_step(self, model: nn.Module, cost_fn: Callable, experiment: Experiment, epoch_no: int,
+                  logging_interval: int):
         """
         Function for performing validation step for model
-        :param model:
-        :param experiment:
-        :param epoch_no:
-        :param logging_interval:
+        :param model: model to be evaluated
+        :param cost_fn: cost function
+        :param experiment: comet ml experiment
+        :param epoch_no: epoch number for validation step - mostly for logging
+        :param logging_interval: interval for logs within epoch
         :return:
         """
         val_loss = []
@@ -157,7 +160,7 @@ class ModelRunner:
         for batch_idx, (batch, _) in enumerate(self.val_dataloader):
             batch = batch.to(self.device)
             model_output = model(batch)
-            loss = model.loss_fn(batch, model_output)
+            loss = cost_fn(batch, model_output)
 
             loss_float = loss.item()
             val_loss.append(loss_float)
@@ -190,10 +193,10 @@ class ModelRunner:
 
         best_architecture_file = Path(output_folder) / Path(f"{model_type.value.lower()}"
                                                             f"-{time.strftime('%Y%m%d-%H%M%S')}.config")
-        logging.info("Study statistics: ")
-        logging.info("  Number of finished trials: ", len(study.trials))
-        logging.info("  Number of pruned trials: ", len(pruned_trials))
-        logging.info("  Number of complete trials: ", len(complete_trials))
+        logging.info('Study statistics: ')
+        logging.info(f'  Number of finished trials: {len(study.trials)}')
+        logging.info(f'  Number of pruned trials: {len(pruned_trials)}')
+        logging.info(f'  Number of complete trials: {len(complete_trials)}')
 
         logging.info("Best trial:")
         trial = study.best_trial
@@ -201,8 +204,8 @@ class ModelRunner:
         with best_architecture_file.open('w+') as f:
             f.write(f'Best loss: {str(trial.value)} \r\n')
             f.write('Params: \r\n')
-            logging.info("  Value: ", trial.value)
-            logging.info("  Params: ")
+            logging.info(f'  Value: {trial.value}')
+            logging.info('  Params: ')
             for key, value in trial.params.items():
                 logging.info(f'    {key}:{value}')
                 f.write(f'    {key}:{value} \r\n')
@@ -229,16 +232,18 @@ class ModelRunner:
 
             logging.debug(f'performing optuna train task on {self.device}(s) ({torch.cuda.device_count()})'
                           f' for model {type(model).__name__.lower()} with following config: {learning_config}')
+
+            cost_fn = model.loss_fn
             if torch.cuda.device_count() > 1:
                 model = nn.DataParallel(model)
             model = model.to(self.device)
 
             optimizer: Optimizer = _parse_optimizer(learning_config['optimizer'].get('type', 'Adam'))(
                 model.parameters(), lr=learning_config['learning_rate'])
-            batch_logging_interval = learning_config.get('logging_batch_interval', 10)
+            log_interval = learning_config.get('logging_batch_interval', 10)
             train_epoch_loss = sys.maxsize
             for epoch in range(1, learning_config.get('epochs', 10) + 1):
-                train_epoch_loss = self._train_step(model, optimizer, experiment, epoch, batch_logging_interval)
+                train_epoch_loss = self._train_step(model, optimizer, cost_fn, experiment, epoch, log_interval)
                 experiment.log_metric('train_epoch_loss', train_epoch_loss, step=epoch)
                 logging.info(f'--- train epoch {epoch} end with train loss: {train_epoch_loss} ---')
 
@@ -267,20 +272,21 @@ class ModelRunner:
 
         logging.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
                       f' for model {checkpoint_path.stem.upper()} with following config: {config}')
+
+        cost_fn = model.loss_fn
         if torch.cuda.device_count() > 1:
             model = nn.DataParallel(model)
-
         model = model.to(self.device)
         optimizer: Optimizer = _parse_optimizer(config['optimizer'].get('type', 'Adam'))(model.parameters(),
                                                                                          lr=config.get(
                                                                                              'learning_rate',
                                                                                              0.0001))
-        batch_logging_interval = config.get('logging_batch_interval', 10)
+        log_interval = config.get('logging_batch_interval', 10)
         for epoch in range(1, config.get('epochs', 10) + 1):
-            train_epoch_loss = self._train_step(model, optimizer, experiment, epoch, batch_logging_interval)
+            train_epoch_loss = self._train_step(model, optimizer, cost_fn, experiment, epoch, log_interval)
             experiment.log_metric('train_epoch_loss', train_epoch_loss, step=epoch)
 
-            val_epoch_loss = self._val_step(model, experiment, epoch, batch_logging_interval)
+            val_epoch_loss = self._val_step(model, cost_fn, experiment, epoch, log_interval)
             experiment.log_metric('val_epoch_loss', val_epoch_loss, step=epoch)
 
             logging.info(
