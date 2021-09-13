@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 
 from models.model_type import HiveModelType
-from utils.model_factory import HiveModelFactory, build_optuna_ae_config
+from utils.model_factory import HiveModelFactory, build_optuna_model_config
 
 
 def _read_comet_key(path: Path) -> str:
@@ -81,6 +81,21 @@ def model_load(checkpoint_filepath: Path, model: BaseModel, optimizer: Optimizer
     loss = checkpoint['loss']
 
     return epoch, loss
+
+
+def build_optuna_learning_config(learning_config: dict, trial: optuna.Trial) -> dict:
+    """
+    Function for building optuna learning config
+    :param learning_config: dictionary with learning config
+    :param trial: optuna trial
+    :return: directory with combined optuna suggest values and original learning dict
+    """
+    optuna_learning_config = learning_config.copy()
+    optuna_learning_config['learning_rate'] = trial.suggest_loguniform('lr', 1e-5, 1e-2)
+    optuna_learning_config['opitimizer']['type'] = trial.suggest_categorical('optimizer_type',
+                                                                             ['Adam', 'SGD', 'RMSprop', 'Adagrad',
+                                                                              'Adadelta'])
+    return optuna_learning_config
 
 
 class ModelRunner:
@@ -219,30 +234,28 @@ class ModelRunner:
         :param config: configuration for the model
         :return: final loss
         """
-        model_config = build_optuna_ae_config(model_type, input_shape, trial)
+        optuna_model_config = build_optuna_model_config(model_type, input_shape, trial)
+        optuna_learning_config = build_optuna_learning_config(learning_config, trial)
         try:
-            model = HiveModelFactory.build_model_and_check(model_type, input_shape, model_config)
-            learning_config['learning_rate'] = trial.suggest_loguniform('lr', 1e-5, 1e-2)
-            learning_config['opitimizer'] = trial.suggest_categorical('optimizer',
-                                                                      ['Adam', 'SGD', 'RMSprop', 'Adagrad', 'Adadelta'])
+            model = HiveModelFactory.build_model_and_check(model_type, input_shape, optuna_model_config)
 
             experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
-                                                {**model.get_params(), **learning_config, **self.feature_config},
+                                                {**model.get_params(), **optuna_learning_config, **self.feature_config},
                                                 ['optuna'])
 
             logging.debug(f'performing optuna train task on {self.device}(s) ({torch.cuda.device_count()})'
-                          f' for model {type(model).__name__.lower()} with following config: {learning_config}')
+                          f' for model {type(model).__name__.lower()} with following config: {optuna_learning_config}')
 
             cost_fn = model.loss_fn
             if torch.cuda.device_count() > 1:
                 model = nn.DataParallel(model)
             model = model.to(self.device)
 
-            optimizer: Optimizer = _parse_optimizer(learning_config['optimizer'].get('type', 'Adam'))(
-                model.parameters(), lr=learning_config['learning_rate'])
-            log_interval = learning_config.get('logging_batch_interval', 10)
+            optimizer: Optimizer = _parse_optimizer(optuna_learning_config['optimizer']['type'])(
+                model.parameters(), lr=optuna_learning_config['learning_rate'])
+            log_interval = optuna_learning_config.get('logging_batch_interval', 10)
             train_epoch_loss = sys.maxsize
-            for epoch in range(1, learning_config.get('epochs', 10) + 1):
+            for epoch in range(1, optuna_learning_config.get('epochs', 10) + 1):
                 train_epoch_loss = self._train_step(model, optimizer, cost_fn, experiment, epoch, log_interval)
                 experiment.log_metric('train_epoch_loss', train_epoch_loss, step=epoch)
                 logging.info(f'--- train epoch {epoch} end with train loss: {train_epoch_loss} ---')
@@ -255,7 +268,7 @@ class ModelRunner:
 
             return train_epoch_loss
         except RuntimeError as e:
-            logging.error(f'hive model build failed for config: {model_config} with exception: {e}')
+            logging.error(f'hive model build failed for config: {optuna_model_config} with exception: {e}')
 
     def train(self, model: BaseModel, config: dict) -> BaseModel:
         """
@@ -303,3 +316,4 @@ class ModelRunner:
 
         epoch, _ = model_load(checkpoint_path, model, optimizer)
         return model
+
