@@ -16,7 +16,7 @@ def model_check(model, input_shape, device="cuda"):
     return model
 
 
-def build_optuna_ae_config(model_type: HiveModelType, input_size: int, trial: optuna.Trial) -> dict:
+def build_optuna_model_config(model_type: HiveModelType, input_size: int, trial: optuna.Trial) -> dict:
     """
     Function for building optuna trial config for autoencoder
     :param model_type: model type
