@@ -92,9 +92,8 @@ def build_optuna_learning_config(learning_config: dict, trial: optuna.Trial) -> 
     """
     optuna_learning_config = learning_config.copy()
     optuna_learning_config['learning_rate'] = trial.suggest_loguniform('lr', 1e-5, 1e-2)
-    optuna_learning_config['opitimizer']['type'] = trial.suggest_categorical('optimizer_type',
-                                                                             ['Adam', 'SGD', 'RMSprop', 'Adagrad',
-                                                                              'Adadelta'])
+    optuna_learning_config['optimizer']['type'] = trial.suggest_categorical('optimizer_type', ['Adam', 'SGD', 'RMSprop',
+                                                                                               'Adagrad', 'Adadelta'])
     return optuna_learning_config
 
 
@@ -111,6 +110,9 @@ class ModelRunner:
         self.output_folder = output_folder
         self.feature_config = feature_config if feature_config is not None else {}
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self._curr_patience = -1
+        self._curr_best_loss = -1
 
     def _setup_experiment(self, experiment_name: str, log_parameters: dict, tags: List[str]) -> Experiment:
         """
@@ -236,6 +238,10 @@ class ModelRunner:
         """
         optuna_model_config = build_optuna_model_config(model_type, input_shape, trial)
         optuna_learning_config = build_optuna_learning_config(learning_config, trial)
+
+        self._curr_best_loss = -1
+        self._curr_patience = optuna_learning_config.get('epoch_patience', 10)
+        patience_init_val = optuna_learning_config.get('epoch_patience', 10)
         try:
             model = HiveModelFactory.build_model_and_check(model_type, input_shape, optuna_model_config)
 
@@ -264,6 +270,13 @@ class ModelRunner:
                 if trial.should_prune():
                     raise optuna.exceptions.TrialPruned()
 
+                patience = self.early_stopping_callback(train_epoch_loss, patience_init_val)
+                if patience == patience_init_val:
+                    logging.debug(f'*** model checkpoint at epoch {epoch} ***')
+                elif patience == 0:
+                    logging.info(f' ___ early stopping at epoch {epoch} ___')
+                    break
+
             del model
 
             return train_epoch_loss
@@ -277,8 +290,10 @@ class ModelRunner:
         :param config: configuration for learning process
         :rtype: BaseModel: trained model
         """
-        best_val_loss = -1
-        patience_counter = config.get('epoch_patience', 10)
+        self._curr_best_loss = -1
+        self._curr_patience = config.get('epoch_patience', 10)
+        patience_init_val = config.get('epoch_patience', 10)
+
         experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
                                             {**model.get_params(), **config, **self.feature_config}, [])
         checkpoint_path = self.output_folder / f'{experiment.get_name()}-checkpoint.pth'
@@ -304,16 +319,30 @@ class ModelRunner:
 
             logging.info(
                 f'--- train epoch {epoch} end with train loss: {train_epoch_loss} and val loss: {val_epoch_loss} ---')
-            if val_epoch_loss < best_val_loss or best_val_loss == -1:
+            patience = self.early_stopping_callback(val_epoch_loss, patience_init_val)
+            if patience == patience_init_val:
                 logging.debug(f'*** model checkpoint at epoch {epoch} ***')
-                best_val_loss = val_epoch_loss
-                patience_counter = config.get('epoch_patience', 10)
                 model_save(model, checkpoint_path, optimizer, epoch, train_epoch_loss)
-            elif patience_counter == 0 or math.isnan(val_epoch_loss):
-                logging.info(f'___ early stopping at epoch {epoch} ___')
-            else:
-                patience_counter -= 1
+            elif patience == 0:
+                logging.info(f' ___ early stopping at epoch {epoch} ___')
+                epoch, _ = model_load(checkpoint_path, model, optimizer)
+                break
 
-        epoch, _ = model_load(checkpoint_path, model, optimizer)
         return model
 
+    def early_stopping_callback(self, curr_loss: float, patience_reset_value: int) -> int:
+        """
+        Method for performing callback for early stopping
+        :param curr_loss:
+        :param patience_reset_value:
+        :return:
+        """
+        if curr_loss < self._curr_best_loss or self._curr_best_loss == -1:
+            self._curr_best_loss = curr_loss
+            self._curr_patience = patience_reset_value
+        elif self._curr_patience == 0 or math.isnan(curr_loss):
+            return 0
+        else:
+            self._curr_patience -= 1
+
+        return self._curr_patience
