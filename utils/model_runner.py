@@ -337,11 +337,11 @@ class ModelRunner:
         :param patience_reset_value:
         :return:
         """
-        if curr_loss < self._curr_best_loss or self._curr_best_loss == -1:
+        if self._curr_patience == 0 or math.isnan(curr_loss):
+            return 0
+        elif curr_loss < self._curr_best_loss or self._curr_best_loss == -1:
             self._curr_best_loss = curr_loss
             self._curr_patience = patience_reset_value
-        elif self._curr_patience == 0 or math.isnan(curr_loss):
-            return 0
         else:
             self._curr_patience -= 1
 
