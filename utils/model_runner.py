@@ -12,9 +12,7 @@ import math
 import gc
 
 from pathlib import Path
-from typing import Any, Dict, Iterator
-
-from torch.nn.parameter import Parameter
+from typing import Any, Dict
 
 from models.base_model import BaseModel
 from typing import List, Callable, Union
