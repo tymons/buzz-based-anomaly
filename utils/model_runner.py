@@ -13,7 +13,7 @@ from pathlib import Path
 
 from models.base_model import BaseModel
 from typing import List, Callable, Union
-from torch import nn
+from torch import nn, device
 
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
@@ -99,6 +99,8 @@ def build_optuna_learning_config(learning_config: dict, trial: optuna.Trial) -> 
 
 
 class ModelRunner:
+    device: device
+
     def __init__(self, train_loader: DataLoader, val_loader: DataLoader, output_folder: Path,
                  feature_config=None, comet_api_key: str = None, comet_config_file: Path = None,
                  comet_project_name: str = "Default Project"):
@@ -237,6 +239,34 @@ class ModelRunner:
         :param config: configuration for the model
         :return: final loss
         """
+
+        def _optimizer_to(device_to: device) -> None:
+            """
+            Closure for optimizier transfers
+            :param device_to: torch device (cpu or gpu)
+            """
+            for param in optimizer.state.values():
+                if isinstance(param, torch.Tensor):
+                    param.data = param.data.to(device_to)
+                    if param._grad is not None:
+                        param._grad.data = param._grad.data.to(device_to)
+                elif isinstance(param, dict):
+                    for subparam in param.values():
+                        if isinstance(subparam, torch.Tensor):
+                            subparam.data = subparam.data.to(device_to)
+                            if subparam._grad is not None:
+                                subparam._grad.data = subparam._grad.data.to(device_to)
+
+        def _free_memory() -> None:
+            """
+            Clear memory for model
+            """
+            _optimizer_to(self.device)
+            del model
+            del optimizer
+            gc.collect()
+            torch.cuda.empty_cache()
+
         optuna_model_config = build_optuna_model_config(model_type, input_shape, trial)
         optuna_learning_config = build_optuna_learning_config(learning_config, trial)
 
@@ -278,10 +308,7 @@ class ModelRunner:
                     logging.info(f' ___ early stopping at epoch {epoch} ___')
                     break
 
-            # clear (cuda) memory
-            del model
-            gc.collect()
-            torch.cuda.empty_cache()
+            _free_memory()
 
             return train_epoch_loss
         except RuntimeError as e:
