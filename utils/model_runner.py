@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 import logging
 
@@ -10,6 +12,9 @@ import math
 import gc
 
 from pathlib import Path
+from typing import Any, Dict, Iterator
+
+from torch.nn.parameter import Parameter
 
 from models.base_model import BaseModel
 from typing import List, Callable, Union
@@ -22,19 +27,9 @@ from models.model_type import HiveModelType
 from utils.model_factory import HiveModelFactory, build_optuna_model_config
 
 
-def _read_comet_key(path: Path) -> str:
-    """
-    Function for reading comet key from config file
-    :param path: path to comet config file
-    :return:
-    """
-    with path.open('r') as f:
-        return [b.split('=')[-1] for b in f.read().splitlines() if b.startswith('api_key')][0]
-
-
 def _parse_optimizer(optimizer_name: str) -> Callable:
     """
-    Function for getting optimizer based on string representation
+    Function for getting parsing based on string representation
     :param optimizer_name:  string name representation
     :return: Optimizer
     """
@@ -46,6 +41,37 @@ def _parse_optimizer(optimizer_name: str) -> Callable:
         'Adadelta': torch.optim.Adadelta,
     }
     return optimizer.get(optimizer_name, lambda x: logging.error(f'loss function for model {x} not implemented!'))
+
+
+def transfer_optimizer_to(optimizer: Optimizer, device_to: device) -> None:
+    """
+    Closure for optimizier transfers
+    :param optimizer: optimizer to be transferred
+    :param device_to: torch device (cpu or gpu)
+    """
+    for param in optimizer.state.values():
+        if isinstance(param, torch.Tensor):
+            param.data = param.data.to(device_to)
+            if param._grad is not None:
+                param._grad.data = param._grad.data.to(device_to)
+        elif isinstance(param, dict):
+            for subparam in param.values():
+                if isinstance(subparam, torch.Tensor):
+                    subparam.data = subparam.data.to(device_to)
+                    if subparam._grad is not None:
+                        subparam._grad.data = subparam._grad.data.to(device_to)
+
+    return optimizer
+
+
+def _read_comet_key(path: Path) -> str:
+    """
+    Function for reading comet key from config file
+    :param path: path to comet config file
+    :return:
+    """
+    with path.open('r') as f:
+        return [b.split('=')[-1] for b in f.read().splitlines() if b.startswith('api_key')][0]
 
 
 def model_save(model: BaseModel, output_path: Path, optimizer: Optimizer, epoch_no: int,
@@ -84,7 +110,7 @@ def model_load(checkpoint_filepath: Path, model: BaseModel, optimizer: Optimizer
     return epoch, loss
 
 
-def build_optuna_learning_config(learning_config: dict, trial: optuna.Trial) -> dict:
+def build_optuna_learning_config(learning_config: dict, trial: optuna.Trial) -> Dict[str, Any]:
     """
     Function for building optuna learning config
     :param learning_config: dictionary with learning config
@@ -239,36 +265,8 @@ class ModelRunner:
         :param config: configuration for the model
         :return: final loss
         """
-
-        def _optimizer_to(device_to: device) -> None:
-            """
-            Closure for optimizier transfers
-            :param device_to: torch device (cpu or gpu)
-            """
-            for param in optimizer.state.values():
-                if isinstance(param, torch.Tensor):
-                    param.data = param.data.to(device_to)
-                    if param._grad is not None:
-                        param._grad.data = param._grad.data.to(device_to)
-                elif isinstance(param, dict):
-                    for subparam in param.values():
-                        if isinstance(subparam, torch.Tensor):
-                            subparam.data = subparam.data.to(device_to)
-                            if subparam._grad is not None:
-                                subparam._grad.data = subparam._grad.data.to(device_to)
-
-        def _free_memory() -> None:
-            """
-            Clear memory for model
-            """
-            _optimizer_to(self.device)
-            del model
-            del optimizer
-            gc.collect()
-            torch.cuda.empty_cache()
-
         optuna_model_config = build_optuna_model_config(model_type, input_shape, trial)
-        optuna_learning_config = build_optuna_learning_config(learning_config, trial)
+        optuna_learning_config: Dict[str, Any] = build_optuna_learning_config(learning_config, trial)
 
         self._curr_best_loss = -1
         self._curr_patience = optuna_learning_config.get('epoch_patience', 10)
@@ -288,8 +286,8 @@ class ModelRunner:
                 model = nn.DataParallel(model)
             model = model.to(self.device)
 
-            optimizer: Optimizer = _parse_optimizer(optuna_learning_config['optimizer']['type'])(
-                model.parameters(), lr=optuna_learning_config['learning_rate'])
+            optimizer_class = _parse_optimizer(optuna_learning_config['optimizer']['type'])
+            optimizer = optimizer_class(model.parameters(), lr=optuna_learning_config['learning_rate'])
             log_interval = optuna_learning_config.get('logging_batch_interval', 10)
             train_epoch_loss = sys.maxsize
             for epoch in range(1, optuna_learning_config.get('epochs', 10) + 1):
@@ -308,7 +306,13 @@ class ModelRunner:
                     logging.info(f' ___ early stopping at epoch {epoch} ___')
                     break
 
-            _free_memory()
+            # clear memory
+            transfer_optimizer_to(optimizer, torch.device('cpu'))
+            model.to(torch.device('cpu'))
+            del model
+            del optimizer
+            gc.collect()
+            torch.cuda.empty_cache()
 
             return train_epoch_loss
         except RuntimeError as e:
