@@ -7,6 +7,7 @@ import torch
 import time
 import optuna
 import math
+import gc
 
 from pathlib import Path
 
@@ -277,7 +278,10 @@ class ModelRunner:
                     logging.info(f' ___ early stopping at epoch {epoch} ___')
                     break
 
+            # clear (cuda) memory
             del model
+            gc.collect()
+            torch.cuda.empty_cache()
 
             return train_epoch_loss
         except RuntimeError as e:
