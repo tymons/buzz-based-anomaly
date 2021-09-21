@@ -30,11 +30,11 @@ class PeriodogramDataset(SoundDataset):
         """ Function for getting periodogram """
         should_be_integers = self.convert_db
         sound_samples, sampling_rate, labels = SoundDataset.read_sound(self, idx=idx, raw=should_be_integers)
-        periodogram = abs(np.fft.rfft(sound_samples, sampling_rate))[1:]
+        periodogram = abs(np.fft.fft(sound_samples, sampling_rate))[1:]
         if self.convert_db:
-            periodogram = 20 * np.log10(periodogram / np.iinfo(sound_samples[0]).max)
+            periodogram = 20 * np.log10(periodogram)
 
-        frequencies = np.fft.rfftfreq(sampling_rate, d=(1. / sampling_rate))[1:]
+        frequencies = np.fft.fftfreq(sampling_rate, d=(1. / sampling_rate))[1:]
 
         if self.slice_freq:
             periodogram = periodogram[self.slice_freq.start:self.slice_freq.stop]
@@ -43,7 +43,7 @@ class PeriodogramDataset(SoundDataset):
         if self.normalize:
             periodogram = MinMaxScaler().fit_transform(periodogram.reshape(-1, 1)).squeeze()
 
-        periodogram = periodogram.astype(float)
+        periodogram = periodogram.astype(np.float32)
         return (periodogram, frequencies), labels
 
     def __getitem__(self, idx):

@@ -9,7 +9,7 @@ from utils.data_utils import closest_power_2
 
 def _get_default_config() -> dict:
     """
-    Function for getting default config along with default input size
+    Function for getting default config
     :return: config, input_size
     """
     return {
