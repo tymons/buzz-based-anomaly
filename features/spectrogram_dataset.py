@@ -11,7 +11,9 @@ from utils.data_utils import adjust_matrix, closest_power_2, adjust_ndarray
 
 
 def calculate_spectrogram(samples, sampling_rate: int, n_fft: int, hop_len: int, slice_freq: SliceFrequency = None,
-                          normalize=True, convert_db=True, window_name: str = 'blackman') -> (np.ndarray, np.ndarray, np.ndarray):
+                          normalize=True, convert_db=True, window_name: str = 'blackman') -> (np.ndarray,
+                                                                                              np.ndarray,
+                                                                                              np.ndarray):
     """ Function for calculating spectrogram
     :param window_name: window name, see scipy.signal.get_window function
     :param samples: audio samples from which spectrogram should be calculated
@@ -23,8 +25,8 @@ def calculate_spectrogram(samples, sampling_rate: int, n_fft: int, hop_len: int,
     :param convert_db: should magnitued be converted to db
     :return: spectrogram_magnitude: spectrogram
     """
-    frequencies, times, spectrogram = signal.spectrogram(samples, sampling_rate, nperseg=n_fft, window=window_name,
-                                                         noverlap=hop_len)
+    frequencies, times, spectrogram = signal.spectrogram(samples, sampling_rate, nperseg=n_fft,
+                                                         window=window_name, noverlap=hop_len)
     spectrogram_magnitude = np.abs(spectrogram)
     if convert_db:
         spectrogram_magnitude = 20*np.log10(spectrogram_magnitude)
