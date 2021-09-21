@@ -1,5 +1,9 @@
 import numpy as np
 
+from typing import List
+from pathlib import Path
+
+from features.slice_frequency_dataclass import SliceFrequency
 from sklearn.preprocessing import MinMaxScaler
 
 from features.sound_dataset import SoundDataset
@@ -8,7 +12,8 @@ from features.sound_dataset import SoundDataset
 class PeriodogramDataset(SoundDataset):
     """ Periodogram dataset """
 
-    def __init__(self, filenames, labels, convert_db=False, normalize=False, slice_freq=None):
+    def __init__(self, filenames: List[Path], labels, convert_db=False, normalize=False,
+                 slice_freq: SliceFrequency = None):
         SoundDataset.__init__(self, filenames, labels)
         self.slice_freq = slice_freq
         self.normalize = normalize  # should scale data to be within 0 and 1
@@ -16,7 +21,7 @@ class PeriodogramDataset(SoundDataset):
 
     def get_params(self):
         """ Method for returning feature params """
-        params = dict(self.__dict__)
+        params = vars(self)
         params.pop('filenames')
         params.pop('labels')
         return params
@@ -32,13 +37,13 @@ class PeriodogramDataset(SoundDataset):
         frequencies = np.fft.rfftfreq(sampling_rate, d=(1. / sampling_rate))[1:]
 
         if self.slice_freq:
-            periodogram = periodogram[self.slice_freq[0]:self.slice_freq[1]]
-            frequencies = frequencies[self.slice_freq[0]:self.slice_freq[1]]
+            periodogram = periodogram[self.slice_freq.start:self.slice_freq.stop]
+            frequencies = frequencies[self.slice_freq.start:self.slice_freq.stop]
 
         if self.normalize:
             periodogram = MinMaxScaler().fit_transform(periodogram.reshape(-1, 1)).squeeze()
 
-        periodogram = periodogram.astype(np.float32)
+        periodogram = periodogram.astype(float)
         return (periodogram, frequencies), labels
 
     def __getitem__(self, idx):
