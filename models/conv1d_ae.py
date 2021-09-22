@@ -81,18 +81,17 @@ class Conv1DDecoder(nn.Module):
         self.conv = nn.Sequential()
 
         self.mlp = nn.Linear(latent, conv_to_mlp_size)
-        self.unflatten = nn.Unflatten(1, (features[0], int(conv_to_mlp_size // features[0])))
-        self.conv.add_module(name=f'ld-upsample-{0}', module=nn.Upsample(size=forced_conv_shapes[0]))
-
+        self.unflatten = nn.Unflatten(1, (features[0], forced_conv_shapes[0]))
         for i, (in_size, out_size) in enumerate(zip(features[:-1], features[1:]), 1):
             self.conv.add_module(name=f'ld-conv-{i}',
                                  module=_conv1d_transpose_block(in_size, out_size, dropout_probs[i],
                                                                 kernel_size=kernel_size,
                                                                 padding=padding))
             self.conv.add_module(name=f'ld-upsample-{i}', module=nn.Upsample(size=forced_conv_shapes[i]))
-        self.conv.add_module(name=f"ld-conv-{len(features)}", module=nn.ConvTranspose1d(features[-1], 1,
-                                                                                        kernel_size=kernel_size,
-                                                                                        padding=padding))
+        self.conv.add_module(name=f"ld-conv-{len(features) + 1}", module=nn.ConvTranspose1d(features[-1], 1,
+                                                                                            kernel_size=kernel_size,
+                                                                                            padding=padding))
+        self.conv.add_module(name=f'ld-upsample-{len(features) + 1}', module=nn.Upsample(size=forced_conv_shapes[-1]))
 
     def forward(self, latent):
         x = self.mlp(latent)
