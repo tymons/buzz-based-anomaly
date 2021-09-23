@@ -10,7 +10,7 @@ from typing import Union, List
 class Autoencoder(BaseModel):
     """ Vanilla autoencoder """
 
-    def __init__(self, layers: List[int], latent_size: int, input_size: Union[int, tuple],
+    def __init__(self, layers: List[int], latent_size: int, input_size: tuple,
                  dropout: Union[List[float], float] = 0.2):
         super().__init__()
 

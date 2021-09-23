@@ -85,7 +85,7 @@ def main():
         sound_labels: List[int] = [list(available_labels).index(sound_name.stem.split('-')[0])
                                    for sound_name in sound_list]
         dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, sound_labels, feature_config)
-        data_shape = dataset[0][0][0].squeeze().shape[0]
+        data_shape = dataset[0][0][0].squeeze().shape
         train_loader, val_loader = SoundFeatureFactory.build_train_and_validation_dataloader(dataset,
                                                                                              learning_config.get(
                                                                                                  'batch_size', 32))
