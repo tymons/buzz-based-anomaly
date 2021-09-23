@@ -117,11 +117,6 @@ class Conv2DAE(BaseModel):
         self._max_pool = max_pool
 
         connector_size, conv_temporal = convolutional_to_mlp(input_size, len(features), kernel_size, padding, max_pool)
-<<<<<<< HEAD
-=======
-        print(f'connector size: {connector_size}')
-        print(f'temporals: {conv_temporal}')
->>>>>>> 22686b59edb10434e7082596e74a7ac6c558809e
         self.encoder = Conv2DEncoderWithLatent(features, dropout_probs, kernel_size, padding, max_pool, latent,
                                                features[-1] * connector_size)
         self.decoder = Conv2DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, latent,
