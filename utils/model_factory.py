@@ -1,6 +1,5 @@
 import logging
 import optuna
-import math
 
 from models.model_type import HiveModelType
 from torchsummary import summary

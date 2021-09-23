@@ -142,7 +142,7 @@ class ModelRunner:
         self._curr_patience = -1
         self._curr_best_loss = -1
 
-    def _setup_experiment(self, experiment_name: str, log_parameters: dict, tags: List[str])  -> Experiment:
+    def _setup_experiment(self, experiment_name: str, log_parameters: dict, tags: List[str]) -> Experiment:
         """
         Method for setting up the comet ml experiment
         :param experiment_name: unique experiment name
