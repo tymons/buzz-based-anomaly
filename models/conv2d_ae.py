@@ -96,6 +96,7 @@ class Conv2DDecoder(nn.Module):
                                                                                             kernel_size=kernel_size,
                                                                                             padding=padding))
         self.conv.add_module(name=f'ld-upsample-{len(features) + 1}', module=nn.Upsample(size=forced_conv_shapes[-1]))
+        self.conv.add_module(name=f'activation-conv-{len(features) + 1}', module=nn.Sigmoid())
 
     def forward(self, latent):
         x = self.mlp(latent)
@@ -116,8 +117,6 @@ class Conv2DAE(BaseModel):
         self._max_pool = max_pool
 
         connector_size, conv_temporal = convolutional_to_mlp(input_size, len(features), kernel_size, padding, max_pool)
-        print(f'connector size: {connector_size}')
-        print(f'temporals: {conv_temporal}')
         self.encoder = Conv2DEncoderWithLatent(features, dropout_probs, kernel_size, padding, max_pool, latent,
                                                features[-1] * connector_size)
         self.decoder = Conv2DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, latent,

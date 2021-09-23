@@ -27,13 +27,11 @@ class SoundFeatureFactory:
         """
         slice_freq = SliceFrequency(**features_params_dict.get('slice_frequency'))
         convert_db = features_params_dict.get('convert_db')
-        normalize = features_params_dict.get('normalize')
 
         logging.debug(f'building periodogram dataset of length {len(sound_filenames)}'
-                      f' with params: db_scale({convert_db}), min_max_scale({normalize}),'
-                      f' slice_freq({slice_freq})')
+                      f' with params: db_scale({convert_db}),  slice_freq({slice_freq})')
 
-        return PeriodogramDataset(sound_filenames, labels, convert_db, normalize, slice_freq=slice_freq)
+        return PeriodogramDataset(sound_filenames, labels, convert_db, slice_freq=slice_freq)
 
     @staticmethod
     def _get_spectrogram_dataset(sound_filenames: List[Path], labels: List[int],
@@ -49,11 +47,10 @@ class SoundFeatureFactory:
         n_fft: int = features_params_dict.get('nfft')
         hop_len: int = features_params_dict.get('hop_len')
         convert_db: bool = features_params_dict.get('convert_db')
-        normalize: bool = features_params_dict.get('normalize')
         window: str = features_params_dict.get('window')
         data_round: bool = features_params_dict.get('round_power_2')
 
-        return SpectrogramDataset(sound_filenames, labels, n_fft, hop_len, convert_db, normalize, slice_freq,
+        return SpectrogramDataset(sound_filenames, labels, n_fft, hop_len, convert_db, slice_freq,
                                   data_round=data_round, window=window)
 
     @staticmethod

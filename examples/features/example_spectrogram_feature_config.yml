@@ -4,6 +4,5 @@ slice_frequency:
 nfft: 512
 hop_len: 256
 convert_db: False
-normalize: False
 window: hann
 round_power_2: True
