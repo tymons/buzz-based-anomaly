@@ -26,9 +26,9 @@ class PeriodogramDataset(SoundDataset):
 
     def get_item(self, idx):
         """ Function for getting periodogram """
-        should_be_integers = self.convert_db
-        sound_samples, sampling_rate, labels = SoundDataset.read_sound(self, idx=idx, raw=should_be_integers)
+        sound_samples, sampling_rate, labels = SoundDataset.read_sound(self, idx=idx, raw=False)
         periodogram = abs(np.fft.fft(sound_samples, sampling_rate))[1:]
+
         if self.convert_db:
             periodogram = 20 * np.log10(periodogram)
 

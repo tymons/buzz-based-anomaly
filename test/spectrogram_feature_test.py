@@ -20,7 +20,6 @@ def _get_default_config() -> dict:
         'nfft': 512,
         'hop_len': 256,
         'convert_db': False,
-        'normalize': False,
         'window': 'hann',
         'round_power_2': True
     }
@@ -29,7 +28,7 @@ def _get_default_config() -> dict:
 class TestPeriodogramMethods(unittest.TestCase):
     def setUp(self):
         self.filename_10kHz = Path(Path(__file__).parent.resolve(), 'data/10kHz.wav')
-        self.filename_440Hz = Path(Path(__file__).parent.resolve(), 'data/440Hz.wav')
+        self.filename_1kHz = Path(Path(__file__).parent.resolve(), 'data/1kHz.wav')
 
     def test_10kHz_basic(self):
         config = _get_default_config()
