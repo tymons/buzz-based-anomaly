@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import logging
 
@@ -141,7 +142,7 @@ class ModelRunner:
         self._curr_patience = -1
         self._curr_best_loss = -1
 
-    def _setup_experiment(self, experiment_name: str, log_parameters: dict, tags: List[str]) -> Experiment:
+    def _setup_experiment(self, experiment_name: str, log_parameters: dict, tags: List[str])  -> Experiment:
         """
         Method for setting up the comet ml experiment
         :param experiment_name: unique experiment name
@@ -149,6 +150,10 @@ class ModelRunner:
         :param tags: additional tags for COMET ML experiment
         :return: Experiment
         """
+        environment = os.getenv('ENVIRONMENT', None)
+        if environment is not None:
+            tags.append(environment)
+
         experiment = Experiment(api_key=self.comet_api_key, display_summary_level=0,
                                 project_name=self.comet_proj_name, auto_metric_logging=False)
         experiment.set_name(experiment_name)

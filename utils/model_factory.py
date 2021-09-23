@@ -1,5 +1,6 @@
 import logging
 import optuna
+import math
 
 from models.model_type import HiveModelType
 from torchsummary import summary
@@ -17,21 +18,25 @@ def model_check(model, input_shape, device="cuda"):
     return model
 
 
-def build_optuna_model_config(model_type: HiveModelType, input_size: int, trial: optuna.Trial) -> dict:
+def build_optuna_model_config(model_type: HiveModelType, input_shape: Union[Tuple, int], trial: optuna.Trial) -> dict:
     """
     Function for building optuna trial config for autoencoder
     :param model_type: model type
     :param trial: optuna trial object
-    :param input_size: data input size
+    :param input_shape: data input size
     :return: config dictionary
     """
     n_layers = trial.suggest_int('n_layers', 1, 4)
-    latent = trial.suggest_int('latent', 2, 16)
+    latent = trial.suggest_int('latent', 2, 32)
 
     layers = []
     dividers = []
     dropouts = []
-    last_input_size = input_size
+
+    if not isinstance(input_shape, tuple):
+        input_shape = (input_shape,)
+
+    last_input_size = min(*input_shape)
     for i in range(n_layers):
         dividers.append(trial.suggest_uniform(f'divider_{i}', 1, 3))
         layer_size = trial.suggest_int(f'layer_{i}', 1, max(int(last_input_size // dividers[i]), latent))
@@ -132,12 +137,15 @@ class HiveModelFactory:
         return model
 
     @staticmethod
-    def build_model_and_check(model_type: HiveModelType, input_shape: int, config: dict) -> BaseModel:
+    def build_model_and_check(model_type: HiveModelType, input_shape: Union[int, Tuple], config: dict) -> BaseModel:
         """
         Method for building and verifying model
         :param model_type: model type enum
         :param config: dictionary for model config
         :param input_shape: data input shape
         """
-        return model_check(HiveModelFactory.build_model(model_type, input_shape, config), (1, input_shape),
+        if not isinstance(input_shape, tuple):
+            input_shape = (input_shape, )
+
+        return model_check(HiveModelFactory.build_model(model_type, input_shape, config), (1, *input_shape),
                            device='cpu')
