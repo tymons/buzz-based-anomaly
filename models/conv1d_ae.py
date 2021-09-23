@@ -92,6 +92,7 @@ class Conv1DDecoder(nn.Module):
                                                                                             kernel_size=kernel_size,
                                                                                             padding=padding))
         self.conv.add_module(name=f'ld-upsample-{len(features) + 1}', module=nn.Upsample(size=forced_conv_shapes[-1]))
+        self.conv.add_module(name=f'activation-conv-{len(features) + 1}', module=nn.Sigmoid())
 
     def forward(self, latent):
         x = self.mlp(latent)

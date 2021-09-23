@@ -11,9 +11,7 @@ from utils.data_utils import adjust_matrix, closest_power_2, adjust_ndarray
 
 
 def calculate_spectrogram(samples, sampling_rate: int, n_fft: int, hop_len: int, slice_freq: SliceFrequency = None,
-                          normalize=True, convert_db=True, window_name: str = 'blackman') -> (np.ndarray,
-                                                                                              np.ndarray,
-                                                                                              np.ndarray):
+                          convert_db=True, window_name: str = 'blackman') -> (np.ndarray, np.ndarray, np.ndarray):
     """ Function for calculating spectrogram
     :param window_name: window name, see scipy.signal.get_window function
     :param samples: audio samples from which spectrogram should be calculated
@@ -36,10 +34,8 @@ def calculate_spectrogram(samples, sampling_rate: int, n_fft: int, hop_len: int,
         frequencies = frequencies[freq_slice]
         spectrogram_magnitude = spectrogram_magnitude[freq_slice]
 
-    if normalize:
-        initial_shape = spectrogram_magnitude.shape
-        spectrogram_magnitude = MinMaxScaler().fit_transform(spectrogram_magnitude.reshape(-1, 1)).reshape(
-            initial_shape)
+    initial_shape = spectrogram_magnitude.shape
+    spectrogram_magnitude = MinMaxScaler().fit_transform(spectrogram_magnitude.reshape(-1, 1)).reshape(initial_shape)
 
     spectrogram_magnitude = spectrogram_magnitude.astype(float)
     return spectrogram_magnitude, frequencies, times
@@ -53,14 +49,13 @@ class SpectrogramDataset(SoundDataset):
     slice_freq: SliceFrequency
 
     def __init__(self, filenames: List[Path], labels: List[int], n_fft: int, hop_len: int,
-                 convert_db: bool = False, normalize: bool = False, slice_freq: SliceFrequency = None,
+                 convert_db: bool = False, slice_freq: SliceFrequency = None,
                  data_round: bool = True, window: str = 'hann'):
         SoundDataset.__init__(self, filenames, labels)
         self.n_fft = n_fft
         self.hop_len = hop_len
         self.slice_freq = slice_freq
         self.convert_db = convert_db
-        self.normalize = normalize
         self.data_round = data_round
         self.window = window
 
@@ -81,7 +76,7 @@ class SpectrogramDataset(SoundDataset):
         """
         sound_samples, sampling_rate, label = SoundDataset.read_sound(self, idx)
         spectrogram, frequencies, times = calculate_spectrogram(sound_samples, sampling_rate, self.n_fft,
-                                                                self.hop_len, self.slice_freq, self.normalize,
+                                                                self.hop_len, self.slice_freq,
                                                                 self.convert_db, self.window)
 
         if self.data_round:
@@ -96,4 +91,5 @@ class SpectrogramDataset(SoundDataset):
     def __getitem__(self, idx):
         """ Wrapper for getting item from Spectrogram dataset """
         (data, _, _), labels = self.get_item(idx)
-        return data, labels
+        data = data.astype(np.float32)
+        return data[None, :], labels
