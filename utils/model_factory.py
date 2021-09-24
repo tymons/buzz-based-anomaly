@@ -7,7 +7,7 @@ from models.base_model import BaseModel
 from models.ae import Autoencoder
 from models.conv1d_ae import Conv1DAE
 from models.conv2d_ae import Conv2DAE
-from typing import Callable, Union, Tuple
+from typing import Callable, Tuple
 
 
 def model_check(model, input_shape, device="cuda"):
