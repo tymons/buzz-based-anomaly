@@ -175,8 +175,10 @@ def adjust_ndarray(input_array: np.ndarray, length: int, policy: str = 'zeros') 
         else:
             new_values = np.zeros(length)
         output = np.hstack([input_array, new_values])
-    else:
+    elif diff_len < 0:
         output = input_array[:diff_len]
+    else:
+        output = input_array
     return output
 
 

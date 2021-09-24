@@ -13,6 +13,7 @@ dependencies:
   - cudatoolkit==${CUDA_TOOLKIT_VERSION}
   - scikit-learn
   - pyyaml
+  - librosa
   - comet_ml
   - optuna
   - pydub

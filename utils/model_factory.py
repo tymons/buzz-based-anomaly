@@ -17,7 +17,7 @@ def model_check(model, input_shape, device="cuda"):
     return model
 
 
-def build_optuna_model_config(model_type: HiveModelType, input_shape: Union[Tuple, int], trial: optuna.Trial) -> dict:
+def build_optuna_model_config(model_type: HiveModelType, input_shape: Tuple, trial: optuna.Trial) -> dict:
     """
     Function for building optuna trial config for autoencoder
     :param model_type: model type
@@ -32,10 +32,7 @@ def build_optuna_model_config(model_type: HiveModelType, input_shape: Union[Tupl
     dividers = []
     dropouts = []
 
-    if not isinstance(input_shape, tuple):
-        input_shape = (input_shape,)
-
-    last_input_size = min(*input_shape)
+    last_input_size = min(*input_shape) if len(input_shape) > 1 else input_shape[0]
     for i in range(n_layers):
         dividers.append(trial.suggest_uniform(f'divider_{i}', 1, 3))
         layer_size = trial.suggest_int(f'layer_{i}', 1, max(int(last_input_size // dividers[i]), latent))
@@ -62,7 +59,7 @@ class HiveModelFactory:
     """ Factory for ML models """
 
     @staticmethod
-    def _get_autoencoder_model(config: dict, input_shape: int) -> Autoencoder:
+    def _get_autoencoder_model(config: dict, input_shape: Tuple) -> Autoencoder:
         """
         Method for building vanilla autoencoder model
         :param config: config for model
@@ -75,10 +72,10 @@ class HiveModelFactory:
 
         logging.debug(f'building ae model with config: layers({layers}), latent({latent_size}),'
                       f' dropout({dropouts})')
-        return Autoencoder(layers, latent_size, input_shape, dropouts)
+        return Autoencoder(layers, latent_size, input_shape[0], dropouts)
 
     @staticmethod
-    def _get_conv1d_autoencoder_model(config: dict, input_size: int) -> Conv1DAE:
+    def _get_conv1d_autoencoder_model(config: dict, input_size: Tuple) -> Conv1DAE:
         """
         Method for building 1D convolutional Autoencoder
         :param config: model config
@@ -96,10 +93,10 @@ class HiveModelFactory:
                       f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
                       f' max_pool({max_pool})')
         return Conv1DAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
-                        input_size=input_size, max_pool=max_pool)
+                        input_size=input_size[0], max_pool=max_pool)
 
     @staticmethod
-    def _get_conv2d_autoencoder_model(config: dict, input_size) -> Conv2DAE:
+    def _get_conv2d_autoencoder_model(config: dict, input_size: Tuple) -> Conv2DAE:
         """
         Method for building 2D convolutional Autoencoder
         :param config: model config
@@ -121,7 +118,7 @@ class HiveModelFactory:
                         input_size=input_size, max_pool=max_pool)
 
     @staticmethod
-    def build_model(model_type: HiveModelType, input_shape: Union[int, Tuple], config: dict) -> BaseModel:
+    def build_model(model_type: HiveModelType, input_shape: Tuple, config: dict) -> BaseModel:
         """
         Method for building ML models
         :param model_type: model type enum
@@ -129,22 +126,19 @@ class HiveModelFactory:
         :param input_shape: data input shape
         :return:
         """
-        model_func: Callable[[dict, int], (BaseModel, dict)] = \
+        model_func: Callable[[dict, tuple], (BaseModel, dict)] = \
             getattr(HiveModelFactory, f'_get_{model_type.value.lower()}_model',
                     lambda x, y: logging.error('invalid model type!'))
         model = model_func(config, input_shape)
         return model
 
     @staticmethod
-    def build_model_and_check(model_type: HiveModelType, input_shape: Union[int, Tuple], config: dict) -> BaseModel:
+    def build_model_and_check(model_type: HiveModelType, input_shape: Tuple, config: dict) -> BaseModel:
         """
         Method for building and verifying model
         :param model_type: model type enum
         :param config: dictionary for model config
         :param input_shape: data input shape
         """
-        if not isinstance(input_shape, tuple):
-            input_shape = (input_shape, )
-
         return model_check(HiveModelFactory.build_model(model_type, input_shape, config), (1, *input_shape),
                            device='cpu')

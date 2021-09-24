@@ -13,7 +13,7 @@ class TestModelFactoryMethods(unittest.TestCase):
             'dropout': [0.3, 0.3, 0.3],
             'latent': 8
         }
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('autoencoder'), input_size, config)
+        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('autoencoder'), (input_size, ), config)
         self.assertIsNotNone(model_check(model, (1, input_size), device='cpu'), "model verification failed!")
         self.assertListEqual(model.get_params().get('model_layers'), config['layers'])
         self.assertListEqual(model.get_params().get('model_dropouts'), config['dropout'])

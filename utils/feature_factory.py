@@ -7,6 +7,7 @@ from features.sound_dataset import SoundDataset
 from features.periodogram_dataset import PeriodogramDataset
 from features.spectrogram_dataset import SpectrogramDataset
 from features.slice_frequency_dataclass import SliceFrequency
+from features.melspectrogram_dataset import MelSpectrogramDataset
 
 from typing import List, Callable
 from pathlib import Path
@@ -51,7 +52,21 @@ class SoundFeatureFactory:
         data_round: bool = features_params_dict.get('round_power_2')
 
         return SpectrogramDataset(sound_filenames, labels, n_fft, hop_len, convert_db, slice_freq,
-                                  data_round=data_round, window=window)
+                                  round_data_shape=data_round, window=window)
+
+    @staticmethod
+    def _get_melspectrogram_dataset(sound_filenames: List[Path], labels: List[int],
+                                    features_params_dict: dict) -> MelSpectrogramDataset:
+        slice_freq = SliceFrequency(**features_params_dict.get('slice_frequency'))
+        n_fft: int = features_params_dict.get('nfft')
+        hop_len: int = features_params_dict.get('hop_len')
+        convert_db: bool = features_params_dict.get('convert_db')
+        window: str = features_params_dict.get('window')
+        data_round: bool = features_params_dict.get('round_power_2')
+        n_mels: int = features_params_dict.get('nmels')
+
+        return MelSpectrogramDataset(sound_filenames, labels, n_fft, hop_len, convert_db, slice_freq,
+                                     round_data_shape=data_round, window=window, n_mels=n_mels)
 
     @staticmethod
     def build_dataset(input_type: SoundFeatureType, sound_filenames: List[Path], labels: List[int],

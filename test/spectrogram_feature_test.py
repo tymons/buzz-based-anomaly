@@ -55,6 +55,7 @@ class TestPeriodogramMethods(unittest.TestCase):
     def test_10kHz_db_scaled(self):
         config = _get_default_config()
         config['convert_db'] = True
+        config['round_power_2'] = False
 
         dataset = SoundFeatureFactory.build_dataset(SoundFeatureType.from_name('spectrogram'),
                                                     [self.filename_10kHz], [1], config)
@@ -80,6 +81,7 @@ class TestPeriodogramMethods(unittest.TestCase):
         config = _get_default_config()
         config['normalize'] = True
         config['convert_db'] = True
+        config['round_power_2'] = False
 
         dataset = SoundFeatureFactory.build_dataset(SoundFeatureType.from_name('spectrogram'),
                                                     [self.filename_10kHz], [1], config)

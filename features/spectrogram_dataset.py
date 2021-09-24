@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 
 from typing import List
 from sklearn.preprocessing import MinMaxScaler
@@ -50,13 +51,13 @@ class SpectrogramDataset(SoundDataset):
 
     def __init__(self, filenames: List[Path], labels: List[int], n_fft: int, hop_len: int,
                  convert_db: bool = False, slice_freq: SliceFrequency = None,
-                 data_round: bool = True, window: str = 'hann'):
+                 round_data_shape: bool = True, window: str = 'hann'):
         SoundDataset.__init__(self, filenames, labels)
         self.n_fft = n_fft
         self.hop_len = hop_len
         self.slice_freq = slice_freq
         self.convert_db = convert_db
-        self.data_round = data_round
+        self.round_data_shape = round_data_shape
         self.window = window
 
     def get_params(self) -> dict:
@@ -79,12 +80,16 @@ class SpectrogramDataset(SoundDataset):
                                                                 self.hop_len, self.slice_freq,
                                                                 self.convert_db, self.window)
 
-        if self.data_round:
-            spectrogram = adjust_matrix(spectrogram, 2 ** closest_power_2(spectrogram.shape[0]),
-                                        2 ** closest_power_2(spectrogram.shape[1]), fill_with=spectrogram.min())
+        if self.round_data_shape:
+            if self.convert_db:
+                # for now we only extend linearly spaced values
+                logging.warning('ONLY LINEAR SPECTROGRAM COULD BE EXTENDED!')
+            else:
+                spectrogram = adjust_matrix(spectrogram, 2 ** closest_power_2(spectrogram.shape[0]),
+                                            2 ** closest_power_2(spectrogram.shape[1]), fill_with=spectrogram.min())
 
-            frequencies = adjust_ndarray(frequencies, 2 ** closest_power_2(frequencies.shape[0]), policy='sequence')
-            times = adjust_ndarray(times, 2 ** closest_power_2(times.shape[0]), policy='sequence')
+                frequencies = adjust_ndarray(frequencies, 2 ** closest_power_2(frequencies.shape[0]), policy='sequence')
+                times = adjust_ndarray(times, 2 ** closest_power_2(times.shape[0]), policy='sequence')
 
         return (spectrogram, frequencies, times), label
 
