@@ -4,6 +4,7 @@ from enum import Enum
 class SoundFeatureType(Enum):
     PERIODOGRAM = 'periodogram'
     SPECTROGRAM = 'spectrogram'
+    MELSPECTROGRAM = 'melspectrogram'
 
     @classmethod
     def from_name(cls, name):

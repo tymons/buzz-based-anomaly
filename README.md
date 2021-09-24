@@ -1,17 +1,38 @@
-# Buzz-based anomaly
+# Buzz-Based Anomaly
 
 ![unittest](https://github.com/tymons/buzz-based-anomaly/actions/workflows/code-check-anaconda.yml/badge.svg)
 
-This repo contains scripts and utils for buzz-based bee anomaly detection model. We utilize multiple different methods for e.g. swarming, pest attact, queenless detection tasks.
+This repo contains scripts and utils for buzz-based bee anomaly detection models. We utilize multiple different methods for e.g. swarming, pest attact, queenless detection tasks.
+Models are tested against anomalies which are (for now) just different colonies sounds. In presented paper [NU-HIVE](https://zenodo.org/record/1321278) project data are labeled as anomalies for ML models. This reflects real world scenario
+as the data comes from different devices and bees subspecies. 
 
-## Data preparation
+## Data preprocess
 
-In order to build working dataset one should use ```data_utils.py``` script. In order to download data from smartula server `SMARTULA_API` and `SMARTULA_TOKEN` environemnts should be set. 
-By default script will scan for nu-hive data and extract bees sound from available data. It can be used as anomaly or for trained models.
+In order to build working dataset one should use ```data_prepare.py``` script. Script will scan for nu-hive data in **dataset/nu-hive/** folder and extract only bees sound from available data.
+It can be used as anomaly or for trained models.
 
-### Model train
+One could download data from smartula server to train own models. Mind that this requires `SMARTULA_API` and `SMARTULA_TOKEN` environments to be set.
+Smartula raw data should be preprocessed in order to reject samples which are too silent or distorted sounds.
 
-TBA
+Example for preparing only NU-HIVE data:
+```shell
+python data_prepare.py
+```
+extending date prepare with smartula data involves additional arguments about dates (start/end) and hive sns:
+```shell
+python data_prepare.py --start YYYY-MM-DD --end YYYY-MM-DD --hives DEADBEEF99
+```
+## Model train
+Model training entrypoint is based on `train.py` script. Currently, only few models and sound features are supported. Mind that this list will change.
+
+- **Models**
+  - Vanilla Autoencoder (_autoencoder_)
+  - Convolutional 1D Autoencoder (_conv1d_autoencoder_)
+
+
+- **Features**
+  - Periodogram (_periodogram_) for models: autoencoder, conv1d_autoencoder
+  
 
 ## Docker support 
 

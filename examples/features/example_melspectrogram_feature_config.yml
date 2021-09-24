@@ -1,0 +1,9 @@
+slice_frequency:
+  start: 0
+  stop: 10000
+nfft: 512
+hop_len: 256
+convert_db: True
+window: hann
+round_power_2: False
+nmels: 32
