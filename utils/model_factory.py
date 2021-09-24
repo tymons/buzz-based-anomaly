@@ -49,7 +49,7 @@ def build_optuna_model_config(model_type: HiveModelType, input_shape: Tuple, tri
     if model_type.value.startswith('conv'):
         kernel: int = trial.suggest_int('kernel', 2, 8)
         config['padding'] = trial.suggest_int('padding', 0, kernel)
-        config['max_pool'] = trial.suggest_int('max_pool', 2, kernel)
+        config['max_pool'] = 2
         config['kernel'] = kernel
 
     return config
