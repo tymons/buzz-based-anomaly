@@ -12,5 +12,6 @@ dependencies:
   - pydub
   - pip
   - optuna
+  - librosa
   - pip:
     - torchsummary
