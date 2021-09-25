@@ -8,7 +8,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 from features.sound_dataset import SoundDataset
 from features.slice_frequency_dataclass import SliceFrequency
-from utils.data_utils import adjust_matrix, adjust_ndarray, closest_power_2
+from utils.data_utils import adjust_matrix, adjust_linear_ndarray, closest_power_2
 
 
 class MelSpectrogramDataset(SoundDataset):
@@ -35,9 +35,9 @@ class MelSpectrogramDataset(SoundDataset):
         return params
 
     def get_item(self, idx) -> tuple:
-        """ Function for getting item from Spectrogram dataset
+        """ Function for getting item from melspectrogram dataset
         :param:idx: element idx
-        :return: ((spectrogram, frequencies, times), label) (tuple)
+        :return: ((melspectrogram, frequencies, times), label) (tuple)
         """
         sound_samples, sampling_rate, label = SoundDataset.read_sound(self, idx)
         f_max = min(self.slice_freq.stop, sampling_rate // 2)
@@ -65,13 +65,14 @@ class MelSpectrogramDataset(SoundDataset):
                                                 2 ** closest_power_2(mel_spectrogram.shape[1]),
                                                 fill_with=mel_spectrogram.min())
 
-                frequencies = adjust_ndarray(frequencies, 2 ** closest_power_2(frequencies.shape[0]), policy='sequence')
-                times = adjust_ndarray(times, 2 ** closest_power_2(times.shape[0]), policy='sequence')
+                frequencies = adjust_linear_ndarray(frequencies, 2 ** closest_power_2(frequencies.shape[0]),
+                                                    policy='sequence')
+                times = adjust_linear_ndarray(times, 2 ** closest_power_2(times.shape[0]), policy='sequence')
 
         return (mel_spectrogram, frequencies, times), label
 
     def __getitem__(self, idx):
-        """ Wrapper for getting item from Spectrogram dataset """
+        """ Wrapper for getting item from melpectrogram dataset """
         (data, _, _), labels = self.get_item(idx)
         data = data.astype(np.float32)
         return data[None, :], labels
