@@ -8,6 +8,7 @@ from features.periodogram_dataset import PeriodogramDataset
 from features.spectrogram_dataset import SpectrogramDataset
 from features.slice_frequency_dataclass import SliceFrequency
 from features.melspectrogram_dataset import MelSpectrogramDataset
+from features.mfcc_dataset import MfccDataset
 
 from typing import List, Callable
 from pathlib import Path
@@ -57,6 +58,13 @@ class SoundFeatureFactory:
     @staticmethod
     def _get_melspectrogram_dataset(sound_filenames: List[Path], labels: List[int],
                                     features_params_dict: dict) -> MelSpectrogramDataset:
+        """
+        Function for getting melspectrogram dataset
+        :param sound_filenames:
+        :param labels:
+        :param features_params_dict:
+        :return:
+        """
         slice_freq = SliceFrequency(**features_params_dict.get('slice_frequency'))
         n_fft: int = features_params_dict.get('nfft')
         hop_len: int = features_params_dict.get('hop_len')
@@ -67,6 +75,26 @@ class SoundFeatureFactory:
 
         return MelSpectrogramDataset(sound_filenames, labels, n_fft, hop_len, convert_db, slice_freq,
                                      round_data_shape=data_round, window=window, n_mels=n_mels)
+
+    @staticmethod
+    def _get_mfcc_dataset(sound_filenames: List[Path], labels: List[int], features_params_dict: dict) -> MfccDataset:
+        """
+        Function for getting mfccs dataset
+        :param sound_filenames:
+        :param labels:
+        :param features_params_dict:
+        :return:
+        """
+        slice_freq = SliceFrequency(**features_params_dict.get('slice_frequency'))
+        n_fft: int = features_params_dict.get('nfft')
+        hop_len: int = features_params_dict.get('hop_len')
+        window: str = features_params_dict.get('window')
+        round_data_shape: bool = features_params_dict.get('round_power_2')
+        n_mfccs: int = features_params_dict.get('nmfccs')
+        n_mels: int = features_params_dict.get('nmels')
+
+        return MfccDataset(sound_filenames, labels, n_fft, hop_len, slice_freq, round_data_shape=round_data_shape,
+                           window=window, n_mfccs=n_mfccs, n_mels=n_mels)
 
     @staticmethod
     def build_dataset(input_type: SoundFeatureType, sound_filenames: List[Path], labels: List[int],

@@ -5,6 +5,7 @@ class SoundFeatureType(Enum):
     PERIODOGRAM = 'periodogram'
     SPECTROGRAM = 'spectrogram'
     MELSPECTROGRAM = 'melspectrogram'
+    MFCC = 'mfcc'
 
     @classmethod
     def from_name(cls, name):

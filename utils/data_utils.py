@@ -157,7 +157,7 @@ def closest_power_2(x):
     return min(possible_results, key=lambda z: abs(x - 2 ** z))
 
 
-def adjust_ndarray(input_array: np.ndarray, length: int, policy: str = 'zeros') -> np.ndarray:
+def adjust_linear_ndarray(input_array: np.ndarray, length: int, policy: str = 'zeros') -> np.ndarray:
     """
     Function for adjusting nd array
     :param input_array: input data
