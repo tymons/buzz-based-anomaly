@@ -27,8 +27,8 @@ def _get_default_config() -> dict:
 
 class TestPeriodogramMethods(unittest.TestCase):
     def setUp(self):
-        self.filename_10kHz = Path(Path(__file__).parent.resolve(), 'data/10kHz.wav')
-        self.filename_1kHz = Path(Path(__file__).parent.resolve(), 'data/1kHz.wav')
+        self.filename_10kHz = Path(Path(__file__).parent.resolve(), '../data/10kHz.wav')
+        self.filename_1kHz = Path(Path(__file__).parent.resolve(), '../data/1kHz.wav')
 
     def test_10kHz_basic(self):
         config = _get_default_config()
