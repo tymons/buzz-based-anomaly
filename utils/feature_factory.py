@@ -5,6 +5,11 @@ from torch.utils.data import DataLoader, Dataset, random_split
 from features.feature_type import SoundFeatureType
 from features.sound_dataset import SoundDataset
 from features.periodogram_dataset import PeriodogramDataset
+from features.spectrogram_dataset import SpectrogramDataset
+from features.slice_frequency_dataclass import SliceFrequency
+from features.melspectrogram_dataset import MelSpectrogramDataset
+from features.mfcc_dataset import MfccDataset
+
 from typing import List, Callable
 from pathlib import Path
 
@@ -14,24 +19,82 @@ class SoundFeatureFactory:
 
     @staticmethod
     def _get_periodogram_dataset(sound_filenames: List[Path], labels: List[int],
-                                 features_params_dict: dict) -> SoundDataset:
+                                 features_params_dict: dict) -> PeriodogramDataset:
         """
         Function for building periodogram dataset
+        :param sound_filenames: list of full os paths with sounds
+        :param labels: list of int labels
+        :param features_params_dict: parameters for
+        :return:
+        """
+        slice_freq = SliceFrequency(**features_params_dict.get('slice_frequency'))
+        convert_db = features_params_dict.get('convert_db')
+
+        logging.debug(f'building periodogram dataset of length {len(sound_filenames)}'
+                      f' with params: db_scale({convert_db}),  slice_freq({slice_freq})')
+
+        return PeriodogramDataset(sound_filenames, labels, convert_db, slice_freq=slice_freq)
+
+    @staticmethod
+    def _get_spectrogram_dataset(sound_filenames: List[Path], labels: List[int],
+                                 features_params_dict: dict) -> SpectrogramDataset:
+        """
+        Function for building spectrogram dataset
         :param sound_filenames:
         :param labels:
         :param features_params_dict:
         :return:
         """
-        frequencies = features_params_dict.get('slice_frequency', {'start': 0, 'stop': 2048})
-        convert_db = features_params_dict.get('convert_db', False)
-        normalize = features_params_dict.get('normalize', True)
+        slice_freq = SliceFrequency(**features_params_dict.get('slice_frequency'))
+        n_fft: int = features_params_dict.get('nfft')
+        hop_len: int = features_params_dict.get('hop_len')
+        convert_db: bool = features_params_dict.get('convert_db')
+        window: str = features_params_dict.get('window')
+        data_round: bool = features_params_dict.get('round_power_2')
 
-        logging.debug(f'building periodogram dataset of length {len(sound_filenames)}'
-                      f' with params: db_scale({convert_db}), min_max_scale({normalize}),'
-                      f' slice_freq({(frequencies.get("start"), frequencies.get("stop"))})')
+        return SpectrogramDataset(sound_filenames, labels, n_fft, hop_len, convert_db, slice_freq,
+                                  round_data_shape=data_round, window=window)
 
-        return PeriodogramDataset(sound_filenames, labels, convert_db, normalize,
-                                  slice_freq=(frequencies.get('start'), frequencies.get('stop')))
+    @staticmethod
+    def _get_melspectrogram_dataset(sound_filenames: List[Path], labels: List[int],
+                                    features_params_dict: dict) -> MelSpectrogramDataset:
+        """
+        Function for getting melspectrogram dataset
+        :param sound_filenames:
+        :param labels:
+        :param features_params_dict:
+        :return:
+        """
+        slice_freq = SliceFrequency(**features_params_dict.get('slice_frequency'))
+        n_fft: int = features_params_dict.get('nfft')
+        hop_len: int = features_params_dict.get('hop_len')
+        convert_db: bool = features_params_dict.get('convert_db')
+        window: str = features_params_dict.get('window')
+        data_round: bool = features_params_dict.get('round_power_2')
+        n_mels: int = features_params_dict.get('nmels')
+
+        return MelSpectrogramDataset(sound_filenames, labels, n_fft, hop_len, convert_db, slice_freq,
+                                     round_data_shape=data_round, window=window, n_mels=n_mels)
+
+    @staticmethod
+    def _get_mfcc_dataset(sound_filenames: List[Path], labels: List[int], features_params_dict: dict) -> MfccDataset:
+        """
+        Function for getting mfccs dataset
+        :param sound_filenames:
+        :param labels:
+        :param features_params_dict:
+        :return:
+        """
+        slice_freq = SliceFrequency(**features_params_dict.get('slice_frequency'))
+        n_fft: int = features_params_dict.get('nfft')
+        hop_len: int = features_params_dict.get('hop_len')
+        window: str = features_params_dict.get('window')
+        round_data_shape: bool = features_params_dict.get('round_power_2')
+        n_mfccs: int = features_params_dict.get('nmfccs')
+        n_mels: int = features_params_dict.get('nmels')
+
+        return MfccDataset(sound_filenames, labels, n_fft, hop_len, slice_freq, round_data_shape=round_data_shape,
+                           window=window, n_mfccs=n_mfccs, n_mels=n_mels)
 
     @staticmethod
     def build_dataset(input_type: SoundFeatureType, sound_filenames: List[Path], labels: List[int],

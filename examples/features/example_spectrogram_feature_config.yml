@@ -1,8 +1,8 @@
 slice_frequency:
   start: 0
-  stop: 5000
+  stop: 2048
 nfft: 512
 hop_len: 256
-convert_db: True
+convert_db: False
 window: hann
 round_power_2: True

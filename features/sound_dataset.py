@@ -39,11 +39,8 @@ def _read_samples(filename: Path, raw: bool = False) -> (np.ndarray, int):
     if len(sound_samples.shape) > 1:
         sound_samples = sound_samples.sum(axis=1) // 2
 
-    if sound_samples.dtype.kind == 'i':
-        sound_samples = sound_samples.astype(np.uint64)
-
     if not raw and sound_samples.dtype.kind != 'f':
-        sound_samples = _pcm2float(sound_samples, dynamic_type='float64')
+        sound_samples = _pcm2float(sound_samples, dynamic_type='float32')
 
     return sound_samples, sampling_rate
 

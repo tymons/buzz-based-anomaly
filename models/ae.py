@@ -9,8 +9,7 @@ from typing import Union, List
 
 class Autoencoder(BaseModel):
     """ Vanilla autoencoder """
-
-    def __init__(self, layers: List[int], latent_size: int, input_size: Union[int, tuple],
+    def __init__(self, layers: List[int], latent_size: int, input_size: int,
                  dropout: Union[List[float], float] = 0.2):
         super().__init__()
 
@@ -90,7 +89,7 @@ class Decoder(nn.Module):
             self.MLP.add_module(name=f"D{i}", module=nn.Dropout(p=dropout[i]))
         # output layer
         self.MLP.add_module(name=f"L{len(layer_sizes) + 1}", module=nn.Linear(layer_sizes[-1], output_size))
-        self.MLP.add_module(name="sigmoid", module=nn.Sigmoid())
+        self.MLP.add_module(name="activation", module=nn.Sigmoid())
 
     def forward(self, z):
         x = self.MLP(z)

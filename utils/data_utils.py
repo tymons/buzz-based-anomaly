@@ -141,7 +141,7 @@ def _batch_perform(batch_data: torch.Tensor, operation: Callable):
     if input_target.ndim > 2:
         input_target = input_target.reshape(initial_shape[0], -1)
 
-    output = torch.Tensor(operation(input_target).astype(np.float32))
+    output = torch.Tensor(operation(input_target).astype(float))
 
     if len(initial_shape) > 2:
         output = output.reshape(initial_shape)
@@ -157,10 +157,36 @@ def closest_power_2(x):
     return min(possible_results, key=lambda z: abs(x - 2 ** z))
 
 
-def adjust_matrix(matrix, *lengths):
-    """ Function for truncating matrix to lengths
+def adjust_linear_ndarray(input_array: np.ndarray, length: int, policy: str = 'zeros') -> np.ndarray:
+    """
+    Function for adjusting nd array
+    :param input_array: input data
+    :param length: length to be expanded or truncated
+    :param policy: policy ('zeros' or 'sequence')
+    :return: nd array
+    """
+    diff_len = length - len(input_array)
+    if diff_len > 0:
+        step = input_array[-1] - input_array[-2]
+        if policy == 'sequence':
+            start = input_array[-1] + step
+            stop = start + (diff_len * step)
+            new_values = np.arange(start, stop, step)
+        else:
+            new_values = np.zeros(length)
+        output = np.hstack([input_array, new_values])
+    elif diff_len < 0:
+        output = input_array[:diff_len]
+    else:
+        output = input_array
+    return output
+
+
+def adjust_matrix(matrix, *lengths, fill_with: int = 0):
+    """ Function for truncating or expanding matrix to lengths
     Parameters:
-        matrix: matrix to be truncated or expanded
+        :param matrix: matrix to be truncated or expanded
+        :param fill_with: fill auxilary data with value
      """
     for i, length in enumerate(lengths):
         shape = matrix.shape
@@ -170,8 +196,9 @@ def adjust_matrix(matrix, *lengths):
             new_shape = list(shape)
             new_shape[i] = diff
             new_shape = tuple(new_shape)
-            zeros = np.zeros(new_shape)
-            matrix = np.append(matrix, zeros, axis=i)
+            values = np.empty(new_shape)
+            values.fill(fill_with)
+            matrix = np.append(matrix, values, axis=i)
         else:
             matrix = np.swapaxes(matrix, 0, i)
             matrix = matrix[:length, ...]

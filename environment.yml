@@ -16,6 +16,7 @@ dependencies:
   - comet_ml
   - optuna
   - pydub
+  - librosa
   - pip
   - pip:
     - torchsummary
