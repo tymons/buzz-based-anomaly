@@ -23,17 +23,21 @@ extending date prepare with smartula data involves additional arguments about da
 python data_prepare.py --start YYYY-MM-DD --end YYYY-MM-DD --hives DEADBEEF99
 ```
 ## Model train
-Model training entrypoint is based on `train.py` script. Currently, only few models and sound features are supported. Mind that this list will change.
+Model training entrypoint is based on `train.py` script. Currently, only listed models and sound features are supported.
+Names in italics are direct arguments to the `train.py` script.
 
-- **Models**
-  - Vanilla Autoencoder (_autoencoder_)
-  - Convolutional 1D Autoencoder (_conv1d_autoencoder_)
-
-
-- **Features**
-  - Periodogram (_periodogram_) for models: autoencoder, conv1d_autoencoder
+- **Vanilla Autoencoder** (_autoencoder_)
+  - periodogram (_periodogram_)
+- **Convolutional 1D Autoencoder** (_conv1d_autoencoder_)
+  - Periodogram (_periodogram_)
+- **Convolutional 2D Autoencoder** (_conv2d_autoencoder_)
+  - Spectrogram (_spectrogram_)
+  - MelSpectrogram (_melspectrogram_)
+  - MFCC (_mfcc_)
+- **Variational Autoencoder** (_IN PROGRESS_)
+- **Convolutional Variational Autoencoder** (_TBD_)
+- **Convtrastive Convolutional Variational Autoencoder** (_TBD_)
   
-
 ## Docker support 
 
 Repo has ready to use docker images at [dockerhub/tymonzz](https://hub.docker.com/repository/docker/tymonzz/buzz-based-anomaly)
