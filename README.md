@@ -60,7 +60,7 @@ docker run -d --name buzz-based-anomaly \
               --find_best 4
 ```
 
-_Note that if you are using git-for-windows or other emulators MSYS_NO_PATHCPMV=1 environment variable should be set 
+_Note that if you are using git-for-windows or other shell emulators MSYS_NO_PATHCPMV=1 environment variable should be set 
 in order to correctly parse paths for data and output volumes._
 ### Building own docker image
 
