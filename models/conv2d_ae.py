@@ -125,11 +125,11 @@ class Conv2DAE(BaseModel):
     def loss_fn(self, x, y) -> torch.Tensor:
         """
         Loss function for convolutional autoencoder
-        :param x:
-        :param y:
+        :param x: model input
+        :param y: model output
         :return:
         """
-        mse = functional.F.mse_loss(x, y, reduction='mean')
+        mse = functional.F.mse_loss(y, x, reduction='mean')
         return mse
 
     def get_params(self) -> dict:
