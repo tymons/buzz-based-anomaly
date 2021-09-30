@@ -27,7 +27,7 @@ class Autoencoder(BaseModel):
         :param y: model output data
         :return: loss
         """
-        mse = F.mse_loss(x, y, reduction='mean')
+        mse = F.mse_loss(y, x, reduction='mean')
         return mse
 
     def forward(self, x):

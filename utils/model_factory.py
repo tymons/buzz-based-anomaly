@@ -7,6 +7,7 @@ from models.base_model import BaseModel
 from models.ae import Autoencoder
 from models.conv1d_ae import Conv1DAE
 from models.conv2d_ae import Conv2DAE
+from models.vae import VAE
 from typing import Callable, Tuple
 
 
@@ -116,6 +117,22 @@ class HiveModelFactory:
 
         return Conv2DAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
                         input_size=input_size, max_pool=max_pool)
+
+    @staticmethod
+    def _get_vae_model(config: dict, input_size: Tuple) -> VAE:
+        """
+        Method for building 1D Variational Autoencoder
+        :param config: model config
+        :param input_size: input size
+        :return: model
+        """
+        layers = config.get('layers', [256, 32, 16])
+        dropouts = config.get('dropout', [0.2, 0.2, 0.2])
+        latent_size = config.get('latent', 2)
+
+        logging.debug(f'building vae model with config: layers({layers}), latent({latent_size}),'
+                      f' dropout({dropouts})')
+        return VAE(layers, latent_size, input_size[0], dropouts)
 
     @staticmethod
     def build_model(model_type: HiveModelType, input_shape: Tuple, config: dict) -> BaseModel:

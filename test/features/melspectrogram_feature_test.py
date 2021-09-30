@@ -26,7 +26,7 @@ def _get_default_config() -> dict:
 
 class TestMelSpectrogramDataset(unittest.TestCase):
     def setUp(self):
-        self.filename_10kHz = Path(Path(__file__).parent.resolve(), 'data/1kHz.wav')
+        self.filename_10kHz = Path(Path(__file__).parent.resolve(), '../data/1kHz.wav')
 
     def test_1kHz_nmels_rounding_low(self):
         config = _get_default_config()

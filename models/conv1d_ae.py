@@ -124,7 +124,13 @@ class Conv1DAE(BaseModel):
         return y
 
     def loss_fn(self, x, y):
-        mse = functional.F.mse_loss(x, y, reduction='mean')
+        """
+        Function for calculating convolutional autoencoder loss
+        :param x: input data
+        :param y: model output
+        :return:
+        """
+        mse = functional.F.mse_loss(y, x, reduction='mean')
         return mse
 
     def get_params(self):
