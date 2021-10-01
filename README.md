@@ -41,7 +41,10 @@ Names in italics are direct arguments to the `train.py` script.
   - periodogram (_periodogram_)
 - [x] Convolutional 1D Variational Autoencoder (_conv1d_vae_)
   - periodogram (_periodogram_)
-- [ ] Convolutional 2D Variational Autoencoder (_IN PROGRESS_)
+- [x] Convolutional 2D Variational Autoencoder (_conv2d_vae_)
+  - Spectrogram (_spectrogram_)
+  - MelSpectrogram (_melspectrogram_)
+  - MFCC (_mfcc_)
   
 #### ~~Contrastive Autoencoders~~ (_TBA_)
 
