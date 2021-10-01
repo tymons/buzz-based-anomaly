@@ -8,6 +8,7 @@ from models.ae import Autoencoder
 from models.conv1d_ae import Conv1DAE
 from models.conv2d_ae import Conv2DAE
 from models.vae import VAE
+from models.conv1d_vae import Conv1DVAE
 from typing import Callable, Tuple
 
 
@@ -133,6 +134,27 @@ class HiveModelFactory:
         logging.debug(f'building vae model with config: layers({layers}), latent({latent_size}),'
                       f' dropout({dropouts})')
         return VAE(layers, latent_size, input_size[0], dropouts)
+
+    @staticmethod
+    def _get_conv1d_vae_model(config: dict, input_size: Tuple) -> Conv1DVAE:
+        """
+        Function for getting convolutional 1d VAE model
+        :param config: config for conv1d vae model
+        :param input_size: input size
+        :return:
+        """
+        layers = config.get('layers', [256, 64, 16])
+        dropout = config.get('dropout', [0.1, 0.1, 0.1])
+        latent_size = config.get('latent', 2)
+        kernel = config.get('kernel', 2)
+        padding = config.get('padding', 0)
+        max_pool = config.get('max_pool', 2)
+
+        logging.debug(f'building conv1d vae model with config: encoder_layers({layers}),'
+                      f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
+                      f' max_pool({max_pool})')
+        return Conv1DVAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
+                         input_size=input_size[0], max_pool=max_pool)
 
     @staticmethod
     def build_model(model_type: HiveModelType, input_shape: Tuple, config: dict) -> BaseModel:

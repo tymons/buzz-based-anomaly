@@ -16,7 +16,7 @@ class VaeOutput:
     mean: torch.Tensor
 
 
-def _kld_loss(mean, log_var):
+def kld_loss(mean, log_var):
     """ KLD loss for normal distribution"""
     return -0.5 * torch.sum(1 + log_var - mean ** 2 - log_var.exp())
 
@@ -25,7 +25,6 @@ def reparameterize(mu, log_var):
     """ Function for reparametrization trick """
     std = torch.exp(0.5 * log_var)
     eps = torch.randn_like(std)
-
     return mu + eps * std
 
 
@@ -53,7 +52,7 @@ class VAE(BaseModel):
         :return: loss
         """
         mse = functional.F.mse_loss(y.output, x, reduction='mean')
-        kld = _kld_loss(y.mean, y.log_var)
+        kld = kld_loss(y.mean, y.log_var)
         return mse + kld
 
     def get_params(self) -> dict:
