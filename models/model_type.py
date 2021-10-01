@@ -7,6 +7,7 @@ class HiveModelType(Enum):
     CONV2D_AE: str = 'conv2d_autoencoder'
     VAE: str = 'vae'
     CONV1D_VAE: str = 'conv1d_vae'
+    CONV2D_VAE: str = 'conv2d_vae'
 
     @classmethod
     def from_name(cls, name):
