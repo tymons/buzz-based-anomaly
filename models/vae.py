@@ -18,7 +18,7 @@ class VaeOutput:
 
 def _kld_loss(mean, log_var):
     """ KLD loss for normal distribution"""
-    return torch.mean(-0.5 * torch.sum(1 + log_var - mean ** 2 - log_var.exp())).item()
+    return -0.5 * torch.sum(1 + log_var - mean ** 2 - log_var.exp())
 
 
 def reparameterize(mu, log_var):
