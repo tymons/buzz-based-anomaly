@@ -34,8 +34,9 @@ Names in italics are direct arguments to the `train.py` script.
   - Spectrogram (_spectrogram_)
   - MelSpectrogram (_melspectrogram_)
   - MFCC (_mfcc_)
-- **Variational Autoencoder** (_IN PROGRESS_)
-- **Convolutional Variational Autoencoder** (_TBD_)
+- **Variational Autoencoder** (_vae)
+  - periodogram (_periodogram_)
+- **Convolutional Variational Autoencoder** (_IN PROGRESS_)
 - **Convtrastive Convolutional Variational Autoencoder** (_TBD_)
   
 ## Docker support 
