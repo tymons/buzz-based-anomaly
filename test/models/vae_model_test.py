@@ -19,3 +19,5 @@ class TestModelFactoryMethods(unittest.TestCase):
         self.assertListEqual(model.get_params().get('model_dropouts'), config['dropout'])
         self.assertEqual(model.get_params().get('model_latent'), config['latent'])
         self.assertEqual(model(torch.empty(size=(1, input_size))).output.shape[1], input_size)
+        self.assertEqual(model(torch.empty(size=(1, input_size))).mean.shape[1], config['latent'])
+        self.assertEqual(model(torch.empty(size=(1, input_size))).log_var.shape[1], config['latent'])
