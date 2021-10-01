@@ -27,7 +27,7 @@ class Conv1DVAEModelTest(unittest.TestCase):
     def test_model_is_build_basic_setup(self):
         config, input_size = get_default_config()
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_vae'), (input_size, ),
+        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_vae'), (input_size,),
                                                         config)
 
         self.assertIsNotNone(model, "model build failed!")
@@ -46,7 +46,7 @@ class Conv1DVAEModelTest(unittest.TestCase):
         config, _ = get_default_config()
         input_size = 4523
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_vae'), (input_size, ),
+        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_vae'), (input_size,),
                                                         config)
 
         self.assertIsNotNone(model, "model build failed!")
@@ -65,7 +65,7 @@ class Conv1DVAEModelTest(unittest.TestCase):
         config, input_size = get_default_config()
         config['max_pool'] = 5
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_vae'), (input_size, ),
+        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_vae'), (input_size,),
                                                         config)
 
         self.assertIsNotNone(model, "model build failed!")
@@ -80,12 +80,11 @@ class Conv1DVAEModelTest(unittest.TestCase):
         self.assertEqual(model(torch.empty(size=(1, 1, input_size))).mean.shape[1], config['latent'])
         self.assertEqual(model(torch.empty(size=(1, 1, input_size))).log_var.shape[1], config['latent'])
 
-
     def test_model_is_build_different_padding(self):
         config, input_size = get_default_config()
         config['padding'] = 4
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_vae'), (input_size, ),
+        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_vae'), (input_size,),
                                                         config)
 
         self.assertIsNotNone(model, "model build failed!")
@@ -104,7 +103,7 @@ class Conv1DVAEModelTest(unittest.TestCase):
         config, input_size = get_default_config()
         config['kernel'] = 6
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_vae'), (input_size, ),
+        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv1d_vae'), (input_size,),
                                                         config)
 
         self.assertIsNotNone(model, "model build failed!")
