@@ -41,11 +41,11 @@ class ContrastiveVAE(ContrastiveBaseModel):
         :return: loss
         """
         # reconstruction loss for target and background
-        loss = nn.functional.mse_loss(x.target, y.target, reduction='mean')
-        loss += nn.functional.mse_loss(x.background, y.background, reduction='mean')
+        loss = F.mse_loss(x.target, y.target, reduction='mean')
+        loss += F.mse_loss(x.background, y.background, reduction='mean')
         # KLD losses
         loss += kld_loss(y.target_qs_mean, y.target_qs_log_var)
-        loss += kld_loss(y.target_qz_mean, y.target_qz_log_var)
+        loss += kld_loss(y.target_qz_mean, y.target_qz_log_vaffr)
         loss += kld_loss(y.background_qz_mean, y.background_qz_log_var)
 
         # total correction loss

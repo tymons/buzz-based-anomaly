@@ -26,5 +26,3 @@ class ContrastiveAEModelTest(unittest.TestCase):
         self.assertEqual(model(input_data).target.shape[1], input_size)
         self.assertEqual(model(input_data).background.shape[1], input_size)
         self.assertEqual(model(input_data).target_qs_latent.shape[1], config['latent'])
-
-
