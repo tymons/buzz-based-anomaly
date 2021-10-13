@@ -10,7 +10,10 @@ from models.conv2d_ae import Conv2DAE
 from models.vae import VAE
 from models.conv1d_vae import Conv1DVAE
 from models.conv2d_vae import Conv2DVAE
-from typing import Callable, Tuple
+from models.contrastive_vae import ContrastiveVAE
+from models.contrastive_base_model import ContrastiveBaseModel
+from models.discriminator import Discriminator
+from typing import Callable, Tuple, Union
 
 
 def model_check(model, input_shape, device="cuda"):
@@ -180,7 +183,34 @@ class HiveModelFactory:
                          input_size=input_size, max_pool=max_pool)
 
     @staticmethod
-    def build_model(model_type: HiveModelType, input_shape: Tuple, config: dict) -> BaseModel:
+    def _get_contrastive_vae_model(config: dict, input_size: Tuple) -> ContrastiveVAE:
+        """
+        Method for building 1D Variational Autoencoder
+        :param config: model config
+        :param input_size: input size
+        :return: model
+        """
+        layers = config.get('layers', [256, 32, 16])
+        dropouts = config.get('dropout', [0.2, 0.2, 0.2])
+        latent_size = config.get('latent', 2)
+        use_discriminator = config.get('use_discriminator', False)
+
+        logging.debug(f'building contrastive vae model with config: layers({layers}), latent({latent_size}),'
+                      f' dropout({dropouts}), use_discriminator({use_discriminator})')
+        return ContrastiveVAE(layers, latent_size, input_size[0], dropouts, use_discriminator)
+
+    @staticmethod
+    def get_discriminator(discriminator_config: dict, input_size: int) -> Discriminator:
+        """
+        Method for building discriminator for contrastive autoencoder
+        :return:
+        """
+        layers = discriminator_config.get('layers', [8, 16])
+        return Discriminator(layers, input_size)
+
+    @staticmethod
+    def build_model(model_type: HiveModelType, input_shape: Tuple, config: dict) \
+            -> Union[BaseModel, ContrastiveBaseModel]:
         """
         Method for building ML models
         :param model_type: model type enum
@@ -195,7 +225,8 @@ class HiveModelFactory:
         return model
 
     @staticmethod
-    def build_model_and_check(model_type: HiveModelType, input_shape: Tuple, config: dict) -> BaseModel:
+    def build_model_and_check(model_type: HiveModelType, input_shape: Tuple, config: dict) -> \
+            Union[BaseModel, ContrastiveBaseModel]:
         """
         Method for building and verifying model
         :param model_type: model type enum

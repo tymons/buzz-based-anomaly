@@ -13,6 +13,7 @@ from tqdm import tqdm
 from typing import List
 
 from utils.data_utils import create_valid_sounds_datalist
+from utils.data_prepare_type import DataPrepareType
 
 
 def generate_wav_from_mp3(mp3_filepath: Path, remove_mp3: bool = False):
@@ -134,30 +135,59 @@ def prepare_smartula_data(dataset_path: Path, start_utc_imestamp: int, end_utc_t
     create_valid_sounds_datalist(dataset_path)
 
 
+def fragment_sound_data(files: List[Path], duration_ms: int) -> List[str]:
+    """
+    Method for processing sound files
+    :param files:
+    :param duration_ms:
+    """
+    output_filenames = []
+    logging.info(f'got  {len(files)} sound files to process')
+    for file_path in tqdm(files):
+        audio = AudioSegment.from_wav(file_path)
+        for elem_idx, element in enumerate(audio[::duration_ms]):
+            if element.duration_seconds * 1000 == duration_ms:
+                sub_filename = f"{file_path.with_suffix('')}-{elem_idx}.wav"
+                with open(sub_filename, "wb") as f:
+                    element.export(f, format='wav')
+                output_filenames.append(sub_filename)
+
+    return output_filenames
+
+
 def main():
     parser = argparse.ArgumentParser(description='Process data preparation arguments.')
+    parser.add_argument('task', metavar='task', choices=list(DataPrepareType),
+                        type=DataPrepareType.from_name, help="Data prepare task type")
     parser.add_argument('--start', '-s', type=date.fromisoformat, metavar='S',
-                        help='Start date for Smartula data in format YYYY-MM-DD', required=True)
+                        help='Start date for Smartula data in format YYYY-MM-DD')
     parser.add_argument('--end', '-e', type=date.fromisoformat, metavar='E',
                         help='End date for Smartula data in format YYYY-MM-DD', default=datetime.now())
-    parser.add_argument('--hives', type=str, nargs='+', metavar='H', help='Smartula hives sns')
+    parser.add_argument('--smartula_hives', type=str, nargs='+', metavar='H', help='Smartula hives sns')
+    parser.add_argument('--data_folder', default=Path(__file__).absolute().parent / "dataset/", type=Path)
+    parser.add_argument('--duration', type=int, help="sound duration for files to be truncated in seconds")
+
     args = parser.parse_args()
 
-    dataset_path = Path('./dataset/')
-
-    # nu-hive data - only bees
-    prepare_nuhive_data(dataset_path / 'nu-hive')
-
-    # smartula data - download and validate
-    if args.hives:
-        SMARTULA_API = os.getenv('SMARTULA_API')
-        SMARTULA_TOKEN = os.getenv('SMARTULA_TOKEN')
-
-        prepare_smartula_data(dataset_path / 'smartula',
+    if args.task == DataPrepareType.GET_NUHIVE_BEES:
+        # nu-hive data - only bees
+        prepare_nuhive_data(args.data_folder)
+    elif args.task == DataPrepareType.SMARTULA:
+        # download and validate smartula data
+        smartula_api_env = os.getenv('SMARTULA_API')
+        smartula_token_env = os.getenv('SMARTULA_TOKEN')
+        prepare_smartula_data(args.data_folder,
                               int(datetime(year=args.start.year, month=args.start.month,
                                            day=args.start.day).timestamp()),
                               int(datetime(year=args.end.year, month=args.end.month, day=args.end.day).timestamp()),
-                              args.hives, SMARTULA_API, SMARTULA_TOKEN)
+                              args.smartula_hives, smartula_api_env, smartula_token_env)
+    elif args.task == DataPrepareType.FRAGMENT_HIVE_BEES:
+        # slice sound segments
+        sound_files = list(args.data_folder.glob('**/*.wav'))
+        fragment_sound_data(sound_files, args.duration * 1000)
+        # delete original files:
+        for file in sound_files:
+            file.unlink()
 
 
 if __name__ == "__main__":
