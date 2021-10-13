@@ -56,6 +56,7 @@ def main():
     parser.add_argument('--comet_config', default=Path(__file__).absolute().parent / ".comet.config", type=Path)
     parser.add_argument('--find_best', type=int, metavar='N', help="how many trials for finding best architecture")
     parser.add_argument('--log_folder', default=Path(__file__).absolute().parent / "output/", type=Path)
+    parser.add_argument('--contrastive_data_folder', type=Path)
 
     args = parser.parse_args()
 
@@ -96,13 +97,15 @@ def main():
             model_runner.find_best(args.model, data_shape, learning_config, n_trials=args.find_best,
                                    output_folder=Path('output/model'))
         else:
-            model = HiveModelFactory.build_model_and_check(args.model, data_shape, model_config)
+            # Here we perform model training
             if args.model == HiveModelType.CONTRASTIVE_VAE:
+                model = HiveModelFactory.build_model(args.model, data_shape, model_config['model'])
                 discriminator = HiveModelFactory.get_discriminator(model_config['discriminator'],
-                                                                   model_config['latent'])
+                                                                   model_config['model']['latent'])
                 model = model_runner.train_contrastive(model, learning_config['model'], discriminator,
                                                        learning_config['discriminator'])
             else:
+                model = HiveModelFactory.build_model_and_check(args.model, data_shape, model_config['model'])
                 model = model_runner.train(model, learning_config)
 
 
