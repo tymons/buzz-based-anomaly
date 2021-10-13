@@ -9,6 +9,7 @@ from features.spectrogram_dataset import SpectrogramDataset
 from features.slice_frequency_dataclass import SliceFrequency
 from features.melspectrogram_dataset import MelSpectrogramDataset
 from features.mfcc_dataset import MfccDataset
+from features.contrastive_feature_dataset import ContrastiveFeatureDataset
 
 from typing import List, Callable
 from pathlib import Path
@@ -113,6 +114,16 @@ class SoundFeatureFactory:
         dataset: SoundDataset = function(sound_filenames, labels, features_params_dict)
 
         return dataset
+
+    @staticmethod
+    def build_contrastive_feature_dataset(target: SoundDataset, background: SoundDataset) -> ContrastiveFeatureDataset:
+        """
+        Method for building contrastive dataset
+        :param target:
+        :param background:
+        :return:
+        """
+        return ContrastiveFeatureDataset(target, background)
 
     @staticmethod
     def build_train_and_validation_dataloader(dataset: SoundDataset, batch_size: int,
