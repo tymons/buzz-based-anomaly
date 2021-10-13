@@ -15,14 +15,17 @@ import gc
 from pathlib import Path
 from typing import Any, Dict
 
+from models.model_type import HiveModelType
 from models.base_model import BaseModel
+from models.contrastive_base_model import ContrastiveBaseModel
+from models.contrastive_vae import latent_permutation
+
 from typing import List, Callable, Union
 from torch import nn, device
 
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
-
-from models.model_type import HiveModelType
+from features.contrastive_feature_dataset import ContrastiveOutput
 from utils.model_factory import HiveModelFactory, build_optuna_model_config
 
 
@@ -73,7 +76,7 @@ def _read_comet_key(path: Path) -> str:
         return [b.split('=')[-1] for b in f.read().splitlines() if b.startswith('api_key')][0]
 
 
-def model_save(model: BaseModel, output_path: Path, optimizer: Optimizer, epoch_no: int,
+def model_save(model: Union[BaseModel, nn.DataParallel], output_path: Path, optimizer: Optimizer, epoch_no: int,
                loss: float) -> None:
     """
     Function for saving model on disc
@@ -88,7 +91,7 @@ def model_save(model: BaseModel, output_path: Path, optimizer: Optimizer, epoch_
          'loss': loss}, output_path)
 
 
-def model_load(checkpoint_filepath: Path, model: BaseModel, optimizer: Optimizer = None):
+def model_load(checkpoint_filepath: Path, model: Union[BaseModel, nn.DataParallel], optimizer: Optimizer = None):
     """
     Function for loading model from disc
     :param checkpoint_filepath: checkpoint path
@@ -161,13 +164,12 @@ class ModelRunner:
         experiment.add_tags(tags)
         return experiment
 
-    def _train_step(self, model: nn.Module, optimizer: torch.optim.Optimizer, cost_fn: Callable,
+    def _train_step(self, model: Union[BaseModel, nn.DataParallel], optimizer: torch.optim.Optimizer,
                     experiment: Experiment, epoch_no: int, logging_interval: int = 10) -> float:
         """
         Function for performing epoch step on data
         :param model: model to be trained
         :param optimizer: used optimizer
-        :param cost_fn: cost function
         :param experiment: comet ml experiment where data will be reported
         :param epoch_no: epoch number
         :param logging_interval: after how many batches data will be logged
@@ -179,7 +181,7 @@ class ModelRunner:
             batch = batch.to(self.device)
             optimizer.zero_grad()
             model_output = model(batch)
-            loss = cost_fn(batch, model_output)
+            loss = model.loss_fn(batch, model_output)
             loss.backward()
             optimizer.step()
 
@@ -193,12 +195,11 @@ class ModelRunner:
                              f'-> batch loss: {loss_float}')
         return sum(mean_loss) / len(mean_loss)
 
-    def _val_step(self, model: nn.Module, cost_fn: Callable, experiment: Experiment, epoch_no: int,
+    def _val_step(self, model: Union[BaseModel, nn.DataParallel], experiment: Experiment, epoch_no: int,
                   logging_interval: int):
         """
         Function for performing validation step for model
         :param model: model to be evaluated
-        :param cost_fn: cost function
         :param experiment: comet ml experiment
         :param epoch_no: epoch number for validation step - mostly for logging
         :param logging_interval: interval for logs within epoch
@@ -209,7 +210,7 @@ class ModelRunner:
         for batch_idx, (batch, _) in enumerate(self.val_dataloader):
             batch = batch.to(self.device)
             model_output = model(batch)
-            loss = cost_fn(batch, model_output)
+            loss = model.loss_fn(batch, model_output)
 
             loss_float = loss.item()
             val_loss.append(loss_float)
@@ -284,7 +285,6 @@ class ModelRunner:
             logging.debug(f'performing optuna train task on {self.device}(s) ({torch.cuda.device_count()})'
                           f' for model {type(model).__name__.lower()} with following config: {optuna_learning_config}')
 
-            cost_fn = model.loss_fn
             if torch.cuda.device_count() > 1:
                 model = nn.DataParallel(model)
             model = model.to(self.device)
@@ -294,7 +294,7 @@ class ModelRunner:
             log_interval = optuna_learning_config.get('logging_batch_interval', 10)
             train_epoch_loss = sys.maxsize
             for epoch in range(1, optuna_learning_config.get('epochs', 10) + 1):
-                train_epoch_loss = self._train_step(model, optimizer, cost_fn, experiment, epoch, log_interval)
+                train_epoch_loss = self._train_step(model, optimizer, experiment, epoch, log_interval)
                 experiment.log_metric('train_epoch_loss', train_epoch_loss, step=epoch)
                 logging.info(f'--- train epoch {epoch} end with train loss: {train_epoch_loss} ---')
 
@@ -339,7 +339,6 @@ class ModelRunner:
         logging.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
                       f' for model {checkpoint_path.stem.upper()} with following config: {config}')
 
-        cost_fn = model.loss_fn
         if torch.cuda.device_count() > 1:
             model = nn.DataParallel(model)
         model = model.to(self.device)
@@ -349,10 +348,10 @@ class ModelRunner:
                                                                                              0.0001))
         log_interval = config.get('logging_batch_interval', 10)
         for epoch in range(1, config.get('epochs', 10) + 1):
-            train_epoch_loss = self._train_step(model, optimizer, cost_fn, experiment, epoch, log_interval)
+            train_epoch_loss = self._train_step(model, optimizer, experiment, epoch, log_interval)
             experiment.log_metric('train_epoch_loss', train_epoch_loss, step=epoch)
 
-            val_epoch_loss = self._val_step(model, cost_fn, experiment, epoch, log_interval)
+            val_epoch_loss = self._val_step(model, experiment, epoch, log_interval)
             experiment.log_metric('val_epoch_loss', val_epoch_loss, step=epoch)
 
             logging.info(
@@ -364,6 +363,65 @@ class ModelRunner:
             elif patience == 0:
                 logging.info(f' ___ early stopping at epoch {epoch} ___')
                 epoch, _ = model_load(checkpoint_path, model, optimizer)
+                break
+
+        return model
+
+    def train_contrastive(self, model: ContrastiveBaseModel, model_train_config: dict,
+                          discriminator: nn.Module, discriminator_train_config: dict) -> ContrastiveBaseModel:
+        """
+
+        :param model:
+        :param model_train_config:
+        :param discriminator_train_config:
+        :param discriminator:
+        """
+        self._curr_best_loss = -1
+        self._curr_patience = model_train_config.get('epoch_patience', 10)
+        patience_init_val = model_train_config.get('epoch_patience', 10)
+
+        experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
+                                            {**model.get_params(), **model_train_config, **self.feature_config}, [])
+        checkpoint_path = self.output_folder / f'{experiment.get_name()}-contrastive-checkpoint.pth'
+
+        logging.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
+                      f' for model {checkpoint_path.stem.upper()} with following config: {model_train_config}')
+
+        if torch.cuda.device_count() > 1:
+            model = nn.DataParallel(model)
+            discriminator = nn.DataParallel(discriminator)
+        model = model.to(self.device)
+        discriminator = discriminator.to(self.device)
+
+        model_optimizer: Optimizer = _parse_optimizer(model_train_config['optimizer'].get('type', 'Adam'))(
+            model.parameters(), lr=model_train_config.get('learning_rate', 0.0001))
+        discriminator_optimizer: Optimizer = _parse_optimizer(
+            discriminator_train_config['optimizer'].get('type', 'Adam'))(discriminator.parameters(),
+                                                                         lr=discriminator_train_config.get(
+                                                                             'learning_rate', 0.0001))
+
+        log_interval = model_train_config.get('logging_batch_interval', 10)
+        for epoch in range(1, model_train_config.get('epochs', 10) + 1):
+            train_epoch_loss, discriminator_epoch_loss = self._train_contrastive_step(model, model_optimizer,
+                                                                                      discriminator,
+                                                                                      discriminator_optimizer,
+                                                                                      experiment, epoch, log_interval)
+            experiment.log_metric('train_epoch_loss', train_epoch_loss, step=epoch)
+            experiment.log_metric('train_discriminator_epoch_loss', discriminator_epoch_loss, step=epoch)
+
+            val_epoch_loss = self._val_step(model, experiment, epoch, log_interval)
+            experiment.log_metric('val_epoch_loss', val_epoch_loss, step=epoch)
+
+            logging.info(
+                f'--- train epoch {epoch} end with train loss: {train_epoch_loss} '
+                f'(discriminator loss:{discriminator_epoch_loss}) and val loss: {val_epoch_loss} ---')
+            patience = self.early_stopping_callback(val_epoch_loss, patience_init_val)
+            if patience == patience_init_val:
+                logging.debug(f'*** model checkpoint at epoch {epoch} ***')
+                model_save(model, checkpoint_path, model_optimizer, epoch, train_epoch_loss)
+            elif patience == 0:
+                logging.info(f' ___ early stopping at epoch {epoch} ___')
+                epoch, _ = model_load(checkpoint_path, model, model_optimizer)
                 break
 
         return model
@@ -384,3 +442,53 @@ class ModelRunner:
             self._curr_patience -= 1
 
         return self._curr_patience
+
+    def _train_contrastive_step(self, model: Union[ContrastiveBaseModel, nn.DataParallel], model_optimizer: Optimizer,
+                                discriminator: nn.Module, discriminator_optimizer: Optimizer,
+                                experiment: Experiment, epoch: int, logging_interval: int):
+        """
+        Function for epoch run on contrastive model
+        :param model:
+        :param model_optimizer:
+        :param discriminator:
+        :param discriminator_optimizer:
+        :param experiment:
+        :param epoch:
+        :param logging_interval:
+        :return:
+        """
+        mean_loss = []
+        discriminator_mean_loss = []
+        model.train()
+        for batch_idx, (batch, _) in enumerate(self.train_dataloader):
+            batch = batch.to(self.device)
+            model_optimizer.zero_grad()
+            model_output: ContrastiveOutput = model(batch)
+            loss = model.loss_fn(batch, model_output, discriminator)
+            loss.backward()
+            model_optimizer.step()
+
+            q = torch.cat((model_output.target_qs_latent, model_output.target_qz_latent), dim=1)
+            q_bar = latent_permutation(q)
+            q = q.to(device)
+            q_bar = q_bar.to(device)
+            discriminator_optimizer.zero_grad()
+            q_score, q_bar_score = discriminator(q, q_bar)
+            discriminator_loss = discriminator.loss_fn(q_score, q_bar_score)
+            discriminator_loss.backward()
+            discriminator_optimizer.step()
+
+            loss_float = loss.item()
+            discriminator_loss_float = discriminator_loss.item()
+            mean_loss.append(loss_float)
+            discriminator_loss_float.append(discriminator_loss_float)
+
+            experiment.log_metric("batch_train_loss", loss_float, step=epoch * batch_idx)
+            experiment.log_metric("discriminator_batch_train_loss", discriminator_loss, step=epoch * batch_idx)
+
+            if logging_interval != -1 and batch_idx % logging_interval == 0:
+                logging.info(f'=== train epoch {epoch},'
+                             f' [{batch_idx * len(batch)}/{len(self.train_dataloader.dataset)}] '
+                             f'-> batch loss: {loss_float}, discriminator loss: {discriminator_loss_float}')
+
+        return sum(mean_loss) / len(mean_loss), sum(discriminator_mean_loss) / len(discriminator_mean_loss)

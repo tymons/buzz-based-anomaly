@@ -97,7 +97,13 @@ def main():
                                    output_folder=Path('output/model'))
         else:
             model = HiveModelFactory.build_model_and_check(args.model, data_shape, model_config)
-            model = model_runner.train(model, learning_config)
+            if args.model == HiveModelType.CONTRASTIVE_VAE:
+                discriminator = HiveModelFactory.get_discriminator(model_config['discriminator'],
+                                                                   model_config['latent'])
+                model = model_runner.train_contrastive(model, learning_config['model'], discriminator,
+                                                       learning_config['discriminator'])
+            else:
+                model = model_runner.train(model, learning_config)
 
 
 if __name__ == "__main__":

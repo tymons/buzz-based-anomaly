@@ -46,8 +46,8 @@ Names in italics are direct arguments to the `train.py` script.
   - MelSpectrogram (_melspectrogram_)
   - MFCC (_mfcc_)
   
-#### ~~Contrastive Autoencoders~~ (_TBA_)
-
+#### Contrastive Autoencoders (_IN PROGRESS_)
+- Contrastive Autoencoder (_contrastive_autoencoder_)
 ## Docker support 
 
 Repo has ready to use docker images at [dockerhub/tymonzz](https://hub.docker.com/repository/docker/tymonzz/buzz-based-anomaly)
