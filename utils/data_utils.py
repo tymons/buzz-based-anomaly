@@ -13,7 +13,7 @@ from typing import Callable
 from datetime import datetime
 from tqdm import tqdm
 from pathlib import Path
-from typing import List
+from typing import List, Union
 
 
 def flatten(x):
@@ -28,7 +28,7 @@ def flatten(x):
         return [x]
 
 
-def create_valid_sounds_datalist(root_folder, valid_file_filename='valid_sounds.txt', prefix="",
+def create_valid_sounds_datalist(root_folder: Union[str, Path], valid_file_filename='valid_sounds.txt', prefix="",
                                  upper_rms_threshold=0.8, lower_rms_threshold=0.0000001):
     """Scans specified folder for files with prefix
     Parameters:
