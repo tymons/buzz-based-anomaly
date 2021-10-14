@@ -409,12 +409,12 @@ class ModelRunner:
             experiment.log_metric('train_epoch_loss', train_epoch_loss, step=epoch)
             experiment.log_metric('train_discriminator_epoch_loss', discriminator_epoch_loss, step=epoch)
 
-            val_epoch_loss = self._val_step(model, experiment, epoch, log_interval)
+            val_epoch_loss = self._val_contrastive_step(model, discriminator, experiment, epoch, log_interval)
             experiment.log_metric('val_epoch_loss', val_epoch_loss, step=epoch)
 
             logging.info(
                 f'--- train epoch {epoch} end with train loss: {train_epoch_loss} '
-                f'(discriminator loss:{discriminator_epoch_loss}) and val loss: {val_epoch_loss} ---')
+                f'(discriminator loss: {discriminator_epoch_loss}) and val loss: {val_epoch_loss} ---')
             patience = self.early_stopping_callback(val_epoch_loss, patience_init_val)
             if patience == patience_init_val:
                 logging.debug(f'*** model checkpoint at epoch {epoch} ***')
@@ -460,35 +460,67 @@ class ModelRunner:
         mean_loss = []
         discriminator_mean_loss = []
         model.train()
-        for batch_idx, (batch, _) in enumerate(self.train_dataloader):
-            batch = batch.to(self.device)
+        for batch_idx, (target, background) in enumerate(self.train_dataloader):
+            target_batch = target.to(self.device)
+            background_batch = background.to(self.device)
             model_optimizer.zero_grad()
-            model_output: ContrastiveOutput = model(batch)
-            loss = model.loss_fn(batch, model_output, discriminator)
+            model_output: ContrastiveOutput = model(target_batch, background_batch)
+            loss = model.loss_fn(target_batch, background_batch, model_output, discriminator)
             loss.backward()
             model_optimizer.step()
 
-            q = torch.cat((model_output.target_qs_latent, model_output.target_qz_latent), dim=1)
+            q = torch.cat((model_output.target_qs_latent.clone().detach(),
+                           model_output.target_qz_latent.clone().detach()), dim=-1).squeeze()
             q_bar = latent_permutation(q)
-            q = q.to(device)
-            q_bar = q_bar.to(device)
+            q = q.to(self.device)
+            q_bar = q_bar.to(self.device)
             discriminator_optimizer.zero_grad()
             q_score, q_bar_score = discriminator(q, q_bar)
-            discriminator_loss = discriminator.loss_fn(q_score, q_bar_score)
-            discriminator_loss.backward()
+            dloss = discriminator.loss_fn(q_score, q_bar_score)
+            dloss.backward()
             discriminator_optimizer.step()
 
             loss_float = loss.item()
-            discriminator_loss_float = discriminator_loss.item()
+            discriminator_loss_float = dloss.item()
             mean_loss.append(loss_float)
-            discriminator_loss_float.append(discriminator_loss_float)
+            discriminator_mean_loss.append(discriminator_loss_float)
 
             experiment.log_metric("batch_train_loss", loss_float, step=epoch * batch_idx)
-            experiment.log_metric("discriminator_batch_train_loss", discriminator_loss, step=epoch * batch_idx)
+            experiment.log_metric("discriminator_batch_train_loss", dloss, step=epoch * batch_idx)
 
             if logging_interval != -1 and batch_idx % logging_interval == 0:
                 logging.info(f'=== train epoch {epoch},'
-                             f' [{batch_idx * len(batch)}/{len(self.train_dataloader.dataset)}] '
+                             f' [{batch_idx * len(target)}/{len(self.train_dataloader.dataset)}] '
                              f'-> batch loss: {loss_float}, discriminator loss: {discriminator_loss_float}')
 
         return sum(mean_loss) / len(mean_loss), sum(discriminator_mean_loss) / len(discriminator_mean_loss)
+
+    def _val_contrastive_step(self, model: Union[ContrastiveBaseModel, nn.DataParallel],
+                              discriminator: Union[nn.Module, nn.DataParallel], experiment: Experiment,
+                              epoch_no: int, logging_interval: int):
+        """
+        Function for performing validation step for model
+        :param model: model to be evaluated
+        :param experiment: comet ml experiment
+        :param epoch_no: epoch number for validation step - mostly for logging
+        :param logging_interval: interval for logs within epoch
+        :return:
+        """
+        val_loss = []
+        model.eval()
+        for batch_idx, (target, background) in enumerate(self.val_dataloader):
+            target_batch = target.to(self.device)
+            background_batch = background.to(self.device)
+            model_output = model(target_batch, background_batch)
+            loss = model.loss_fn(target_batch, background_batch, model_output, discriminator)
+
+            loss_float = loss.item()
+            val_loss.append(loss_float)
+            experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
+
+            if logging_interval != -1 and batch_idx % logging_interval == 0:
+                logging.info(f'=== validation epoch {epoch_no}, '
+                             f'[{batch_idx * len(target)}/{len(self.train_dataloader.dataset)}]'
+                             f'-> batch loss: {loss.item()} ===')
+
+        return sum(val_loss) / len(val_loss)

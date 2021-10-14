@@ -5,12 +5,6 @@ from torch import Tensor
 
 
 @dataclass(frozen=True)
-class ContrastiveInput:
-    target: Tensor
-    background: Tensor
-
-
-@dataclass(frozen=True)
 class ContrastiveOutput:
     target: Tensor
     background: Tensor
@@ -34,9 +28,9 @@ class ContrastiveFeatureDataset(Dataset):
         return self.target.get_params()
 
     def __getitem__(self, idx):
-        target_sample, label = self.target.__getitem__(idx)
+        target_sample, _ = self.target.__getitem__(idx)
         background_sample, _ = self.background.__getitem__(idx)
-        return ContrastiveInput(target=target_sample, background=background_sample), label
+        return target_sample, background_sample
 
     def __len__(self):
         return len(self.target)

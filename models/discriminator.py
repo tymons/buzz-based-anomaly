@@ -26,7 +26,7 @@ class Discriminator(nn.Module):
         :param q_prob: tensor or probability for samples q(x)
         :return:
         """
-        p_loss = F.binary_cross_entropy(p_prob, torch.ones_like(p_prob), reduction='mean')
+        p_loss = F.binary_cross_entropy(p_prob, torch.zeros_like(p_prob), reduction='mean')
         q_loss = F.binary_cross_entropy(q_prob, torch.ones_like(q_prob), reduction='mean')
         return p_loss + q_loss
 

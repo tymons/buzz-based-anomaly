@@ -6,7 +6,7 @@ import numpy as np
 
 from utils.feature_factory import SoundFeatureFactory
 from features.feature_type import SoundFeatureType
-from features.contrastive_feature_dataset import ContrastiveFeatureDataset, ContrastiveInput
+from features.contrastive_feature_dataset import ContrastiveFeatureDataset
 
 
 class TestDoubleFeatureDataset(unittest.TestCase):
@@ -34,10 +34,9 @@ class TestDoubleFeatureDataset(unittest.TestCase):
                                                                [self.filename_1kHz], [0], config)
         double_feature_dataset = ContrastiveFeatureDataset(target_dataset, background_dataset)
 
-        contrastive_input: ContrastiveInput
-        contrastive_input, target_label = double_feature_dataset.__getitem__(0)
+        target, background = double_feature_dataset.__getitem__(0)
 
-        self.assertEqual(type(contrastive_input.target), np.ndarray)
-        self.assertEqual(type(contrastive_input.background), np.ndarray)
-        self.assertEqual(contrastive_input.target.shape[1], 32)
-        self.assertEqual(contrastive_input.background.shape[1], 32)
+        self.assertEqual(type(target), np.ndarray)
+        self.assertEqual(type(background), np.ndarray)
+        self.assertEqual(target.shape[1], 32)
+        self.assertEqual(background.shape[1], 32)
