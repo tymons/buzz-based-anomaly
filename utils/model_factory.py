@@ -200,13 +200,15 @@ class HiveModelFactory:
         return ContrastiveVAE(layers, latent_size, input_size[0], dropouts, use_discriminator)
 
     @staticmethod
-    def get_discriminator(discriminator_config: dict, input_size: int) -> Discriminator:
+    def get_discriminator(discriminator_config: dict, autoencoder_latent: int) -> Discriminator:
         """
         Method for building discriminator for contrastive autoencoder
+        :param discriminator_config: dictionary with config for discriminator. Only 'layers' key is supported
+        :param autoencoder_latent:
         :return:
         """
         layers = discriminator_config.get('layers', [8, 16])
-        return Discriminator(layers, input_size)
+        return Discriminator(layers, 2 * autoencoder_latent)
 
     @staticmethod
     def build_model(model_type: HiveModelType, input_shape: Tuple, config: dict) \
