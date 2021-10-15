@@ -66,8 +66,19 @@ Names in italics are direct arguments to the `train.py` script.
   - MFCC (_mfcc_)
   
 #### Contrastive Autoencoders
+
+>Mind that for contrastive learning `--contrastive_data_folder` argument should be passed. 
+All data from contrastive data folder will be transformed to feature passed as 1st argument of train script.
+Contrastive data will be shuffled and truncated to the length of original dataset.
+
 - :x: Contrastive Autoencoder (_IN_PROGRESS_)
 - :white_check_mark: Contrastive Variational Autoencoder (_contrastive_vae_)
+  - Periodogram (_periodogram_)
+
+
+
+
+
 ## Docker support 
 
 Repo has ready to use docker images at [dockerhub/tymonzz](https://hub.docker.com/repository/docker/tymonzz/buzz-based-anomaly)
