@@ -47,9 +47,11 @@ def build_optuna_model_config(model_type: HiveModelType, input_shape: Tuple, tri
         dropouts.append(trial.suggest_uniform(f'dropout_{i}', 0.1, 0.5))
 
     config: dict = {
-        'layers': layers,
-        'dropout': dropouts,
-        'latent': latent
+        'model': {
+            'layers': layers,
+            'dropout': dropouts,
+            'latent': latent
+        }
     }
 
     if model_type.value.startswith('conv'):

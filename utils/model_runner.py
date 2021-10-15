@@ -120,9 +120,10 @@ def build_optuna_learning_config(learning_config: dict, trial: optuna.Trial) -> 
     :return: directory with combined optuna suggest values and original learning dict
     """
     optuna_learning_config = learning_config.copy()
-    optuna_learning_config['learning_rate'] = trial.suggest_loguniform('lr', 1e-5, 1e-2)
-    optuna_learning_config['optimizer']['type'] = trial.suggest_categorical('optimizer_type', ['Adam', 'SGD', 'RMSprop',
-                                                                                               'Adagrad', 'Adadelta'])
+    optuna_learning_config['model']['learning_rate'] = trial.suggest_loguniform('lr', 1e-5, 1e-2)
+    optuna_learning_config['model']['optimizer']['type'] = trial.suggest_categorical('optimizer_type',
+                                                                                     ['Adam', 'SGD', 'RMSprop',
+                                                                                      'Adagrad', 'Adadelta'])
     return optuna_learning_config
 
 
