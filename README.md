@@ -46,21 +46,21 @@ Model training entrypoint is based on `train.py` script. Currently, only listed 
 Names in italics are direct arguments to the `train.py` script.
 
 #### Vanilla Autoencoders
-- [x] Autoencoder (_autoencoder_)
+- :white_check_mark: Autoencoder (_autoencoder_)
   - periodogram (_periodogram_)
-- [x] Convolutional 1D Autoencoder (_conv1d_autoencoder_)
+- :white_check_mark: Convolutional 1D Autoencoder (_conv1d_autoencoder_)
   - Periodogram (_periodogram_)
-- [x] Convolutional 2D Autoencoder (_conv2d_autoencoder_)
+- :white_check_mark: Convolutional 2D Autoencoder (_conv2d_autoencoder_)
   - Spectrogram (_spectrogram_)
   - MelSpectrogram (_melspectrogram_)
   - MFCC (_mfcc_)
 
 #### Variational Autoencoders
-- [x] Variational Autoencoder (_vae_)
+- :white_check_mark: Variational Autoencoder (_vae_)
   - periodogram (_periodogram_)
-- [x] Convolutional 1D Variational Autoencoder (_conv1d_vae_)
+- :white_check_mark: Convolutional 1D Variational Autoencoder (_conv1d_vae_)
   - periodogram (_periodogram_)
-- [x] Convolutional 2D Variational Autoencoder (_conv2d_vae_)
+- :white_check_mark: Convolutional 2D Variational Autoencoder (_conv2d_vae_)
   - Spectrogram (_spectrogram_)
   - MelSpectrogram (_melspectrogram_)
   - MFCC (_mfcc_)
