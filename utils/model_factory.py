@@ -55,11 +55,38 @@ def build_optuna_model_config(model_type: HiveModelType, input_shape: Tuple, tri
     }
 
     if model_type.value.startswith('conv'):
-        kernel: int = trial.suggest_int('kernel', 2, 8)
-        config['padding'] = trial.suggest_int('padding', 0, kernel)
-        config['max_pool'] = 2
-        config['kernel'] = kernel
+        extend_config_for_convolution(config, trial)
 
+    if model_type.value.startswith('contrastive'):
+        extend_config_for_contrastive(config)
+
+    return config
+
+
+def extend_config_for_contrastive(config: dict, trial: optuna.Trial = None):
+    """
+    Method for adding discriminator parameters
+    :param config: dictionary with existing config
+    :param trial: optuna trial
+    :return:
+    """
+    config['discriminator'] = {}
+    config['discriminator']['layers'] = [64, 32, 256] if trial is None else \
+        [trial.suggest_int(f'discriminator_layer_{i}', 2, 256) for i in range(3)]
+    return config
+
+
+def extend_config_for_convolution(config: dict, trial: optuna.Trial):
+    """
+    Method for appending config values specific for
+    :param config: dictionary
+    :param trial: optuna trial
+    :return: dict
+    """
+    kernel: int = trial.suggest_int('kernel', 2, 8)
+    config['model']['padding'] = trial.suggest_int('padding', 0, kernel)
+    config['model']['max_pool'] = 2
+    config['model']['kernel'] = kernel
     return config
 
 

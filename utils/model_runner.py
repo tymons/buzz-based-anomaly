@@ -29,6 +29,31 @@ from features.contrastive_feature_dataset import ContrastiveOutput
 from utils.model_factory import HiveModelFactory, build_optuna_model_config
 
 
+def clear_memory(model: Union[BaseModel, ContrastiveBaseModel, nn.DataParallel],
+                 optimizer: torch.optim.Optimizer,
+                 discriminator: nn.Module = None,
+                 discriminator_optimizer: torch.optim.Optimizer = None):
+    """
+    Method for clearning all the memory from models and optimizers
+    :param model:
+    :param optimizer:
+    :param discriminator:
+    :param discriminator_optimizer:
+    """
+    transfer_optimizer_to(optimizer, torch.device('cpu'))
+    model.to(torch.device('cpu'))
+    del model
+    del optimizer
+
+    if all([discriminator, discriminator_optimizer]):
+        transfer_optimizer_to(discriminator_optimizer, torch.device('cpu'))
+        discriminator.to(torch.device('cpu'))
+        del discriminator
+
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
 def _parse_optimizer(optimizer_name: str) -> Callable:
     """
     Function for getting parsing based on string representation
@@ -112,7 +137,7 @@ def model_load(checkpoint_filepath: Path, model: Union[BaseModel, nn.DataParalle
     return epoch, loss
 
 
-def build_optuna_learning_config(learning_config: dict, trial: optuna.Trial) -> Dict[str, Any]:
+def modify_optuna_learning_config(learning_config: dict, trial: optuna.Trial) -> Dict[str, Any]:
     """
     Function for building optuna learning config
     :param learning_config: dictionary with learning config
@@ -124,7 +149,32 @@ def build_optuna_learning_config(learning_config: dict, trial: optuna.Trial) -> 
     optuna_learning_config['model']['optimizer']['type'] = trial.suggest_categorical('optimizer_type',
                                                                                      ['Adam', 'SGD', 'RMSprop',
                                                                                       'Adagrad', 'Adadelta'])
+    if optuna_learning_config['discriminator'] is not None:
+        optuna_learning_config['discriminator']['optimizer']['type'] = trial.suggest_categorical('disc_optimizer_type',
+                                                                                                 ['Adam', 'SGD',
+                                                                                                  'RMSprop',
+                                                                                                  'Adagrad',
+                                                                                                  'Adadelta'])
+        optuna_learning_config['discriminator']['learning_rate'] = trial.suggest_loguniform('discriminator_lr',
+                                                                                            1e-5, 1e-2)
     return optuna_learning_config
+
+
+def _prepare_discrimination_for_train(discriminator_model_config: dict, model_latent: int, torch_device: torch.device,
+                                      discriminator_train_config: dict):
+    """
+    Method for preparing discriminator model and optimizer
+    :param discriminator_model_config:
+    :param model_latent:
+    :param torch_device:
+    :param discriminator_train_config:
+    :return:
+    """
+    discriminator = HiveModelFactory.get_discriminator(discriminator_model_config, model_latent).to(torch_device)
+    discriminator_optimizer_class = _parse_optimizer(discriminator_train_config['optimizer']['type'])
+    discriminator_optimizer = discriminator_optimizer_class(discriminator.parameters(),
+                                                            lr=discriminator_train_config['learning_rate'])
+    return discriminator, discriminator_optimizer
 
 
 class ModelRunner:
@@ -271,13 +321,15 @@ class ModelRunner:
         :return: final loss
         """
         optuna_model_config = build_optuna_model_config(model_type, input_shape, trial)
-        optuna_learning_config: Dict[str, Any] = build_optuna_learning_config(learning_config, trial)
+        optuna_learning_config: Dict[str, Any] = modify_optuna_learning_config(learning_config, trial)
 
         self._curr_best_loss = -1
         self._curr_patience = optuna_learning_config.get('epoch_patience', 10)
         patience_init_val = optuna_learning_config.get('epoch_patience', 10)
         try:
-            model = HiveModelFactory.build_model_and_check(model_type, input_shape, optuna_model_config)
+            model = HiveModelFactory.build_model(model_type, input_shape, optuna_model_config['model']) \
+                if not model_type.value.startswith('contrastive') else \
+                HiveModelFactory.build_model(model_type, input_shape, optuna_model_config['model'])
 
             experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
                                                 {**model.get_params(), **optuna_learning_config, **self.feature_config},
@@ -290,20 +342,29 @@ class ModelRunner:
                 model = nn.DataParallel(model)
             model = model.to(self.device)
 
-            optimizer_class = _parse_optimizer(optuna_learning_config['optimizer']['type'])
-            optimizer = optimizer_class(model.parameters(), lr=optuna_learning_config['learning_rate'])
+            optimizer_class = _parse_optimizer(optuna_learning_config['model']['optimizer']['type'])
+            optim = optimizer_class(model.parameters(), lr=optuna_learning_config['model']['learning_rate'])
             log_interval = optuna_learning_config.get('logging_batch_interval', 10)
-            train_epoch_loss = sys.maxsize
-            for epoch in range(1, optuna_learning_config.get('epochs', 10) + 1):
-                train_epoch_loss = self._train_step(model, optimizer, experiment, epoch, log_interval)
-                experiment.log_metric('train_epoch_loss', train_epoch_loss, step=epoch)
-                logging.info(f'--- train epoch {epoch} end with train loss: {train_epoch_loss} ---')
+            epoch_loss = sys.maxsize
 
-                trial.report(train_epoch_loss, epoch)
+            disc, disc_opt = None, None
+            if model_type.value.startswith('contrastive'):
+                disc, disc_opt = _prepare_discrimination_for_train(optuna_model_config,
+                                                                   optuna_model_config['model']['latent'],
+                                                                   self.device,
+                                                                   optuna_learning_config['discriminator'])
+
+            for epoch in range(1, optuna_learning_config.get('epochs', 10) + 1):
+                epoch_loss = self._train_step(model, optim, experiment, epoch, log_interval) if disc is None \
+                    else self._train_contrastive_step(model, optim, disc, disc_opt, experiment, epoch, log_interval)[0]
+                experiment.log_metric('train_epoch_loss', epoch_loss, step=epoch)
+                logging.info(f'--- train epoch {epoch} end with train loss: {epoch_loss} ---')
+
+                trial.report(epoch_loss, epoch)
                 if trial.should_prune():
                     raise optuna.exceptions.TrialPruned()
 
-                patience = self.early_stopping_callback(train_epoch_loss, patience_init_val)
+                patience = self.early_stopping_callback(epoch_loss, patience_init_val)
                 if patience == patience_init_val:
                     logging.debug(f'*** model checkpoint at epoch {epoch} ***')
                 elif patience == 0:
@@ -311,14 +372,9 @@ class ModelRunner:
                     break
 
             # clear memory
-            transfer_optimizer_to(optimizer, torch.device('cpu'))
-            model.to(torch.device('cpu'))
-            del model
-            del optimizer
-            gc.collect()
-            torch.cuda.empty_cache()
+            clear_memory(model, optim)
 
-            return train_epoch_loss
+            return epoch_loss
         except RuntimeError as e:
             logging.error(f'hive model build failed for config: {optuna_model_config} with exception: {e}')
 
