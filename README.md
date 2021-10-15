@@ -6,23 +6,42 @@ This repo contains scripts and utils for buzz-based bee anomaly detection models
 Models are tested against anomalies which are (for now) just different colonies sounds. In presented paper [NU-HIVE](https://zenodo.org/record/1321278) project data are labeled as anomalies for ML models. This reflects real world scenario
 as the data comes from different devices and bees subspecies. 
 
-## Data preprocess
+# Data preprocess
 
-In order to build working dataset one should use ```data_prepare.py``` script. Script will scan for nu-hive data in **dataset/nu-hive/** folder and extract only bees sound from available data.
-It can be used as anomaly or for trained models.
+In order to build working dataset one should use ```data_prepare.py``` script along with specified option.
+There are three different options to perform data processing: 
+ 
+* **NU-HIVE BEES' DATA EXTRACTION OPTION**
+
+
+This step extracts only bees' sound data from nuhive dataset. New WAV sound files
+are saved within created `nu-hive-processed/` folder. 
+To execute such option run:
+
+```shell
+data-prepare.py extract-nuhive-bees --data_folder C:\NUHIVE_FOLDER
+```
+
+* **FRAGMENT SOUNDS**  
+
+In order to use some fancy methods with `train.py` script one should have coherent dataset. To fragment
+all wav sounds to files with equal length `fragment-sound-bees` option should be used. Additional options are
+`--duration` which is length in seconds for every fragment. Example:
+
+```shell
+data-prepare.py fragment-sound-bees --data_folder C:\NUHIVE_FOLDER --duration 2
+```
+
+* **DOWNLOAD SMARTULA DATA**
 
 One could download data from smartula server to train own models. Mind that this requires `SMARTULA_API` and `SMARTULA_TOKEN` environments to be set.
-Smartula raw data should be preprocessed in order to reject samples which are too silent or distorted sounds.
+Smartula raw data will be preprocessed in order to reject samples which are too silent or distorted sounds.
 
-Example for preparing only NU-HIVE data:
 ```shell
-python data_prepare.py
+python data_prepare.py --start YYYY-MM-DD --end YYYY-MM-DD --smartula_hives DEADBEEF99
 ```
-extending date prepare with smartula data involves additional arguments about dates (start/end) and hive sns:
-```shell
-python data_prepare.py --start YYYY-MM-DD --end YYYY-MM-DD --hives DEADBEEF99
-```
-## Model train
+
+# Model train
 Model training entrypoint is based on `train.py` script. Currently, only listed models and sound features are supported.
 Names in italics are direct arguments to the `train.py` script.
 
@@ -46,8 +65,9 @@ Names in italics are direct arguments to the `train.py` script.
   - MelSpectrogram (_melspectrogram_)
   - MFCC (_mfcc_)
   
-#### Contrastive Autoencoders (_IN PROGRESS_)
-- Contrastive Autoencoder (_contrastive_autoencoder_)
+#### Contrastive Autoencoders
+- :x: Contrastive Autoencoder (_IN_PROGRESS_)
+- :white_check_mark: Contrastive Variational Autoencoder (_contrastive_vae_)
 ## Docker support 
 
 Repo has ready to use docker images at [dockerhub/tymonzz](https://hub.docker.com/repository/docker/tymonzz/buzz-based-anomaly)

@@ -108,8 +108,8 @@ def prepare_smartula_data(dataset_path: Path, start_utc_imestamp: int, end_utc_t
                           api_url: str, token: str = ''):
     """
     Function for downloading and validating data from smartula system
-    :param api_url:
-    :param dataset_path:
+    :param api_url: root api url for smartula
+    :param dataset_path: root data folder where data will be saved
     :param start_utc_imestamp:
     :param end_utc_timestamp:
     :param hive_list:
