@@ -83,24 +83,31 @@ def main():
         if args.filter_dates:
             sound_list = filter_by_datetime(sound_list, args.filter_dates[0], args.filter_dates[1])
 
+        # prepare sound filenames
         sound_list = filter_string_list(sound_list, *args.filter_hives)
         available_labels = list(set([path.stem.split("-")[0] for path in sound_list]))
         sound_labels: List[int] = [list(available_labels).index(sound_name.stem.split('-')[0])
                                    for sound_name in sound_list]
-        dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, sound_labels, feature_config)
-        data_shape = dataset[0][0].squeeze().shape
-
+        # preparse background filenames if needed
         if args.contrastive_data_folder is not None:
             background_filenames = list(args.contrastive_data_folder.glob('**/*.wav'))
-            # shuffle filenames as dataloader shuffle option will only
-            # permute across complete dataset (target, background)
             random.shuffle(background_filenames)
-            background_filenames = background_filenames[:len(dataset)]
+            if len(sound_list) > len(background_filenames):
+                logging.info(f'truncating target dataset to the length of {len(background_filenames)}')
+                sound_list = sound_list[:len(background_filenames)]
+                sound_labels = sound_labels[:len(background_filenames)]
+            else:
+                logging.info(f'truncating background dataset to the length of: {len(sound_list)}')
+                background_filenames = background_filenames[:len(sound_list)]
+
+        # build datasets and dataloader
+        dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, sound_labels, feature_config)
+        data_shape = dataset[0][0].squeeze().shape
+        if args.contrastive_data_folder is not None:
             background_dataset = SoundFeatureFactory.build_dataset(args.feature, background_filenames,
                                                                    [0] * len(background_filenames),
                                                                    feature_config)
             dataset = SoundFeatureFactory.build_contrastive_feature_dataset(dataset, background_dataset)
-
         train_loader, val_loader = SoundFeatureFactory.build_train_and_validation_dataloader(dataset,
                                                                                              learning_config.get(
                                                                                                  'batch_size', 32))
