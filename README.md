@@ -72,11 +72,12 @@ All data from contrastive data folder will be transformed to feature passed as 1
 Contrastive data will be shuffled and truncated to the length of original dataset.
 
 - :x: Contrastive Autoencoder (_IN_PROGRESS_)
+- :x: Contrastive Convolutional 1D Autoencoder (_TBD_)
+- :x: Contrastive Convolutional 2D Autoencoder (_TBD_)
 - :white_check_mark: Contrastive Variational Autoencoder (_contrastive_vae_)
   - Periodogram (_periodogram_)
-
-
-
+- :x: Contrastive Convolutional Variational 1D Autoencoder (_TBD_)
+- :x: Contrastive Convolutional Variational 2D Autoencoder (_TBD_)
 
 
 ## Docker support 
