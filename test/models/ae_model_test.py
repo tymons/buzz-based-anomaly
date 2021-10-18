@@ -5,7 +5,7 @@ from utils.model_factory import HiveModelFactory, HiveModelType, model_check
 from models.base_model import BaseModel
 
 
-class TestModelFactoryMethods(unittest.TestCase):
+class AEModelTest(unittest.TestCase):
     def test_model_is_build(self):
         input_size = 512
         config = {
