@@ -231,6 +231,12 @@ class HiveModelFactory:
 
     @staticmethod
     def _get_contrastive_autoencoder_model(config: dict, input_size: Tuple) -> ContrastiveAE:
+        """
+        Method for building contrastive autoencoder model
+        :param config: config for model
+        :param input_size: data input size
+        :return: Contrastive AE model
+        """
         layers = config.get('layers', [256, 32, 16])
         dropouts = config.get('dropout', [0.2, 0.2, 0.2])
         latent_size = config.get('latent', 2)

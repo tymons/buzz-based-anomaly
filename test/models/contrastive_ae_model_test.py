@@ -24,7 +24,6 @@ class ContrastiveAEModelTest(unittest.TestCase):
         target, background = torch.empty(size=(32, 1, input_size)), torch.empty(size=(32, 1, input_size))
         self.assertEqual(model(target, background).target.shape[-1], input_size)
         self.assertEqual(model(target, background).background.shape[-1], input_size)
-        self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
 
 
 if __name__ == '__main__':
