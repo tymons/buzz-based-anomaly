@@ -1,7 +1,7 @@
 import unittest
 import torch
 
-from utils.model_factory import HiveModelFactory, HiveModelType, model_check
+from utils.model_factory import HiveModelFactory, HiveModelType
 from models.base_model import BaseModel
 
 
