@@ -5,7 +5,7 @@ from utils.model_factory import HiveModelFactory, HiveModelType, model_check
 from models.base_model import BaseModel
 
 
-class AEModelTest(unittest.TestCase):
+class ContrastiveAEModelTest(unittest.TestCase):
     def test_model_is_build(self):
         input_size = 512
         config = {
@@ -13,12 +13,18 @@ class AEModelTest(unittest.TestCase):
             'dropout': [0.3, 0.3, 0.3],
             'latent': 8
         }
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('autoencoder'), (input_size, ), config)
-        self.assertIsNotNone(model_check(model, (1, input_size), device='cpu'), "model verification failed!")
+
+        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_autoencoder'),
+                                                        (input_size,), config)
+
         self.assertListEqual(model.get_params().get('model_layers'), config['layers'])
         self.assertListEqual(model.get_params().get('model_dropouts'), config['dropout'])
         self.assertEqual(model.get_params().get('model_latent'), config['latent'])
-        self.assertEqual(model(torch.empty(size=(1, input_size))).shape[1], input_size)
+
+        target, background = torch.empty(size=(32, 1, input_size)), torch.empty(size=(32, 1, input_size))
+        self.assertEqual(model(target, background).target.shape[-1], input_size)
+        self.assertEqual(model(target, background).background.shape[-1], input_size)
+        self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
 
 
 if __name__ == '__main__':

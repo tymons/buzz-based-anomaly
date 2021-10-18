@@ -6,9 +6,10 @@ class HiveModelType(Enum):
     CONV1D_AE: str = 'conv1d_autoencoder'
     CONV2D_AE: str = 'conv2d_autoencoder'
     VAE: str = 'vae'
-    CONTRASTIVE_VAE: str = 'contrastive_vae'
     CONV1D_VAE: str = 'conv1d_vae'
     CONV2D_VAE: str = 'conv2d_vae'
+    CONTRASTIVE_AE: str = 'contrastive_autoencoder'
+    CONTRASTIVE_VAE: str = 'contrastive_vae'
 
     @classmethod
     def from_name(cls, name):

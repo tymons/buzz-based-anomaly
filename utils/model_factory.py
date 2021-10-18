@@ -13,6 +13,7 @@ from models.conv2d_vae import Conv2DVAE
 from models.contrastive_vae import ContrastiveVAE
 from models.contrastive_base_model import ContrastiveBaseModel
 from models.discriminator import Discriminator
+from models.contrastive_ae import ContrastiveAE
 from typing import Callable, Tuple, Union
 
 
@@ -229,6 +230,16 @@ class HiveModelFactory:
         return ContrastiveVAE(layers, latent_size, input_size[0], dropouts, use_discriminator)
 
     @staticmethod
+    def _get_contrastive_autoencoder_model(config: dict, input_size: Tuple) -> ContrastiveAE:
+        layers = config.get('layers', [256, 32, 16])
+        dropouts = config.get('dropout', [0.2, 0.2, 0.2])
+        latent_size = config.get('latent', 2)
+
+        logging.debug(f'building contrastive ae model with config: layers({layers}), latent({latent_size}),'
+                      f' dropout({dropouts})')
+        return ContrastiveAE(layers, latent_size, input_size[0], dropouts)
+
+    @staticmethod
     def get_discriminator(discriminator_config: dict, autoencoder_latent: int) -> Discriminator:
         """
         Method for building discriminator for contrastive autoencoder
@@ -252,8 +263,7 @@ class HiveModelFactory:
         model_func: Callable[[dict, tuple], (BaseModel, dict)] = \
             getattr(HiveModelFactory, f'_get_{model_type.value.lower()}_model',
                     lambda x, y: logging.error('invalid model type!'))
-        model = model_func(config, input_shape)
-        return model
+        return model_func(config, input_shape)
 
     @staticmethod
     def build_model_and_check(model_type: HiveModelType, input_shape: Tuple, config: dict) -> \
