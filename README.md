@@ -46,24 +46,24 @@ Model training entrypoint is based on `train.py` script. Currently, only listed 
 Names in italics are direct arguments to the `train.py` script.
 
 #### Vanilla Autoencoders
-- :white_check_mark: Autoencoder (_autoencoder_)
-  - periodogram (_periodogram_)
-- :white_check_mark: Convolutional 1D Autoencoder (_conv1d_autoencoder_)
-  - Periodogram (_periodogram_)
-- :white_check_mark: Convolutional 2D Autoencoder (_conv2d_autoencoder_)
-  - Spectrogram (_spectrogram_)
-  - MelSpectrogram (_melspectrogram_)
-  - MFCC (_mfcc_)
+- :white_check_mark: Autoencoder (`autoencoder`)
+  - periodogram (`periodogram`)
+- :white_check_mark: Convolutional 1D Autoencoder (`conv1d_autoencoder`)
+  - Periodogram (`periodogram`)
+- :white_check_mark: Convolutional 2D Autoencoder (`conv2d_autoencoder`)
+  - Spectrogram (`spectrogram`)
+  - MelSpectrogram (`melspectrogram`)
+  - MFCC (`mfcc`)
 
 #### Variational Autoencoders
-- :white_check_mark: Variational Autoencoder (_vae_)
-  - periodogram (_periodogram_)
-- :white_check_mark: Convolutional 1D Variational Autoencoder (_conv1d_vae_)
-  - periodogram (_periodogram_)
-- :white_check_mark: Convolutional 2D Variational Autoencoder (_conv2d_vae_)
-  - Spectrogram (_spectrogram_)
-  - MelSpectrogram (_melspectrogram_)
-  - MFCC (_mfcc_)
+- :white_check_mark: Variational Autoencoder (`vae`)
+  - periodogram (`periodogram`)
+- :white_check_mark: Convolutional 1D Variational Autoencoder (`conv1d_vae`)
+  - periodogram (`periodogram`)
+- :white_check_mark: Convolutional 2D Variational Autoencoder (`conv2d_vae`)
+  - Spectrogram (`spectrogram`)
+  - MelSpectrogram (`melspectrogram`)
+  - MFCC (`mfcc`)
   
 #### Contrastive Autoencoders
 
@@ -74,8 +74,8 @@ Contrastive data will be shuffled and truncated to the length of original datase
 - :x: Contrastive Autoencoder (_IN_PROGRESS_)
 - :x: Contrastive Convolutional 1D Autoencoder (_TBD_)
 - :x: Contrastive Convolutional 2D Autoencoder (_TBD_)
-- :white_check_mark: Contrastive Variational Autoencoder (_contrastive_vae_)
-  - Periodogram (_periodogram_)
+- :white_check_mark: Contrastive Variational Autoencoder (`contrastive_vae`)
+  - Periodogram (`periodogram`)
 - :x: Contrastive Convolutional Variational 1D Autoencoder (_TBD_)
 - :x: Contrastive Convolutional Variational 2D Autoencoder (_TBD_)
 
