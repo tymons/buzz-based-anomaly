@@ -5,14 +5,14 @@ from torch import nn, Tensor
 from typing import Union, List
 
 from models.discriminator import Discriminator
-from models.contrastive_base_model import ContrastiveBaseModel
+from models.contrastive_variational_base_model import ContrastiveVariationalBaseModel
 from models.ae import Encoder, Decoder
 from models.vae import reparameterize, kld_loss
 
 from features.contrastive_feature_dataset import ContrastiveOutput
 
 
-class ContrastiveVAE(ContrastiveBaseModel):
+class ContrastiveVAE(ContrastiveVariationalBaseModel):
     def __init__(self, layers: List[int], latent_size: int, input_size: int,
                  dropout: Union[List[float], float] = 0.2, use_discriminator: bool = False):
         super().__init__()

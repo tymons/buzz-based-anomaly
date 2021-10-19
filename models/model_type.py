@@ -2,18 +2,22 @@ from enum import Enum
 
 
 class HiveModelType(Enum):
-    AE: str = 'autoencoder'
-    CONV1D_AE: str = 'conv1d_autoencoder'
-    CONV2D_AE: str = 'conv2d_autoencoder'
-    VAE: str = 'vae'
-    CONV1D_VAE: str = 'conv1d_vae'
-    CONV2D_VAE: str = 'conv2d_vae'
-    CONTRASTIVE_AE: str = 'contrastive_autoencoder'
-    CONTRASTIVE_VAE: str = 'contrastive_vae'
+    AE = (1, 'autoencoder')
+    CONV1D_AE = (2, 'conv1d_autoencoder')
+    CONV2D_AE = (3, 'conv2d_autoencoder')
+    VAE = (4, 'vae')
+    CONV1D_VAE = (5, 'conv1d_vae')
+    CONV2D_VAE = (6, 'conv2d_vae')
+    CONTRASTIVE_AE = (7, 'contrastive_autoencoder')
+    CONTRASTIVE_VAE = (8, 'contrastive_vae')
 
     @classmethod
-    def from_name(cls, name):
+    def from_name(cls, name: str):
         for _, feature in HiveModelType.__members__.items():
-            if feature.value == name:
+            if feature.model_name == name:
                 return feature
         raise ValueError(f"{name} is not a valid supported model name")
+
+    def __init__(self, num, model_name):
+        self.num = num
+        self.model_name = model_name
