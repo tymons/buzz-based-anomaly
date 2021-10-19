@@ -45,7 +45,7 @@ def clear_memory(model: Union[BM, CBM, nn.DataParallel],
                  discriminator: nn.Module = None,
                  discriminator_optimizer: torch.optim.Optimizer = None):
     """
-    Method for clearning all the memory from models and optimizers
+    Method for clearing all the memory from models and optimizers
     :param model:
     :param optimizer:
     :param discriminator:
@@ -205,7 +205,7 @@ class ModelRunner:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self._curr_patience = -1
-        self._curr_best_loss = -1
+        self._curr_best_loss = sys.maxsize
 
     def _setup_experiment(self, experiment_name: str, log_parameters: dict, tags: List[str]) -> Experiment:
         """
@@ -243,7 +243,7 @@ class ModelRunner:
         pruned_trials = [t for t in study.trials if t.state == optuna.structs.TrialState.PRUNED]
         complete_trials = [t for t in study.trials if t.state == optuna.structs.TrialState.COMPLETE]
 
-        best_architecture_file = Path(output_folder) / Path(f"{model_type.value.model_name.lower()}"
+        best_architecture_file = Path(output_folder) / Path(f"{model_type.model_name.lower()}"
                                                             f"-{time.strftime('%Y%m%d-%H%M%S')}.config")
         logging.info('Study statistics: ')
         logging.info(f'  Number of finished trials: {len(study.trials)}')
@@ -274,9 +274,8 @@ class ModelRunner:
         optuna_model_config = build_optuna_model_config(model_type, input_shape, trial)
         optuna_learning_config: Dict[str, Any] = modify_optuna_learning_config(learning_config, trial)
 
-        self._curr_best_loss = -1
+        self._curr_best_loss = sys.maxsize
         self._curr_patience = optuna_learning_config.get('epoch_patience', 10)
-        patience_init_val = optuna_learning_config.get('epoch_patience', 10)
         try:
             model = HiveModelFactory.build_model(model_type, input_shape, optuna_model_config['model'])
             experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
@@ -293,36 +292,33 @@ class ModelRunner:
             optimizer_class = _parse_optimizer(optuna_learning_config['model']['optimizer']['type'])
             optim = optimizer_class(model.parameters(), lr=optuna_learning_config['model']['learning_rate'])
             log_interval = optuna_learning_config.get('logging_batch_interval', 10)
-            epoch_loss = sys.maxsize
 
             disc, disc_opt = None, None
-            if model_type.model_name.startswith('contrastive'):
+            if model_type.num >= HiveModelType.CONTRASTIVE_VAE.num:
                 disc, disc_opt = _prepare_discrimination_for_train(optuna_model_config,
                                                                    optuna_model_config['model']['latent'],
                                                                    self.device,
                                                                    optuna_learning_config['discriminator'])
 
             for epoch in range(1, optuna_learning_config.get('epochs', 10) + 1):
-                epoch_loss = self._train_step(model, optim, experiment, epoch, log_interval) if disc is None \
-                    else self._train_contrastive_step(model, optim, disc, disc_opt, experiment, epoch, log_interval)[0]
-                experiment.log_metric('train_epoch_loss', epoch_loss, step=epoch)
-                logging.info(f'--- train epoch {epoch} end with train loss: {epoch_loss} ---')
+                epoch_loss = self._train_step(model, optim, experiment, epoch, log_interval) \
+                    if model_type.num < HiveModelType.CONTRASTIVE_AE.num else \
+                    self._train_contrastive_step(model, optim, experiment, epoch, log_interval, disc, disc_opt)
 
-                trial.report(epoch_loss, epoch)
+                epoch_loss_value = epoch_loss.model_loss
+                experiment.log_metric('train_epoch_loss', epoch_loss_value, step=epoch)
+                logging.info(f'--- train epoch {epoch} end with train loss: {epoch_loss_value} ---')
+
+                trial.report(epoch_loss_value, epoch)
                 if trial.should_prune():
                     raise optuna.exceptions.TrialPruned()
 
-                patience = self.early_stopping_callback(epoch_loss, patience_init_val)
-                if patience == patience_init_val:
-                    logging.debug(f'*** model checkpoint at epoch {epoch} ***')
-                elif patience == 0:
-                    logging.info(f' ___ early stopping at epoch {epoch} ___')
-                    break
+                self.early_stopping_callback(epoch_loss_value, optuna_learning_config.get('epochs', 10) + 1)
 
             # clear memory
             clear_memory(model, optim)
 
-            return epoch_loss
+            return self._curr_best_loss
         except RuntimeError as e:
             logging.error(f'hive model build failed for config: {optuna_model_config} with exception: {e}')
 
@@ -333,7 +329,8 @@ class ModelRunner:
         :param train_config: train config
         :return:
         """
-        return self._train(model, train_config, self._train_step, self._val_step)
+        model, _ = self._train(model, train_config, self._train_step, self._val_step)
+        return model
 
     def train_contrastive(self, model: CBM, train_config: dict) -> CBM:
         """
@@ -343,8 +340,21 @@ class ModelRunner:
         """
         return self._train(model, train_config, self._train_contrastive_step, self._val_contrastive_step)
 
-    def _train(self, model: Union[BM, CBM], train_config: dict,
-               train_step_func: T_train_step, val_step_func: T_val_step) -> Union[BM, CBM]:
+    def train_contrastive_with_discriminator(self, model: CVBM, model_train_config: dict, discriminator: nn.Module,
+                                             discriminator_train_config: dict) -> CVBM:
+        """
+        Wrapper for training contrastive variational autoencoders
+        :param model:
+        :param model_train_config:
+        :param discriminator_train_config:
+        :param discriminator:
+        :return:
+        """
+        return self.train_contrastive_with_discriminator(model, model_train_config, discriminator,
+                                                         discriminator_train_config)
+
+    def _train(self, model: Union[BM, CBM], train_config: dict, train_step_func: T_train_step,
+               val_step_func: T_val_step) -> (Union[BM, CBM]):
         """
         Base function for training model with specified config.
         This method should be used only without discriminator model.
@@ -352,9 +362,9 @@ class ModelRunner:
         :param train_config: configuration for learning process
         :param train_step_func: function to be invoked for single epoch training
         :param val_step_func: function to be invoked for single epoch validating
-        :rtype: BM: trained model
+        :rtype: BM: trained model, last loss
         """
-        self._curr_best_loss = -1
+        self._curr_best_loss = sys.maxsize
         self._curr_patience = train_config.get('epoch_patience', 10)
         patience_init_val = train_config.get('epoch_patience', 10)
 
@@ -394,8 +404,8 @@ class ModelRunner:
 
         return model
 
-    def train_contrastive_with_discriminator(self, model: CVBM, model_train_config: dict, discriminator: nn.Module,
-                                             discriminator_train_config: dict) -> CVBM:
+    def _train_contrastive_with_discriminator(self, model: CVBM, model_train_config: dict, discriminator: nn.Module,
+                                              discriminator_train_config: dict) -> (CVBM, float):
         """
         Method for training contrastive model along with discriminator. Most often this method should be used for
         variational contrastive autoencoders
@@ -403,8 +413,9 @@ class ModelRunner:
         :param model_train_config:
         :param discriminator_train_config:
         :param discriminator:
+        :return trained model, last loss
         """
-        self._curr_best_loss = -1
+        self._curr_best_loss = sys.maxsize
         self._curr_patience = model_train_config.get('epoch_patience', 10)
         patience_init_val = model_train_config.get('epoch_patience', 10)
 
@@ -618,7 +629,7 @@ class ModelRunner:
         """
         if self._curr_patience == 0 or math.isnan(curr_loss):
             return 0
-        elif curr_loss < self._curr_best_loss or self._curr_best_loss == -1:
+        elif curr_loss < self._curr_best_loss:
             self._curr_best_loss = curr_loss
             self._curr_patience = patience_reset_value
         else:
