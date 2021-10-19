@@ -71,7 +71,7 @@ Names in italics are direct arguments to the `train.py` script.
 All data from contrastive data folder will be transformed to feature passed as 1st argument of train script.
 Contrastive data will be shuffled and truncated to the length of original dataset.
 
-- :x: Contrastive Autoencoder (`contrastive_autoencoder`)
+- :white_check_mark: Contrastive Autoencoder (`contrastive_autoencoder`)
   - Periodogram (`periodogram`)
 - :x: Contrastive Convolutional 1D Autoencoder (_TBD_)
 - :x: Contrastive Convolutional 2D Autoencoder (_TBD_)
