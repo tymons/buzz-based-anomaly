@@ -2,20 +2,21 @@ from features.sound_dataset import SoundDataset
 from torch.utils.data import Dataset
 from dataclasses import dataclass
 from torch import Tensor
+from typing import Optional
 
 
 @dataclass(frozen=True)
 class ContrastiveOutput:
     target: Tensor
     background: Tensor
-    target_qs_mean: float
-    target_qs_log_var: float
-    target_qz_mean: float
-    target_qz_log_var: float
-    background_qz_mean: float
-    background_qz_log_var: float
-    target_qs_latent: Tensor
-    target_qz_latent: Tensor
+    target_qs_mean: Optional[float] = None
+    target_qs_log_var: Optional[float] = None
+    target_qz_mean: Optional[float] = None
+    target_qz_log_var: Optional[float] = None
+    background_qz_mean: Optional[float] = None
+    background_qz_log_var: Optional[float] = None
+    target_qs_latent: Optional[Tensor] = None
+    target_qz_latent: Optional[Tensor] = None
 
 
 class ContrastiveFeatureDataset(Dataset):

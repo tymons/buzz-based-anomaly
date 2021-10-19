@@ -2,7 +2,7 @@ import unittest
 import torch
 
 from utils.model_factory import HiveModelFactory
-from models.contrastive_base_model import ContrastiveBaseModel
+from models.contrastive_variational_base_model import ContrastiveVariationalBaseModel
 from models.model_type import HiveModelType
 
 
@@ -15,8 +15,9 @@ class ContrastiveAEModelTest(unittest.TestCase):
                                  'latent': 8
                              }, 2048
 
-        model: ContrastiveBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_vae'),
-                                                                   (input_size,), config)
+        model: ContrastiveVariationalBaseModel = HiveModelFactory.build_model(
+            HiveModelType.from_name('contrastive_vae'),
+            (input_size,), config)
         self.assertListEqual(model.get_params().get('model_layers'), config['layers'])
         self.assertListEqual(model.get_params().get('model_dropouts'), config['dropout'])
         self.assertEqual(model.get_params().get('model_latent'), config['latent'])

@@ -11,10 +11,14 @@ from models.vae import VAE
 from models.conv1d_vae import Conv1DVAE
 from models.conv2d_vae import Conv2DVAE
 from models.contrastive_vae import ContrastiveVAE
+from models.contrastive_variational_base_model import ContrastiveVariationalBaseModel
 from models.contrastive_base_model import ContrastiveBaseModel
 from models.discriminator import Discriminator
 from models.contrastive_ae import ContrastiveAE
 from typing import Callable, Tuple, Union
+
+CVBM = ContrastiveVariationalBaseModel
+CBM = ContrastiveBaseModel
 
 
 def model_check(model, input_shape, device="cuda"):
@@ -55,10 +59,10 @@ def build_optuna_model_config(model_type: HiveModelType, input_shape: Tuple, tri
         }
     }
 
-    if model_type.value.startswith('conv'):
+    if model_type.model_name.startswith('conv'):
         extend_config_for_convolution(config, trial)
 
-    if model_type.value.startswith('contrastive'):
+    if model_type.model_name.startswith('contrastive'):
         extend_config_for_contrastive(config)
 
     return config
@@ -231,6 +235,12 @@ class HiveModelFactory:
 
     @staticmethod
     def _get_contrastive_autoencoder_model(config: dict, input_size: Tuple) -> ContrastiveAE:
+        """
+        Method for building contrastive autoencoder model
+        :param config: config for model
+        :param input_size: data input size
+        :return: Contrastive AE model
+        """
         layers = config.get('layers', [256, 32, 16])
         dropouts = config.get('dropout', [0.2, 0.2, 0.2])
         latent_size = config.get('latent', 2)
@@ -252,7 +262,7 @@ class HiveModelFactory:
 
     @staticmethod
     def build_model(model_type: HiveModelType, input_shape: Tuple, config: dict) \
-            -> Union[BaseModel, ContrastiveBaseModel]:
+            -> Union[BaseModel, CBM, CVBM]:
         """
         Method for building ML models
         :param model_type: model type enum
@@ -261,13 +271,13 @@ class HiveModelFactory:
         :return:
         """
         model_func: Callable[[dict, tuple], (BaseModel, dict)] = \
-            getattr(HiveModelFactory, f'_get_{model_type.value.lower()}_model',
+            getattr(HiveModelFactory, f'_get_{model_type.model_name.lower()}_model',
                     lambda x, y: logging.error('invalid model type!'))
         return model_func(config, input_shape)
 
     @staticmethod
     def build_model_and_check(model_type: HiveModelType, input_shape: Tuple, config: dict) -> \
-            Union[BaseModel, ContrastiveBaseModel]:
+            Union[BaseModel, CBM, CVBM]:
         """
         Method for building and verifying model
         :param model_type: model type enum

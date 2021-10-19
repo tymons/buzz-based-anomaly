@@ -118,16 +118,18 @@ def main():
             model_runner.find_best(args.model, data_shape, learning_config, n_trials=args.find_best,
                                    output_folder=Path('output/model'))
         else:
-            # Here we perform model training
-            if args.model == HiveModelType.CONTRASTIVE_VAE:
-                model = HiveModelFactory.build_model(args.model, data_shape, model_config['model'])
+            model = HiveModelFactory.build_model(args.model, data_shape, model_config['model'])
+            if args.model.num >= HiveModelType.CONTRASTIVE_VAE.num:
                 discriminator = HiveModelFactory.get_discriminator(model_config['discriminator'],
                                                                    model_config['model']['latent'])
-                model = model_runner.train_contrastive(model, learning_config['model'], discriminator,
-                                                       learning_config['discriminator'])
+                model = model_runner.train_contrastive_with_discriminator(model, learning_config['model'],
+                                                                          discriminator,
+                                                                          learning_config['discriminator'])
+            elif args.model.num >= HiveModelType.CONTRASTIVE_AE.num:
+                model = model_runner.train_contrastive(model, learning_config['model'])
             else:
                 model = HiveModelFactory.build_model_and_check(args.model, data_shape, model_config['model'])
-                model = model_runner.train(model, learning_config)
+                model = model_runner.train(model, learning_config['model'])
 
 
 if __name__ == "__main__":
