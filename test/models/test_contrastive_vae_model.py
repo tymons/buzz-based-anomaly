@@ -15,8 +15,9 @@ class ContrastiveAEModelTest(unittest.TestCase):
                                  'latent': 8
                              }, 2048
 
-        model: ContrastiveVariationalBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_vae'),
-                                                                   (input_size,), config)
+        model: ContrastiveVariationalBaseModel = HiveModelFactory.build_model(
+            HiveModelType.from_name('contrastive_vae'),
+            (input_size,), config)
         self.assertListEqual(model.get_params().get('model_layers'), config['layers'])
         self.assertListEqual(model.get_params().get('model_dropouts'), config['dropout'])
         self.assertEqual(model.get_params().get('model_latent'), config['latent'])

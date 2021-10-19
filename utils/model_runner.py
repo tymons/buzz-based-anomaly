@@ -17,8 +17,8 @@ from typing import Any, Dict
 
 from models.model_type import HiveModelType
 from models.base_model import BaseModel as BM
-from models.contrastive_base_model import ContrastiveBaseModel as CBM
-from models.contrastive_variational_base_model import ContrastiveVariationalBaseModel as CVBM
+from models.contrastive_base_model import ContrastiveBaseModel
+from models.contrastive_variational_base_model import ContrastiveVariationalBaseModel
 from models.contrastive_vae import latent_permutation
 
 from typing import List, Callable, Union, Optional
@@ -29,6 +29,9 @@ from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 from features.contrastive_feature_dataset import ContrastiveOutput
 from utils.model_factory import HiveModelFactory, build_optuna_model_config
+
+CVBM = ContrastiveVariationalBaseModel
+CBM = ContrastiveBaseModel
 
 
 @dataclass
@@ -454,7 +457,8 @@ class ModelRunner:
 
     def _train_contrastive_step(self, model: Union[CBM, CVBM, nn.DataParallel], model_optimizer: Optimizer,
                                 experiment: Experiment, epoch: int, logging_interval: int,
-                                discriminator: nn.Module = None, discriminator_optimizer: Optimizer = None) -> EpochLoss:
+                                discriminator: nn.Module = None,
+                                discriminator_optimizer: Optimizer = None) -> EpochLoss:
         """
         Function for epoch run on contrastive model
         :param model:

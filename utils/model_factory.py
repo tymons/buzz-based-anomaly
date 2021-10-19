@@ -20,6 +20,7 @@ from typing import Callable, Tuple, Union
 CVBM = ContrastiveVariationalBaseModel
 CBM = ContrastiveBaseModel
 
+
 def model_check(model, input_shape, device="cuda"):
     """ Function for model check """
     summary(model, input_shape, device=device)
