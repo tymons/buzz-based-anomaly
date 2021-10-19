@@ -63,7 +63,7 @@ def main():
 
     logger_setup(args.log_folder, f"{args.model.value}-{args.feature.value}")
 
-    logging.info(f'runing {args.model.value} model with {args.feature.value}...')
+    logging.info(f'runing {args.model.model_name} model with {args.feature.value}...')
     logging.info(f'data folder located at: {args.data_folder}')
     logging.info(f'output folder for ML models located at: {args.model_output}')
     logging.info(f'output folder for logs located at: {args.log_folder}')
@@ -122,8 +122,7 @@ def main():
             if args.model.num >= HiveModelType.CONTRASTIVE_VAE.num:
                 discriminator = HiveModelFactory.get_discriminator(model_config['discriminator'],
                                                                    model_config['model']['latent'])
-                model = model_runner.train_contrastive_with_discriminator(model, learning_config['model'],
-                                                                          discriminator,
+                model = model_runner.train_contrastive_with_discriminator(model, learning_config['model'], discriminator,
                                                                           learning_config['discriminator'])
             elif args.model.num >= HiveModelType.CONTRASTIVE_AE.num:
                 model = model_runner.train_contrastive(model, learning_config['model'])
