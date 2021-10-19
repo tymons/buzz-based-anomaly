@@ -502,7 +502,8 @@ class ModelRunner:
                 discriminator_loss_float = dloss.item()
                 discriminator_mean_loss.append(discriminator_loss_float)
                 experiment.log_metric("discriminator_batch_train_loss", dloss, step=epoch * batch_idx)
-                logging.info(f'-> discriminator loss: {discriminator_loss_float}')
+                if logging_interval != -1 and batch_idx % logging_interval == 0:
+                    logging.info(f'-> discriminator loss: {discriminator_loss_float}')
 
         epoch_loss = EpochLoss(sum(mean_loss) / len(mean_loss))
         if len(discriminator_mean_loss) > 0:
@@ -536,7 +537,7 @@ class ModelRunner:
 
             if logging_interval != -1 and batch_idx % logging_interval == 0:
                 logging.info(f'=== validation epoch {epoch_no}, '
-                             f'[{batch_idx * len(target)}/{len(self.train_dataloader.dataset)}]'
+                             f'[{batch_idx * len(target)}/{len(self.val_dataloader.dataset)}]'
                              f'-> batch loss: {loss.item()} ===')
 
         return EpochLoss(sum(val_loss) / len(val_loss))
@@ -599,7 +600,7 @@ class ModelRunner:
 
             if logging_interval != -1 and batch_idx % logging_interval == 0:
                 logging.info(f'=== validation epoch {epoch_no}, '
-                             f'[{batch_idx * len(batch)}/{len(self.train_dataloader.dataset)}]'
+                             f'[{batch_idx * len(batch)}/{len(self.val_dataloader.dataset)}]'
                              f'-> batch loss: {loss.item()} ===')
 
         return EpochLoss(sum(val_loss) / len(val_loss))
