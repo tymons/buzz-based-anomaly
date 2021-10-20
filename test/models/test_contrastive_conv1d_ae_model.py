@@ -5,7 +5,7 @@ from utils.model_factory import HiveModelFactory, HiveModelType
 from models.base_model import BaseModel
 
 
-class ContrastiveAEModelTest(unittest.TestCase):
+class ContrastiveConv1DAEModelTest(unittest.TestCase):
     def test_model_is_build(self):
         input_size = 512
         config = {
