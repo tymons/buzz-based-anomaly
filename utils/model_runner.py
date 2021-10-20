@@ -160,7 +160,7 @@ def modify_optuna_learning_config(learning_config: dict, trial: optuna.Trial) ->
     optuna_learning_config['model']['optimizer']['type'] = trial.suggest_categorical('optimizer_type',
                                                                                      ['Adam', 'SGD', 'RMSprop',
                                                                                       'Adagrad', 'Adadelta'])
-    if optuna_learning_config['discriminator'] is not None:
+    if optuna_learning_config.get('discriminator') is not None:
         optuna_learning_config['discriminator']['optimizer']['type'] = trial.suggest_categorical('disc_optimizer_type',
                                                                                                  ['Adam', 'SGD',
                                                                                                   'RMSprop',
@@ -340,18 +340,15 @@ class ModelRunner:
         """
         return self._train(model, train_config, self._train_contrastive_step, self._val_contrastive_step)
 
-    def train_contrastive_with_discriminator(self, model: CVBM, model_train_config: dict, discriminator: nn.Module,
-                                             discriminator_train_config: dict) -> CVBM:
+    def train_contrastive_with_discriminator(self, model: CVBM, train_config: dict, discriminator: nn.Module) -> CVBM:
         """
         Wrapper for training contrastive variational autoencoders
         :param model:
-        :param model_train_config:
-        :param discriminator_train_config:
+        :param train_config:
         :param discriminator:
         :return:
         """
-        return self.train_contrastive_with_discriminator(model, model_train_config, discriminator,
-                                                         discriminator_train_config)
+        return self._train_contrastive_with_discriminator(model, train_config, discriminator)
 
     def _train(self, model: Union[BM, CBM], train_config: dict, train_step_func: T_train_step,
                val_step_func: T_val_step) -> (Union[BM, CBM]):
@@ -378,10 +375,11 @@ class ModelRunner:
         if torch.cuda.device_count() > 1:
             model = nn.DataParallel(model)
         model = model.to(self.device)
-        optimizer: Optimizer = _parse_optimizer(train_config['optimizer'].get('type', 'Adam'))(model.parameters(),
-                                                                                               lr=train_config.get(
-                                                                                                   'learning_rate',
-                                                                                                   0.0001))
+        optimizer: Optimizer = _parse_optimizer(train_config['model']['optimizer'].get('type', 'Adam'))(
+            model.parameters(),
+            lr=train_config.get(
+                'learning_rate',
+                0.0001))
         log_interval = train_config.get('logging_batch_interval', 10)
         for epoch in range(1, train_config.get('epochs', 10) + 1):
             train_epoch_loss = train_step_func(model, optimizer, experiment, epoch, log_interval)
@@ -404,28 +402,27 @@ class ModelRunner:
 
         return model
 
-    def _train_contrastive_with_discriminator(self, model: CVBM, model_train_config: dict, discriminator: nn.Module,
-                                              discriminator_train_config: dict) -> (CVBM, float):
+    def _train_contrastive_with_discriminator(self, model: CVBM, train_config: dict,
+                                              discriminator: nn.Module) -> (CVBM, float):
         """
         Method for training contrastive model along with discriminator. Most often this method should be used for
         variational contrastive autoencoders
         :param model:
-        :param model_train_config:
-        :param discriminator_train_config:
+        :param train_config:
         :param discriminator:
         :return trained model, last loss
         """
         self._curr_best_loss = sys.maxsize
-        self._curr_patience = model_train_config.get('epoch_patience', 10)
-        patience_init_val = model_train_config.get('epoch_patience', 10)
+        self._curr_patience = train_config.get('epoch_patience', 10)
+        patience_init_val = train_config.get('epoch_patience', 10)
 
         experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
-                                            {**model.get_params(), **model_train_config, **self.feature_config}, [])
+                                            {**model.get_params(), **train_config, **self.feature_config}, [])
         model_checkpoint_path = self.output_folder / f'{experiment.get_name()}-contrastive-checkpoint.pth'
         discriminator_checkpoint_path = self.output_folder / f'{experiment.get_name()}-discriminator-checkpoint.pth'
 
         logging.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
-                      f' for model {model_checkpoint_path.stem.upper()} with following config: {model_train_config}')
+                      f' for model {model_checkpoint_path.stem.upper()} with following config: {train_config}')
 
         if torch.cuda.device_count() > 1:
             model = nn.DataParallel(model)
@@ -433,15 +430,15 @@ class ModelRunner:
         model = model.to(self.device)
         discriminator = discriminator.to(self.device)
 
-        model_optimizer: Optimizer = _parse_optimizer(model_train_config['optimizer'].get('type', 'Adam'))(
-            model.parameters(), lr=model_train_config.get('learning_rate', 0.0001))
+        model_optimizer: Optimizer = _parse_optimizer(train_config['model']['optimizer'].get('type', 'Adam'))(
+            model.parameters(), lr=train_config.get('learning_rate', 0.0001))
         discriminator_optimizer: Optimizer = _parse_optimizer(
-            discriminator_train_config['optimizer'].get('type', 'Adam'))(discriminator.parameters(),
-                                                                         lr=discriminator_train_config.get(
-                                                                             'learning_rate', 0.0001))
+            train_config['discriminator']['optimizer'].get('type', 'Adam'))(discriminator.parameters(),
+                                                                            lr=train_config['discriminator'].get(
+                                                                                'learning_rate', 0.0001))
 
-        log_interval = model_train_config.get('logging_batch_interval', 10)
-        for epoch in range(1, model_train_config.get('epochs', 10) + 1):
+        log_interval = train_config.get('logging_batch_interval', 10)
+        for epoch in range(1, train_config.get('epochs', 10) + 1):
             epoch_loss = self._train_contrastive_step(model, model_optimizer, experiment, epoch, log_interval,
                                                       discriminator, discriminator_optimizer)
             experiment.log_metric('train_epoch_loss', epoch_loss.model_loss, step=epoch)

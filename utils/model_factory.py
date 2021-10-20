@@ -15,6 +15,7 @@ from models.contrastive_variational_base_model import ContrastiveVariationalBase
 from models.contrastive_base_model import ContrastiveBaseModel
 from models.discriminator import Discriminator
 from models.contrastive_ae import ContrastiveAE
+from models.contrastive_conv1d_ae import ContrastiveConv1DAE
 from typing import Callable, Tuple, Union
 
 CVBM = ContrastiveVariationalBaseModel
@@ -59,10 +60,10 @@ def build_optuna_model_config(model_type: HiveModelType, input_shape: Tuple, tri
         }
     }
 
-    if model_type.model_name.startswith('conv'):
+    if 'conv' in model_type.model_name:
         extend_config_for_convolution(config, trial)
 
-    if model_type.model_name.startswith('contrastive'):
+    if model_type.model_name.startswith('contrastive') and model_type.model_name.endswith('vae'):
         extend_config_for_contrastive(config)
 
     return config
@@ -248,6 +249,27 @@ class HiveModelFactory:
         logging.debug(f'building contrastive ae model with config: layers({layers}), latent({latent_size}),'
                       f' dropout({dropouts})')
         return ContrastiveAE(layers, latent_size, input_size[0], dropouts)
+
+    @staticmethod
+    def _get_contrastive_conv1d_autoencoder_model(config: dict, input_size: Tuple) -> ContrastiveConv1DAE:
+        """
+        Method for building contrastive convolutional 1d autoencoder model
+        :param config: config for model
+        :param input_size: data input size
+        :return: Contrastive Conv1d AE model
+        """
+        layers = config.get('layers', [256, 64, 16])
+        dropout = config.get('dropout', [0.1, 0.1, 0.1])
+        latent_size = config.get('latent', 2)
+        kernel = config.get('kernel', 2)
+        padding = config.get('padding', 0)
+        max_pool = config.get('max_pool', 2)
+
+        logging.debug(f'building contrastive conv1d ae model with config: encoder_layers({layers}),'
+                      f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
+                      f' max_pool({max_pool})')
+        return ContrastiveConv1DAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
+                                   input_size=input_size[0], max_pool=max_pool)
 
     @staticmethod
     def get_discriminator(discriminator_config: dict, autoencoder_latent: int) -> Discriminator:

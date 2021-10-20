@@ -3,13 +3,16 @@ from enum import Enum
 
 class HiveModelType(Enum):
     AE = (1, 'autoencoder')
-    CONV1D_AE = (2, 'conv1d_autoencoder')
-    CONV2D_AE = (3, 'conv2d_autoencoder')
-    VAE = (4, 'vae')
+    VAE = (2, 'vae')
+
+    CONV1D_AE = (3, 'conv1d_autoencoder')
+    CONV2D_AE = (4, 'conv2d_autoencoder')
     CONV1D_VAE = (5, 'conv1d_vae')
     CONV2D_VAE = (6, 'conv2d_vae')
+
     CONTRASTIVE_AE = (7, 'contrastive_autoencoder')
-    CONTRASTIVE_VAE = (8, 'contrastive_vae')
+    CONTRASTIVE_CONV1D_AE = (8, 'contrastive_conv1d_autoencoder')
+    CONTRASTIVE_VAE = (9, 'contrastive_vae')
 
     @classmethod
     def from_name(cls, name: str):
