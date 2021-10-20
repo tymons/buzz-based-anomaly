@@ -287,7 +287,7 @@ class HiveModelFactory:
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
 
-        logging.debug(f'building conv2d ae model with config: encoder_layers({layers}),'
+        logging.debug(f'building contrastive conv2d ae model with config: encoder_layers({layers}),'
                       f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
                       f' max_pool({max_pool})')
 
