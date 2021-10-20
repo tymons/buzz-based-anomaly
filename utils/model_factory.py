@@ -16,6 +16,7 @@ from models.contrastive_base_model import ContrastiveBaseModel
 from models.discriminator import Discriminator
 from models.contrastive_ae import ContrastiveAE
 from models.contrastive_conv1d_ae import ContrastiveConv1DAE
+from models.contrastive_conv2d_ae import ContrastiveConv2DAE
 from typing import Callable, Tuple, Union
 
 CVBM = ContrastiveVariationalBaseModel
@@ -270,6 +271,28 @@ class HiveModelFactory:
                       f' max_pool({max_pool})')
         return ContrastiveConv1DAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
                                    input_size=input_size[0], max_pool=max_pool)
+
+    @staticmethod
+    def _get_contrastive_conv2d_autoencoder_model(config: dict, input_size: Tuple) -> ContrastiveConv2DAE:
+        """
+        Method for building contrastive 2D convolutional Autoencoder
+        :param config: model config
+        :param input_size: input size
+        :return: model
+        """
+        layers = config.get('layers', [256, 64, 16])
+        dropout = config.get('dropout', [0.1, 0.1, 0.1])
+        latent_size = config.get('latent', 2)
+        kernel = config.get('kernel', 2)
+        padding = config.get('padding', 0)
+        max_pool = config.get('max_pool', 2)
+
+        logging.debug(f'building contrastive conv2d ae model with config: encoder_layers({layers}),'
+                      f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
+                      f' max_pool({max_pool})')
+
+        return ContrastiveConv2DAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
+                                   input_size=input_size, max_pool=max_pool)
 
     @staticmethod
     def get_discriminator(discriminator_config: dict, autoencoder_latent: int) -> Discriminator:

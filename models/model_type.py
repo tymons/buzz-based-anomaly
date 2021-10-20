@@ -12,7 +12,8 @@ class HiveModelType(Enum):
 
     CONTRASTIVE_AE = (7, 'contrastive_autoencoder')
     CONTRASTIVE_CONV1D_AE = (8, 'contrastive_conv1d_autoencoder')
-    CONTRASTIVE_VAE = (9, 'contrastive_vae')
+    CONTRASTIVE_CONV2D_AE = (9, 'contrastive_conv2d_autoencoder')
+    CONTRASTIVE_VAE = (10, 'contrastive_vae')
 
     @classmethod
     def from_name(cls, name: str):
