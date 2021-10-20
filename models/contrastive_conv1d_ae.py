@@ -72,4 +72,3 @@ class ContrastiveConv1DAE(ContrastiveBaseModel):
             'model_latent': self._latent,
             'model_max_pool': self._max_pool
         }
-
