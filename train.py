@@ -122,13 +122,12 @@ def main():
             if args.model.num >= HiveModelType.CONTRASTIVE_VAE.num:
                 discriminator = HiveModelFactory.get_discriminator(model_config['discriminator'],
                                                                    model_config['model']['latent'])
-                model = model_runner.train_contrastive_with_discriminator(model, learning_config['model'], discriminator,
-                                                                          learning_config['discriminator'])
+                model = model_runner.train_contrastive_with_discriminator(model, learning_config['model'], discriminator)
             elif args.model.num >= HiveModelType.CONTRASTIVE_AE.num:
-                model = model_runner.train_contrastive(model, learning_config['model'])
+                model = model_runner.train_contrastive(model, learning_config)
             else:
                 model = HiveModelFactory.build_model_and_check(args.model, data_shape, model_config['model'])
-                model = model_runner.train(model, learning_config['model'])
+                model = model_runner.train(model, learning_config)
 
 
 if __name__ == "__main__":
