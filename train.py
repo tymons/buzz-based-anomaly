@@ -68,6 +68,8 @@ def main():
     logging.info(f'output folder for ML models located at: {args.model_output}')
     logging.info(f'output folder for logs located at: {args.log_folder}')
 
+    # TODO: Check features and model type compatibility
+
     with args.feature_config.open('r') as fc, args.model_config.open('r') as mc, \
             args.learning_config.open('r') as lc:
         feature_config = yaml.load(fc, Loader=yaml.FullLoader)
@@ -103,10 +105,13 @@ def main():
         # build datasets and dataloader
         dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, sound_labels, feature_config)
         data_shape = dataset[0][0].squeeze().shape
+        logging.debug(f'got dataset of shape: {data_shape}')
         if args.contrastive_data_folder is not None:
             background_dataset = SoundFeatureFactory.build_dataset(args.feature, background_filenames,
                                                                    [0] * len(background_filenames),
                                                                    feature_config)
+            logging.debug(f'got background dataset for contrastive learning of shape:'
+                          f' {background_dataset[0][0].squeeze().shape}')
             dataset = SoundFeatureFactory.build_contrastive_feature_dataset(dataset, background_dataset)
         train_loader, val_loader = SoundFeatureFactory.build_train_and_validation_dataloader(dataset,
                                                                                              learning_config.get(
