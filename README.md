@@ -73,7 +73,8 @@ Contrastive data will be shuffled and truncated to the length of original datase
 
 - :white_check_mark: Contrastive Autoencoder (`contrastive_autoencoder`)
   - Periodogram (`periodogram`)
-- :x: Contrastive Convolutional 1D Autoencoder (_TBD_)
+- :white_check_mark: Contrastive Convolutional 1D Autoencoder (`contrastive_conv1d_autoencoder`)
+  - Periodogram (`periodogram`)
 - :x: Contrastive Convolutional 2D Autoencoder (_TBD_)
 - :white_check_mark: Contrastive Variational Autoencoder (`contrastive_vae`)
   - Periodogram (`periodogram`)
