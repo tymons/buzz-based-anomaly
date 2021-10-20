@@ -79,7 +79,7 @@ target data**.
   - Periodogram (`periodogram`)
 - :white_check_mark: Contrastive Convolutional 1D Autoencoder (`contrastive_conv1d_autoencoder`)
   - Periodogram (`periodogram`)
-- :x: Contrastive Convolutional 2D Autoencoder (`contrastive_conv2d_autoencoder`)
+- :white_check_mark: Contrastive Convolutional 2D Autoencoder (`contrastive_conv2d_autoencoder`)
   - Spectrogram (`spectrogram`)
   - MelSpectrogram (`melspectrogram`)
   - MFCC (`mfcc`)
