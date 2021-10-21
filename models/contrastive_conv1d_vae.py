@@ -2,36 +2,45 @@ import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 
-from typing import Union, List
+from typing import List
 
 from models.discriminator import Discriminator
 from models.contrastive_variational_base_model import ContrastiveVariationalBaseModel
-from models.ae import Encoder, Decoder
+from models.conv1d_ae import Conv1DEncoder, Conv1DDecoder
+from models.contrastive_vae import latent_permutation
+from models.conv_utils import convolutional_to_mlp
 from models.vae import reparameterize, kld_loss
 
 from features.contrastive_feature_dataset import ContrastiveOutput
 
 
-class ContrastiveVAE(ContrastiveVariationalBaseModel):
-    def __init__(self, layers: List[int], latent_size: int, input_size: int,
-                 dropout: Union[List[float], float] = 0.2):
+class ContrastiveConv1DVAE(ContrastiveVariationalBaseModel):
+    def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int,
+                 latent_size: int, input_size: int):
         super().__init__()
 
-        self._layers = layers
-        self._latent_size = latent_size
-        self._dropout = [dropout] * len(layers) if isinstance(dropout, float) else dropout
+        self._feature_map = features
+        self._dropout_probs = dropout_probs
+        self._kernel_size = kernel_size
+        self._padding = padding
+        self._latent = latent_size
+        self._max_pool = max_pool
 
-        self.s_encoder = Encoder(layers, dropout, input_size)
-        self.z_encoder = Encoder(layers, dropout, input_size)
-        self.decoder = Decoder(layers[::-1], 2 * latent_size, dropout, input_size)
+        connector_size, conv_temporal = convolutional_to_mlp(input_size, len(features), kernel_size, padding, max_pool)
+        self.s_encoder = Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool)
+        self.z_encoder = Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool)
+        self.decoder = Conv1DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, 2 * latent_size,
+                                     features[-1] * connector_size, conv_temporal[::-1])
 
-        self.s_linear_means = nn.Linear(layers[-1], latent_size)
-        self.s_linear_log_var = nn.Linear(layers[-1], latent_size)
+        self.flatten = nn.Flatten()
+        self.s_linear_means = nn.Linear(features[-1] * connector_size, latent_size)
+        self.s_linear_log_var = nn.Linear(features[-1] * connector_size, latent_size)
 
-        self.z_linear_means = nn.Linear(layers[-1], latent_size)
-        self.z_linear_log_var = nn.Linear(layers[-1], latent_size)
+        self.z_linear_means = nn.Linear(features[-1] * connector_size, latent_size)
+        self.z_linear_log_var = nn.Linear(features[-1] * connector_size, latent_size)
 
-    def loss_fn(self, target, background, model_output: ContrastiveOutput, discriminator: Discriminator) -> torch.Tensor:
+    def loss_fn(self, target, background, model_output: ContrastiveOutput,
+                discriminator: Discriminator) -> torch.Tensor:
         """
         Method for calculating loss function for pytorch model
         :param model_output:
@@ -66,12 +75,15 @@ class ContrastiveVAE(ContrastiveVariationalBaseModel):
         :return: ContrastiveData with reconstructed background and target
         """
         target_s = self.s_encoder(target)
+        target_s = self.flatten(target_s)
         tg_s_mean, tg_s_log_var = self.s_linear_means(target_s), self.s_linear_log_var(target_s)
 
         target_z = self.z_encoder(target)
+        target_z = self.flatten(target_z)
         tg_z_mean, tg_z_log_var = self.z_linear_means(target_z), self.z_linear_log_var(target_z)
 
         background_z = self.z_encoder(background)
+        background_z = self.flatten(background_z)
         bg_z_mean, bg_z_log_var = self.z_linear_means(background_z), self.z_linear_log_var(background_z)
 
         tg_s: Tensor = reparameterize(tg_s_mean, tg_s_log_var)
@@ -93,25 +105,10 @@ class ContrastiveVAE(ContrastiveVariationalBaseModel):
         :return: dictionary with model layer sizes
         """
         return {
-            'model_layers': self._layers,
-            'model_latent': self._latent_size,
-            'model_dropouts': self._dropout
+            'model_feature_map': self._feature_map,
+            'model_dropouts': self._dropout_probs,
+            'model_kernel_size': self._kernel_size,
+            'model_padding': self._padding,
+            'model_latent': self._latent,
+            'model_max_pool': self._max_pool
         }
-
-
-def latent_permutation(latent_batch: Tensor, inplace: bool = False):
-    """
-    Function for latent permutation.
-    :param latent_batch: concatenated batch of z's and s's
-    :param inplace: flag for inplace operation
-    :return:
-    """
-    latent_batch = latent_batch.squeeze()
-
-    data = latent_batch.clone() if inplace is False else latent_batch
-    rand_indices = torch.randperm(data[:, 0:data.shape[1] // 2].shape[0])
-    data[:, 0:data.shape[1] // 2] = data[:, 0:data.shape[1] // 2][rand_indices]
-    rand_indices = torch.randperm(data[:, data.shape[1] // 2:].shape[0])
-    data[:, data.shape[1] // 2:] = data[:, data.shape[1] // 2:][rand_indices]
-
-    return data
