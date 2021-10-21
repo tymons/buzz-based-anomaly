@@ -1,0 +1,7 @@
+model:
+  layers: [256, 32, 8]
+  dropout: [0.3, 0.3, 0.3]
+  latent: 14
+  kernel: 3
+  padding: 1
+  max_pool: 2
