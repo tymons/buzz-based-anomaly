@@ -85,7 +85,8 @@ target data**.
   - MFCC (`mfcc`)
 - :white_check_mark: Contrastive Variational Autoencoder (`contrastive_vae`)
   - Periodogram (`periodogram`)
-- :x: Contrastive Convolutional Variational 1D Autoencoder (_TBD_)
+- :white_check_mark: Contrastive Convolutional Variational 1D Autoencoder (`contrastive_conv1d_vae`)
+  - Periodogram (`periodogram`)
 - :x: Contrastive Convolutional Variational 2D Autoencoder (_TBD_)
 
 
