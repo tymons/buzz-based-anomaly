@@ -4,7 +4,7 @@ from typing import Tuple
 
 from models.base_model import BaseModel
 from models.model_type import HiveModelType
-from utils.model_factory import HiveModelFactory, model_check
+from utils.model_factory import HiveModelFactory
 
 
 def get_default_config() -> Tuple[dict, int]:
