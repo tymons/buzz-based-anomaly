@@ -87,7 +87,10 @@ target data**.
   - Periodogram (`periodogram`)
 - :white_check_mark: Contrastive Convolutional Variational 1D Autoencoder (`contrastive_conv1d_vae`)
   - Periodogram (`periodogram`)
-- :x: Contrastive Convolutional Variational 2D Autoencoder (_TBD_)
+- :white_check_mark: Contrastive Convolutional Variational 2D Autoencoder (`contrastive_conv2d_vae`)
+  - Spectrogram (`spectrogram`)
+  - MelSpectrogram (`melspectrogram`)
+  - MFCC (`mfcc`)
 
 
 ## Docker support 
