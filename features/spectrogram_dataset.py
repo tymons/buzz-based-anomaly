@@ -8,7 +8,7 @@ from scipy import signal
 
 from features.sound_dataset import SoundDataset
 from features.slice_frequency_dataclass import SliceFrequency
-from utils.data_utils import adjust_matrix, closest_power_2, adjust_linear_ndarray
+from utils.utils import adjust_matrix, closest_power_2, adjust_linear_ndarray
 
 
 def calculate_spectrogram(samples, sampling_rate: int, n_fft: int, hop_len: int, slice_freq: SliceFrequency = None,

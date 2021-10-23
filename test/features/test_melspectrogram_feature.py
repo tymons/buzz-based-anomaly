@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 
 from utils.feature_factory import SoundFeatureFactory, SoundFeatureType
-from utils.data_utils import closest_power_2
+from utils.utils import closest_power_2
 
 
 def _get_default_config() -> dict:

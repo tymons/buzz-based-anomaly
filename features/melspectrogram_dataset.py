@@ -8,7 +8,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 from features.sound_dataset import SoundDataset
 from features.slice_frequency_dataclass import SliceFrequency
-from utils.data_utils import adjust_matrix, adjust_linear_ndarray, closest_power_2
+from utils.utils import adjust_matrix, adjust_linear_ndarray, closest_power_2
 
 
 class MelSpectrogramDataset(SoundDataset):

@@ -16,6 +16,25 @@ from pathlib import Path
 from typing import List, Union
 
 
+def logger_setup(log_folder: Path, filename_prefix: str) -> None:
+    """
+    Method for setting up python logger
+    :param log_folder: folder where logs will be saved
+    :param filename_prefix: log file filename prefix
+    """
+    log_folder.mkdir(parents=True, exist_ok=True)
+    log_level = os.environ.get('LOGLEVEL', 'DEBUG').upper()
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        handlers=[
+            logging.FileHandler(log_folder / f"{filename_prefix}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                                             f"-{log_level}.log"),
+            logging.StreamHandler()
+        ]
+    )
+
+
 def flatten(x):
     """
     Flatten array
@@ -68,7 +87,7 @@ def create_valid_sounds_datalist(root_folder: Union[str, Path], valid_file_filen
 def get_valid_sounds_from_folders(folder_list: List[Path], valid_file_filename: str = 'valid_sounds.txt') -> List[Path]:
     """
     Reads valid sounds files in specific directories. Note that files should exists,
-    see create_valid_sounds_datalis method
+    see create_valid_sounds_datalist method
     :param folder_list: list of folders which should be scanned
     :param valid_file_filename: filename for 'valid' sound filenames file.
     :return: list of

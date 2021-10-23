@@ -1,9 +1,9 @@
-import os
 import argparse
 import logging
 
 import yaml
 import random
+import utils.utils as utils
 
 from typing import List
 from pathlib import Path
@@ -14,27 +14,7 @@ from features.feature_type import SoundFeatureType
 
 from utils.model_factory import HiveModelFactory
 from utils.feature_factory import SoundFeatureFactory
-from utils.data_utils import get_valid_sounds_from_folders, filter_string_list, filter_by_datetime
 from datetime import datetime
-
-
-def logger_setup(log_folder: Path, filename_prefix: str) -> None:
-    """
-    Method for setting up python logger
-    :param log_folder: folder where logs will be saved
-    :param filename_prefix: log file filename prefix
-    """
-    log_folder.mkdir(parents=True, exist_ok=True)
-    log_level = os.environ.get('LOGLEVEL', 'DEBUG').upper()
-    logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s [%(levelname)s] %(message)s',
-        handlers=[
-            logging.FileHandler(log_folder / f"{filename_prefix}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-                                             f"-{log_level}.log"),
-            logging.StreamHandler()
-        ]
-    )
 
 
 def main():
@@ -44,7 +24,7 @@ def main():
                         type=HiveModelType.from_name, help="Hive Model Type [AE]")
     parser.add_argument('feature', metavar='feature', choices=list(SoundFeatureType),
                         type=SoundFeatureType.from_name, help='Input feature')
-    parser.add_argument('data_folder', metavar='data_folder', type=Path, help='Root folder for data')
+    parser.add_argument('smartula_data_folder', metavar='data_folder', type=Path, help='Smartula folder for sound data')
     # optional arguments
     parser.add_argument('--filter_hives', default=[], nargs='+', help="Hive names to be excluded from dataset")
     parser.add_argument('--filter_dates', nargs=2, type=datetime.fromisoformat,
@@ -61,10 +41,10 @@ def main():
 
     args = parser.parse_args()
 
-    logger_setup(args.log_folder, f"{args.model.value}-{args.feature.value}")
+    utils.logger_setup(args.log_folder, f"{args.model.value}-{args.feature.value}")
 
     logging.info(f'runing {args.model.model_name} model with {args.feature.value}...')
-    logging.info(f'data folder located at: {args.data_folder}')
+    logging.info(f'data folder located at: {args.smartula_data_folder}')
     logging.info(f'output folder for ML models located at: {args.model_output}')
     logging.info(f'output folder for logs located at: {args.log_folder}')
 
@@ -77,16 +57,16 @@ def main():
         learning_config = yaml.load(lc, Loader=yaml.FullLoader)
 
         # data
-        sound_list = get_valid_sounds_from_folders(args.data_folder.glob('*'))
+        sound_list = utils.get_valid_sounds_from_folders(args.smartula_data_folder.glob('*'))
         if not sound_list:
             logging.error('sound list empty!')
             raise Exception('sound list empty!')
 
         if args.filter_dates:
-            sound_list = filter_by_datetime(sound_list, args.filter_dates[0], args.filter_dates[1])
+            sound_list = utils.filter_by_datetime(sound_list, args.filter_dates[0], args.filter_dates[1])
 
         # prepare sound filenames
-        sound_list = filter_string_list(sound_list, *args.filter_hives)
+        sound_list = utils.filter_string_list(sound_list, *args.filter_hives)
         available_labels = list(set([path.stem.split("-")[0] for path in sound_list]))
         sound_labels: List[int] = [list(available_labels).index(sound_name.stem.split('-')[0])
                                    for sound_name in sound_list]
