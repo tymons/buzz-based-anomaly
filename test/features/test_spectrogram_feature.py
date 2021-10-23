@@ -4,7 +4,7 @@ import numpy as np
 from utils.feature_factory import SoundFeatureFactory
 from features.feature_type import SoundFeatureType
 from pathlib import Path
-from utils.data_utils import closest_power_2
+from utils.utils import closest_power_2
 
 
 def _get_default_config() -> dict:

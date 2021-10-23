@@ -6,7 +6,7 @@ from pathlib import Path
 
 from features.sound_dataset import SoundDataset
 from features.slice_frequency_dataclass import SliceFrequency
-from utils.data_utils import adjust_linear_ndarray, adjust_matrix, closest_power_2
+from utils.utils import adjust_linear_ndarray, adjust_matrix, closest_power_2
 
 from sklearn.preprocessing import MinMaxScaler
 

@@ -12,7 +12,7 @@ from zipfile import ZipFile
 from tqdm import tqdm
 from typing import List
 
-from utils.data_utils import create_valid_sounds_datalist
+from utils.utils import create_valid_sounds_datalist
 from utils.data_prepare_type import DataPrepareType
 
 

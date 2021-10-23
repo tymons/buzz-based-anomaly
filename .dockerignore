@@ -1,5 +1,13 @@
 dataset/
 test/
 examples/
+output/
+unittest-environment.yml
+README.md
+.build_docker.sh
 .ipynb_checkpoints
 .comet.config
+.git/
+.github/
+.gitignore
+.git-credentials
