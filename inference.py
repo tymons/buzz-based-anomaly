@@ -52,7 +52,7 @@ def main():
         labels = target_labels + anomaly_labels
 
         # build datasets and dataloader
-        
+
         # TODO: ensure same shape for target and anomaly data
         dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, labels, feature_config)
         data_shape = dataset[0][0].squeeze().shape
