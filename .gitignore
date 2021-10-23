@@ -5,6 +5,6 @@ __pycache__/
 
 .comet.config
 comet.log
-
+.git-credentials
 output/
 *.ipynb
