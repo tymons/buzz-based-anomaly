@@ -2,18 +2,22 @@
 import os
 import errno
 import logging
+
 import requests
 import argparse
+import scipy.signal as sig
 
+from scipy.io import wavfile
 from pathlib import Path
 from datetime import datetime, date
 from pydub import AudioSegment
 from zipfile import ZipFile
 from tqdm import tqdm
-from typing import List
+from typing import List, Set
 
 from utils.utils import create_valid_sounds_datalist
 from utils.data_prepare_type import DataPrepareType
+from features.sound_dataset import read_samples
 
 
 def generate_wav_from_mp3(mp3_filepath: Path, remove_mp3: bool = False):
@@ -135,7 +139,7 @@ def prepare_smartula_data(dataset_path: Path, start_utc_imestamp: int, end_utc_t
     create_valid_sounds_datalist(dataset_path)
 
 
-def fragment_sound_data(files: List[Path], duration_ms: int) -> List[str]:
+def generate_fragmented_sound_files(files: List[Path], duration_ms: int) -> List[str]:
     """
     Method for processing sound files
     :param files:
@@ -145,12 +149,36 @@ def fragment_sound_data(files: List[Path], duration_ms: int) -> List[str]:
     logging.info(f'got  {len(files)} sound files to process')
     for file_path in tqdm(files):
         audio = AudioSegment.from_wav(file_path)
-        for elem_idx, element in enumerate(audio[::duration_ms]):
-            if element.duration_seconds * 1000 == duration_ms:
-                sub_filename = f"{file_path.with_suffix('')}-{elem_idx}.wav"
-                with open(sub_filename, "wb") as f:
-                    element.export(f, format='wav')
-                output_filenames.append(sub_filename)
+        if audio.duration_seconds * 1000 >= duration_ms:
+            for elem_idx, element in enumerate(audio[::duration_ms]):
+                if element.duration_seconds * 1000 == duration_ms:
+                    sub_filename = f"{file_path.with_suffix('')}-{elem_idx}.wav"
+                    with open(sub_filename, "wb") as f:
+                        element.export(f, format='wav')
+                    output_filenames.append(sub_filename)
+
+    return output_filenames
+
+
+def get_valid_sampling_rate_sound_files(files: List[Path], generate: bool, new_sampling_rate: int) -> List[str]:
+    """
+    Function for upsampling sound files with new sampling frequency
+    :param files:
+    :param new_sampling_rate:
+    :param generate: should new file be generated
+    :return: list of files which ensure sampling rate frequency
+    """
+    output_filenames = []
+    for filename in tqdm(files):
+        sound_samples, sampling_rate = read_samples(filename, True)
+        if sampling_rate != new_sampling_rate:
+            if generate:
+                sound_samples = sig.resample(sound_samples, (len(sound_samples)//sampling_rate) * new_sampling_rate)
+                filename = f'{filename.with_suffix("")}-upsampled.wav'
+                wavfile.write(filename, new_sampling_rate, sound_samples.astype('int16'))
+                output_filenames.append(filename)
+        else:
+            output_filenames.append(filename)
 
     return output_filenames
 
@@ -166,6 +194,7 @@ def main():
     parser.add_argument('--smartula_hives', type=str, nargs='+', metavar='H', help='Smartula hives sns')
     parser.add_argument('--data_folder', default=Path(__file__).absolute().parent / "dataset/", type=Path)
     parser.add_argument('--duration', type=int, help="sound duration for files to be truncated in seconds")
+    parser.add_argument('--sampling_rate', type=int, help="sampling rate for new audio files")
 
     args = parser.parse_args()
 
@@ -181,12 +210,26 @@ def main():
                                            day=args.start.day).timestamp()),
                               int(datetime(year=args.end.year, month=args.end.month, day=args.end.day).timestamp()),
                               args.smartula_hives, smartula_api_env, smartula_token_env)
-    elif args.task == DataPrepareType.FRAGMENT_HIVE_BEES:
-        # slice sound segments
-        sound_files = list(args.data_folder.glob('**/*.wav'))
-        fragment_sound_data(sound_files, args.duration * 1000)
-        # delete original files:
-        for file in sound_files:
+    elif args.task == DataPrepareType.FRAGMENT_HIVE_AUDIO or args.task == DataPrepareType.UPSAMPLE_HIVE_AUDIO:
+        # upsample or fragment audio data
+        sound_files: List[Path] = list(args.data_folder.glob('**/*.wav'))
+        sound_files_to_remove: Set[Path] = set()
+        if args.task == DataPrepareType.FRAGMENT_HIVE_AUDIO:
+            assert args.duration, "duration argument should be specified!"
+            fragmented_sound_filenames = generate_fragmented_sound_files(sound_files, args.duration * 1000)
+            logging.info(f'sound data processed with fragment resulting set of {len(fragmented_sound_filenames)} '
+                         f'audio files.')
+            sound_files_to_remove.update(sound_files)
+
+        if args.task == DataPrepareType.UPSAMPLE_HIVE_AUDIO:
+            assert args.sampling_rate, "sampling rate argument should be specified!"
+            valid_sampling_filenames = get_valid_sampling_rate_sound_files(sound_files, generate=True,
+                                                                           new_sampling_rate=args.sampling_rate)
+            logging.info(f'sound data processed with upsample resulting set of {len(valid_sampling_filenames)} '
+                         f'audio files.')
+            sound_files_to_remove = set(sound_files) - set(list(map(Path, valid_sampling_filenames)))
+
+        for file in sound_files_to_remove:
             file.unlink()
 
 

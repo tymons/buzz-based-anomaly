@@ -19,7 +19,7 @@ are saved within created `nu-hive-processed/` folder.
 To execute such option run:
 
 ```shell
-data-prepare.py extract-nuhive-bees --data_folder C:\NUHIVE_FOLDER
+$ data-prepare.py extract-nuhive-bees --data_folder C:\NUHIVE_FOLDER
 ```
 
 * **FRAGMENT SOUNDS**  
@@ -29,8 +29,19 @@ all wav sounds to files with equal length `fragment-sound-bees` option should be
 `--duration` which is length in seconds for every fragment. Example:
 
 ```shell
-data-prepare.py fragment-sound-bees --data_folder C:\NUHIVE_FOLDER --duration 2
+$ data-prepare.py fragment-sound --data_folder C:\NUHIVE_FOLDER --duration 2
 ```
+
+* **UPSAMPLED SOUNDS**  
+
+Machine Learning models require unified input where e.g. spectrogram should exhibit unified shape for the 
+full dataset. In order to handle such scenario one could use `upsample-sound` option. Such utility upsample 
+all audio files within a folder to given frequency. Audio data which already satisfy sampling rate requirement 
+will be preserved. The rest of data will be upsampled and saved as new file where parent audio will be deleted.  
+```shell
+$ data-prepare.py upsample-sound --data_folder C:\NUHIVE_FOLDER --sampling_rate 44100
+```
+
 
 * **DOWNLOAD SMARTULA DATA**
 
@@ -38,7 +49,7 @@ One could download data from smartula server to train own models. Mind that this
 Smartula raw data will be preprocessed in order to reject samples which are too silent or distorted sounds.
 
 ```shell
-python data_prepare.py --start YYYY-MM-DD --end YYYY-MM-DD --smartula_hives DEADBEEF99
+$ python data_prepare.py --start YYYY-MM-DD --end YYYY-MM-DD --smartula_hives DEADBEEF99
 ```
 
 # Model train
@@ -99,7 +110,7 @@ Repo has ready to use docker images at [dockerhub/tymonzz](https://hub.docker.co
 with entrypoint set to `train.py` script. Example script: 
 
 ```shell
-docker run -d --name buzz-based-anomaly \
+$ docker run -d --name buzz-based-anomaly \
               -v /ssd_local/142847ct/buzz-based-anomaly-dataset/smartula:/data \
               -v /home/macierz/142847ct/142847ct/research/buzz-based-anomaly:/io \
               --gpus all \
@@ -128,6 +139,6 @@ To overwrite default cuda versions just use options: `-p` for _PyTorch_ and `-d`
 For example, pytorch cuda toolkit _v10.2_ and nvidia/cuda_ docker image with _v11.2.0_ could be overwritten with:
 
 ```shell
-./build_docker.sh -p 10.2 -d 11.2.0
+$ ./build_docker.sh -p 10.2 -d 11.2.0
 ```
 

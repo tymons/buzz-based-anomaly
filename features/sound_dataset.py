@@ -28,7 +28,7 @@ def _pcm2float(sig: np.ndarray, dynamic_type: str = 'float64') -> np.ndarray:
     return (sig.astype(d_type) - offset) / abs_max
 
 
-def _read_samples(filename: Path, raw: bool = False) -> (np.ndarray, int):
+def read_samples(filename: Path, raw: bool = False) -> (np.ndarray, int):
     """
     Function for reading sound samples from wav file
     :param filename: wav file to be read
@@ -72,7 +72,7 @@ class SoundDataset(ABC, Dataset):
         """
         filename = self.filenames[idx]
         label = self.labels[idx]
-        sound_samples, sampling_rate = _read_samples(filename, raw)
+        sound_samples, sampling_rate = read_samples(filename, raw)
         return sound_samples, sampling_rate, label
 
     def hour_for_fileid(self, idx: int) -> int:
