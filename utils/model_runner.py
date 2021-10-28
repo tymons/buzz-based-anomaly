@@ -191,15 +191,14 @@ def _prepare_discrimination_for_train(discriminator_model_config: dict, model_la
 class ModelRunner:
     device: device
 
-    def __init__(self, train_loader: DataLoader, val_loader: DataLoader, output_folder: Path,
+    def __init__(self, dataloader: DataLoader, train_validator_dataloader: DataLoader = None,
+                 output_folder: Path = None,
                  feature_config=None, comet_api_key: str = None, comet_config_file: Path = None,
                  comet_project_name: str = "Default Project"):
-        if feature_config is None:
-            feature_config = {}
         self.comet_api_key = comet_api_key if comet_api_key is not None else _read_comet_key(comet_config_file)
         self.comet_proj_name = comet_project_name
-        self.train_dataloader = train_loader
-        self.val_dataloader = val_loader
+        self.train_dataloader = dataloader
+        self.train_validator_dataloader = train_validator_dataloader
         self.output_folder = output_folder
         self.feature_config = feature_config if feature_config is not None else {}
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -322,6 +321,14 @@ class ModelRunner:
         except RuntimeError as e:
             logging.error(f'hive model build failed for config: {optuna_model_config} with exception: {e}')
 
+    def inference(self, model: BM):
+        """
+        Wrapper for model inference
+        :param model: model
+        :return:
+        """
+        pass
+
     def train(self, model: BM, train_config: dict) -> BM:
         """
         Wrapper for training vanilla or variational autoencoders (both convolutional and fully connected)
@@ -385,13 +392,15 @@ class ModelRunner:
             train_epoch_loss = train_step_func(model, optimizer, experiment, epoch, log_interval)
             experiment.log_metric('train_epoch_loss', train_epoch_loss.model_loss, step=epoch)
 
-            val_epoch_loss = val_step_func(model, experiment, epoch, log_interval)
-            experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
+            logging.info(f'--- train epoch {epoch} end with train loss: {train_epoch_loss.model_loss}')
+            early_stopping_loss = train_epoch_loss
+            if self.train_validator_dataloader is not None:
+                val_epoch_loss = val_step_func(model, experiment, epoch, log_interval)
+                experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
+                early_stopping_loss = val_epoch_loss
+                logging.info(f'--- train epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
-            logging.info(
-                f'--- train epoch {epoch} end with train loss: {train_epoch_loss.model_loss}'
-                f' and val loss: {val_epoch_loss.model_loss} ---')
-            patience = self.early_stopping_callback(val_epoch_loss.model_loss, patience_init_val)
+            patience = self.early_stopping_callback(early_stopping_loss.model_loss, patience_init_val)
             if patience == patience_init_val:
                 logging.debug(f'*** model checkpoint at epoch {epoch} ***')
                 model_save(model, checkpoint_path, optimizer, epoch, train_epoch_loss.model_loss)
@@ -444,13 +453,15 @@ class ModelRunner:
             experiment.log_metric('train_epoch_loss', epoch_loss.model_loss, step=epoch)
             experiment.log_metric('train_discriminator_epoch_loss', epoch_loss.discriminator_loss, step=epoch)
 
-            val_epoch_loss = self._val_contrastive_step(model, experiment, epoch, log_interval, discriminator)
-            experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
+            logging.info(f'--- train epoch {epoch} end with train loss: {epoch_loss.model_loss}')
+            early_stopping_loss = epoch_loss
+            if self.train_validator_dataloader is not None:
+                val_epoch_loss = self._val_contrastive_step(model, experiment, epoch, log_interval)
+                experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
+                early_stopping_loss = val_epoch_loss
+                logging.info(f'--- train epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
-            logging.info(
-                f'--- train epoch {epoch} end with train loss: {epoch_loss.model_loss} '
-                f'(discriminator loss: {epoch_loss.discriminator_loss}) and val loss: {val_epoch_loss} ---')
-            patience = self.early_stopping_callback(val_epoch_loss.model_loss, patience_init_val)
+            patience = self.early_stopping_callback(early_stopping_loss.model_loss, patience_init_val)
             if patience == patience_init_val:
                 logging.debug(f'*** model checkpoint at epoch {epoch} ***')
                 model_save(model, model_checkpoint_path, model_optimizer, epoch, epoch_loss.model_loss)
@@ -535,22 +546,22 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
-        for batch_idx, (target, background) in enumerate(self.val_dataloader):
-            target_batch = target.to(self.device)
-            background_batch = background.to(self.device)
-            model_output = model(target_batch, background_batch)
+        with torch.no_grad:
+            for batch_idx, (target, background) in enumerate(self.train_validator_dataloader):
+                target_batch = target.to(self.device)
+                background_batch = background.to(self.device)
+                model_output = model(target_batch, background_batch)
 
-            loss = model.loss_fn(target_batch, background_batch, model_output, discriminator) \
-                if discriminator is not None else model.loss_fn(target_batch, background_batch, model_output)
+                loss = model.loss_fn(target_batch, background_batch, model_output, discriminator) \
+                    if discriminator is not None else model.loss_fn(target_batch, background_batch, model_output)
+                loss_float = loss.item()
+                val_loss.append(loss_float)
+                experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
 
-            loss_float = loss.item()
-            val_loss.append(loss_float)
-            experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
-
-            if logging_interval != -1 and batch_idx % logging_interval == 0:
-                logging.info(f'=== validation epoch {epoch_no}, '
-                             f'[{batch_idx * len(target)}/{len(self.val_dataloader.dataset)}]'
-                             f'-> batch loss: {loss.item()} ===')
+                if logging_interval != -1 and batch_idx % logging_interval == 0:
+                    logging.info(f'=== validation epoch {epoch_no}, '
+                                 f'[{batch_idx * len(target)}/{len(self.train_validator_dataloader.dataset)}]'
+                                 f'-> batch loss: {loss.item()} ===')
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
@@ -601,19 +612,20 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
-        for batch_idx, (batch, _) in enumerate(self.val_dataloader):
-            batch = batch.to(self.device)
-            model_output = model(batch)
-            loss = model.loss_fn(batch, model_output)
+        with torch.no_grad:
+            for batch_idx, (batch, _) in enumerate(self.train_validator_dataloader):
+                batch = batch.to(self.device)
+                model_output = model(batch)
+                loss = model.loss_fn(batch, model_output)
 
-            loss_float = loss.item()
-            val_loss.append(loss_float)
-            experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
+                loss_float = loss.item()
+                val_loss.append(loss_float)
+                experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
 
-            if logging_interval != -1 and batch_idx % logging_interval == 0:
-                logging.info(f'=== validation epoch {epoch_no}, '
-                             f'[{batch_idx * len(batch)}/{len(self.val_dataloader.dataset)}]'
-                             f'-> batch loss: {loss.item()} ===')
+                if logging_interval != -1 and batch_idx % logging_interval == 0:
+                    logging.info(f'=== validation epoch {epoch_no}, '
+                                 f'[{batch_idx * len(batch)}/{len(self.train_validator_dataloader.dataset)}]'
+                                 f'-> batch loss: {loss.item()} ===')
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
