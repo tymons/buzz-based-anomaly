@@ -191,17 +191,11 @@ def _prepare_discrimination_for_train(discriminator_model_config: dict, model_la
 class ModelRunner:
     device: device
 
-    def __init__(self, train_loader: DataLoader, val_loader: DataLoader, output_folder: Path,
-                 feature_config=None, comet_api_key: str = None, comet_config_file: Path = None,
+    def __init__(self, output_folder: Path = None, comet_api_key: str = None, comet_config_file: Path = None,
                  comet_project_name: str = "Default Project"):
-        if feature_config is None:
-            feature_config = {}
         self.comet_api_key = comet_api_key if comet_api_key is not None else _read_comet_key(comet_config_file)
         self.comet_proj_name = comet_project_name
-        self.train_dataloader = train_loader
-        self.val_dataloader = val_loader
         self.output_folder = output_folder
-        self.feature_config = feature_config if feature_config is not None else {}
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self._curr_patience = -1
@@ -226,19 +220,20 @@ class ModelRunner:
         experiment.add_tags(tags)
         return experiment
 
-    def find_best(self, model_type: HiveModelType, input_shape: Union[int, tuple], learning_config: dict, n_trials=10,
-                  output_folder: Path = Path(__file__).parents[1].absolute()) -> None:
+    def find_best(self, model_type: HiveModelType, train_dataloader: DataLoader, learning_config: dict, n_trials=10,
+                  output_folder: Path = Path(__file__).parents[1].absolute(), feature_config: dict = None) -> None:
         """
         Method for searching best architecture with oputa
         :param model_type: autoencoder model type
-        :param input_shape: data input shape
+        :param train_dataloader: train dataloader
         :param learning_config: train config
         :param n_trials: how many trials should be performed for optuna search
         :param output_folder: folder where best architecture config will be saved
+        :param feature_config: feature config
         """
         study = optuna.create_study(sampler=optuna.samplers.TPESampler(), direction='minimize')
         study.optimize(lambda op_trial: self._optuna_train_objective(
-            op_trial, model_type, input_shape, learning_config), n_trials=n_trials)
+            op_trial, model_type, train_dataloader, learning_config, feature_config), n_trials=n_trials)
 
         pruned_trials = [t for t in study.trials if t.state == optuna.structs.TrialState.PRUNED]
         complete_trials = [t for t in study.trials if t.state == optuna.structs.TrialState.COMPLETE]
@@ -262,24 +257,34 @@ class ModelRunner:
                 logging.info(f'    {key}:{value}')
                 f.write(f'    {key}:{value} \r\n')
 
-    def _optuna_train_objective(self, trial: optuna.Trial, model_type: HiveModelType, input_shape: Union[int, tuple],
-                                learning_config: dict) -> float:
+    def _optuna_train_objective(self,
+                                trial: optuna.Trial,
+                                model_type: HiveModelType,
+                                train_dataloader: DataLoader,
+                                learning_config: dict,
+                                feature_config: dict = None) -> float:
         """
         Method for optuna objective
         :param trial: optuna.trial.Trial object
-        :param model: model to be adjusted
-        :param config: configuration for the model
+        :param model_type: model type which should be build
+        :param train_dataloader: dataloader for train method
+        :param learning_config: configuration for model trianing
+        :param feature_config: feature config to be logged
         :return: final loss
         """
-        optuna_model_config = build_optuna_model_config(model_type, input_shape, trial)
+        optuna_model_config = build_optuna_model_config(model_type,
+                                                        train_dataloader.dataset[0][0].squeeze().shape, trial)
         optuna_learning_config: Dict[str, Any] = modify_optuna_learning_config(learning_config, trial)
 
         self._curr_best_loss = sys.maxsize
         self._curr_patience = optuna_learning_config.get('epoch_patience', 10)
         try:
-            model = HiveModelFactory.build_model(model_type, input_shape, optuna_model_config['model'])
+            model = HiveModelFactory.build_model(model_type, train_dataloader.dataset[0][0].squeeze().shape,
+                                                 optuna_model_config['model'])
             experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
-                                                {**model.get_params(), **optuna_learning_config, **self.feature_config},
+                                                {**model.get_params(),
+                                                 **optuna_learning_config,
+                                                 **(feature_config if feature_config is not None else {})},
                                                 ['optuna'])
 
             logging.debug(f'performing optuna train task on {self.device}(s) ({torch.cuda.device_count()})'
@@ -301,9 +306,10 @@ class ModelRunner:
                                                                    optuna_learning_config['discriminator'])
 
             for epoch in range(1, optuna_learning_config.get('epochs', 10) + 1):
-                epoch_loss = self._train_step(model, optim, experiment, epoch, log_interval) \
+                epoch_loss = self._train_step(model, train_dataloader, optim, experiment, epoch, log_interval) \
                     if model_type.num < HiveModelType.CONTRASTIVE_AE.num else \
-                    self._train_contrastive_step(model, optim, experiment, epoch, log_interval, disc, disc_opt)
+                    self._train_contrastive_step(model, train_dataloader,
+                                                 optim, experiment, epoch, log_interval, disc, disc_opt)
 
                 epoch_loss_value = epoch_loss.model_loss
                 experiment.log_metric('train_epoch_loss', epoch_loss_value, step=epoch)
@@ -322,36 +328,77 @@ class ModelRunner:
         except RuntimeError as e:
             logging.error(f'hive model build failed for config: {optuna_model_config} with exception: {e}')
 
-    def train(self, model: BM, train_config: dict) -> BM:
+    def inference_latent(self, model: BM):
+        """
+        Wrapper for model inference
+        :param model: model
+        :return:
+        """
+        pass
+
+    def train(self,
+              model: BM,
+              train_dataloader: DataLoader,
+              train_config: dict,
+              val_dataloader: DataLoader = None,
+              feature_config: dict = None) -> BM:
         """
         Wrapper for training vanilla or variational autoencoders (both convolutional and fully connected)
+        :param feature_config: feature config to be logged
+        :param val_dataloader: validation dataloader
+        :param train_dataloader: train dataloader
         :param model: model to be trained
         :param train_config: train config
         :return:
         """
-        model, _ = self._train(model, train_config, self._train_step, self._val_step)
+        model, _ = self._train(model, train_dataloader, train_config, self._train_step, self._val_step,
+                               val_dataloader, feature_config)
         return model
 
-    def train_contrastive(self, model: CBM, train_config: dict) -> CBM:
+    def train_contrastive(self,
+                          model: CBM,
+                          train_dataloader: DataLoader,
+                          train_config: dict,
+                          val_dataloader: DataLoader = None,
+                          feature_config: dict = None) -> CBM:
         """
         Wrapper for training vanilla contrastive autoencoders (both convolutional and fully connected)
+        :param feature_config: feature config to be logged
+        :param val_dataloader: validation dataloader
+        :param train_dataloader: train dataloader
         :param model: model to be trained
         :param train_config: train config
         """
-        return self._train(model, train_config, self._train_contrastive_step, self._val_contrastive_step)
+        return self._train(model, train_dataloader, train_config, self._train_contrastive_step,
+                           self._val_contrastive_step, val_dataloader, feature_config)
 
-    def train_contrastive_with_discriminator(self, model: CVBM, train_config: dict, discriminator: nn.Module) -> CVBM:
+    def train_contrastive_with_discriminator(self,
+                                             model: CVBM,
+                                             train_dataloader: DataLoader,
+                                             train_config: dict,
+                                             discriminator: nn.Module,
+                                             val_dataloader: DataLoader = None,
+                                             feature_config: dict = None) -> CVBM:
         """
         Wrapper for training contrastive variational autoencoders
-        :param model:
-        :param train_config:
-        :param discriminator:
+        :param model: contrastive model to be trained
+        :param train_dataloader: train dataloader object
+        :param train_config: learning config dictionary
+        :param discriminator: discriminator to be used for latent class learning
+        :param val_dataloader: validation dataloader
+        :param feature_config: dict for feature config to be logged with comet ml
         :return:
         """
-        return self._train_contrastive_with_discriminator(model, train_config, discriminator)
+        return self._train_contrastive_with_discriminator(model, train_dataloader, train_config, discriminator,
+                                                          val_dataloader, feature_config)
 
-    def _train(self, model: Union[BM, CBM], train_config: dict, train_step_func: T_train_step,
-               val_step_func: T_val_step) -> (Union[BM, CBM]):
+    def _train(self, model: Union[BM, CBM],
+               train_dataloader: DataLoader,
+               train_config: dict,
+               train_step_func: T_train_step,
+               val_step_func: T_val_step,
+               val_dataloader: DataLoader = None,
+               feature_config=None) -> (Union[BM, CBM]):
         """
         Base function for training model with specified config.
         This method should be used only without discriminator model.
@@ -361,12 +408,16 @@ class ModelRunner:
         :param val_step_func: function to be invoked for single epoch validating
         :rtype: BM: trained model, last loss
         """
+        if feature_config is None:
+            feature_config = {}
         self._curr_best_loss = sys.maxsize
         self._curr_patience = train_config.get('epoch_patience', 10)
         patience_init_val = train_config.get('epoch_patience', 10)
 
         experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
-                                            {**model.get_params(), **train_config, **self.feature_config}, [])
+                                            {**model.get_params(),
+                                             **train_config,
+                                             **(feature_config if feature_config is not None else {})}, [])
         checkpoint_path = self.output_folder / f'{experiment.get_name()}-checkpoint.pth'
 
         logging.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
@@ -382,16 +433,18 @@ class ModelRunner:
                 0.0001))
         log_interval = train_config.get('logging_batch_interval', 10)
         for epoch in range(1, train_config.get('epochs', 10) + 1):
-            train_epoch_loss = train_step_func(model, optimizer, experiment, epoch, log_interval)
+            train_epoch_loss = train_step_func(model, train_dataloader, optimizer, experiment, epoch, log_interval)
             experiment.log_metric('train_epoch_loss', train_epoch_loss.model_loss, step=epoch)
 
-            val_epoch_loss = val_step_func(model, experiment, epoch, log_interval)
-            experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
+            logging.info(f'--- train epoch {epoch} end with train loss: {train_epoch_loss.model_loss}')
+            early_stopping_loss = train_epoch_loss
+            if val_dataloader is not None:
+                val_epoch_loss = val_step_func(model, val_dataloader, experiment, epoch, log_interval)
+                experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
+                early_stopping_loss = val_epoch_loss
+                logging.info(f'--- train epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
-            logging.info(
-                f'--- train epoch {epoch} end with train loss: {train_epoch_loss.model_loss}'
-                f' and val loss: {val_epoch_loss.model_loss} ---')
-            patience = self.early_stopping_callback(val_epoch_loss.model_loss, patience_init_val)
+            patience = self.early_stopping_callback(early_stopping_loss.model_loss, patience_init_val)
             if patience == patience_init_val:
                 logging.debug(f'*** model checkpoint at epoch {epoch} ***')
                 model_save(model, checkpoint_path, optimizer, epoch, train_epoch_loss.model_loss)
@@ -402,8 +455,13 @@ class ModelRunner:
 
         return model
 
-    def _train_contrastive_with_discriminator(self, model: CVBM, train_config: dict,
-                                              discriminator: nn.Module) -> (CVBM, float):
+    def _train_contrastive_with_discriminator(self,
+                                              model: CVBM,
+                                              train_dataloader: DataLoader,
+                                              train_config: dict,
+                                              discriminator: nn.Module,
+                                              val_dataloader: DataLoader = None,
+                                              feature_config: dict = None) -> (CVBM, float):
         """
         Method for training contrastive model along with discriminator. Most often this method should be used for
         variational contrastive autoencoders
@@ -417,7 +475,10 @@ class ModelRunner:
         patience_init_val = train_config.get('epoch_patience', 10)
 
         experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
-                                            {**model.get_params(), **train_config, **self.feature_config}, [])
+                                            {**model.get_params(),
+                                             **train_config,
+                                             **(feature_config if feature_config is not None else {})}, [])
+
         model_checkpoint_path = self.output_folder / f'{experiment.get_name()}-contrastive-checkpoint.pth'
         discriminator_checkpoint_path = self.output_folder / f'{experiment.get_name()}-discriminator-checkpoint.pth'
 
@@ -439,18 +500,21 @@ class ModelRunner:
 
         log_interval = train_config.get('logging_batch_interval', 10)
         for epoch in range(1, train_config.get('epochs', 10) + 1):
-            epoch_loss = self._train_contrastive_step(model, model_optimizer, experiment, epoch, log_interval,
+            epoch_loss = self._train_contrastive_step(model, train_dataloader,
+                                                      model_optimizer, experiment, epoch, log_interval,
                                                       discriminator, discriminator_optimizer)
             experiment.log_metric('train_epoch_loss', epoch_loss.model_loss, step=epoch)
             experiment.log_metric('train_discriminator_epoch_loss', epoch_loss.discriminator_loss, step=epoch)
 
-            val_epoch_loss = self._val_contrastive_step(model, experiment, epoch, log_interval, discriminator)
-            experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
+            logging.info(f'--- train epoch {epoch} end with train loss: {epoch_loss.model_loss}')
+            early_stopping_loss = epoch_loss
+            if val_dataloader is not None:
+                val_epoch_loss = self._val_contrastive_step(model, val_dataloader, experiment, epoch, log_interval)
+                experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
+                early_stopping_loss = val_epoch_loss
+                logging.info(f'--- train epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
-            logging.info(
-                f'--- train epoch {epoch} end with train loss: {epoch_loss.model_loss} '
-                f'(discriminator loss: {epoch_loss.discriminator_loss}) and val loss: {val_epoch_loss} ---')
-            patience = self.early_stopping_callback(val_epoch_loss.model_loss, patience_init_val)
+            patience = self.early_stopping_callback(early_stopping_loss.model_loss, patience_init_val)
             if patience == patience_init_val:
                 logging.debug(f'*** model checkpoint at epoch {epoch} ***')
                 model_save(model, model_checkpoint_path, model_optimizer, epoch, epoch_loss.model_loss)
@@ -463,25 +527,31 @@ class ModelRunner:
 
         return model
 
-    def _train_contrastive_step(self, model: Union[CBM, CVBM, nn.DataParallel], model_optimizer: Optimizer,
-                                experiment: Experiment, epoch: int, logging_interval: int,
+    def _train_contrastive_step(self,
+                                model: Union[CBM, CVBM, nn.DataParallel],
+                                dataloader: DataLoader,
+                                model_optimizer: Optimizer,
+                                experiment: Experiment,
+                                epoch: int,
+                                logging_interval: int,
                                 discriminator: nn.Module = None,
                                 discriminator_optimizer: Optimizer = None) -> EpochLoss:
         """
         Function for epoch run on contrastive model
-        :param model:
-        :param model_optimizer:
-        :param discriminator:
-        :param discriminator_optimizer:
-        :param experiment:
-        :param epoch:
-        :param logging_interval:
-        :return:
+        :param model: model to be train on contrastive manner
+        :param dataloader: train data loader
+        :param model_optimizer: optimizer for contrastive model
+        :param discriminator: latent discriminator model
+        :param discriminator_optimizer: optimizer for latent discriminator model
+        :param experiment: comet ml experiment
+        :param epoch: current epoch
+        :param logging_interval: logging interval
+        :return: epoch loss object
         """
         mean_loss = []
         discriminator_mean_loss = []
         model.train()
-        for batch_idx, (target, background) in enumerate(self.train_dataloader):
+        for batch_idx, (target, background) in enumerate(dataloader):
             target_batch = target.to(self.device)
             background_batch = background.to(self.device)
             model_optimizer.zero_grad()
@@ -496,7 +566,7 @@ class ModelRunner:
             experiment.log_metric("batch_train_loss", loss_float, step=epoch * batch_idx)
             if logging_interval != -1 and batch_idx % logging_interval == 0:
                 logging.info(f'=== train epoch {epoch},'
-                             f' [{batch_idx * len(target)}/{len(self.train_dataloader.dataset)}] '
+                             f' [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
                              f'-> batch loss: {loss_float}')
 
             if all([discriminator, discriminator_optimizer]):
@@ -522,12 +592,17 @@ class ModelRunner:
             epoch_loss.discriminator_loss = sum(discriminator_mean_loss) / len(discriminator_mean_loss)
         return epoch_loss
 
-    def _val_contrastive_step(self, model: Union[CBM, CVBM, nn.DataParallel], experiment: Experiment,
-                              epoch_no: int, logging_interval: int,
+    def _val_contrastive_step(self,
+                              model: Union[CBM, CVBM, nn.DataParallel],
+                              val_dataloader: DataLoader,
+                              experiment: Experiment,
+                              epoch_no: int,
+                              logging_interval: int,
                               discriminator: Union[nn.Module, nn.DataParallel] = None) -> EpochLoss:
         """
         Function for performing validation step for model
         :param model: model to be evaluated
+        :param val_dataloader: validation dataloader
         :param experiment: comet ml experiment
         :param epoch_no: epoch number for validation step - mostly for logging
         :param logging_interval: interval for logs within epoch
@@ -535,32 +610,38 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
-        for batch_idx, (target, background) in enumerate(self.val_dataloader):
-            target_batch = target.to(self.device)
-            background_batch = background.to(self.device)
-            model_output = model(target_batch, background_batch)
+        with torch.no_grad:
+            for batch_idx, (target, background) in enumerate(val_dataloader):
+                target_batch = target.to(self.device)
+                background_batch = background.to(self.device)
+                model_output = model(target_batch, background_batch)
 
-            loss = model.loss_fn(target_batch, background_batch, model_output, discriminator) \
-                if discriminator is not None else model.loss_fn(target_batch, background_batch, model_output)
+                loss = model.loss_fn(target_batch, background_batch, model_output, discriminator) \
+                    if discriminator is not None else model.loss_fn(target_batch, background_batch, model_output)
+                loss_float = loss.item()
+                val_loss.append(loss_float)
+                experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
 
-            loss_float = loss.item()
-            val_loss.append(loss_float)
-            experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
-
-            if logging_interval != -1 and batch_idx % logging_interval == 0:
-                logging.info(f'=== validation epoch {epoch_no}, '
-                             f'[{batch_idx * len(target)}/{len(self.val_dataloader.dataset)}]'
-                             f'-> batch loss: {loss.item()} ===')
+                if logging_interval != -1 and batch_idx % logging_interval == 0:
+                    logging.info(f'=== validation epoch {epoch_no}, '
+                                 f'[{batch_idx * len(target)}/{len(val_dataloader.dataset)}]'
+                                 f'-> batch loss: {loss.item()} ===')
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
-    T_train_step = Callable[[Union[BM, CBM, nn.DataParallel], Optimizer, Experiment, int, int], EpochLoss]
+    T_train_step = Callable[[Union[BM, CBM, nn.DataParallel], DataLoader, Optimizer, Experiment, int, int], EpochLoss]
 
-    def _train_step(self, model: Union[BM, CBM, nn.DataParallel], optimizer: torch.optim.Optimizer,
-                    experiment: Experiment, epoch_no: int, logging_interval: int = 10) -> EpochLoss:
+    def _train_step(self,
+                    model: Union[BM, CBM, nn.DataParallel],
+                    dataloader: DataLoader,
+                    optimizer: torch.optim.Optimizer,
+                    experiment: Experiment,
+                    epoch_no: int,
+                    logging_interval: int = 10) -> EpochLoss:
         """
         Function for performing epoch step on data
         :param model: model to be trained
+        :param dataloader: train dataloader
         :param optimizer: used optimizer
         :param experiment: comet ml experiment where data will be reported
         :param epoch_no: epoch number
@@ -569,7 +650,7 @@ class ModelRunner:
         """
         mean_loss = []
         model.train()
-        for batch_idx, (batch, _) in enumerate(self.train_dataloader):
+        for batch_idx, (batch, _) in enumerate(dataloader):
             batch = batch.to(self.device)
             optimizer.zero_grad()
             model_output = model(batch)
@@ -583,17 +664,22 @@ class ModelRunner:
 
             if logging_interval != -1 and batch_idx % logging_interval == 0:
                 logging.info(f'=== train epoch {epoch_no},'
-                             f' [{batch_idx * len(batch)}/{len(self.train_dataloader.dataset)}] '
+                             f' [{batch_idx * len(batch)}/{len(dataloader.dataset)}] '
                              f'-> batch loss: {loss_float}')
         return EpochLoss(sum(mean_loss) / len(mean_loss))
 
-    T_val_step = Callable[[Union[BM, CBM, CVBM, nn.DataParallel], Experiment, int, int], EpochLoss]
+    T_val_step = Callable[[Union[BM, CBM, CVBM, nn.DataParallel], DataLoader, Experiment, int, int], EpochLoss]
 
-    def _val_step(self, model: Union[BM, CBM, nn.DataParallel], experiment: Experiment, epoch_no: int,
+    def _val_step(self,
+                  model: Union[BM, CBM, nn.DataParallel],
+                  val_dataloader: DataLoader,
+                  experiment: Experiment,
+                  epoch_no: int,
                   logging_interval: int) -> EpochLoss:
         """
         Function for performing validation step for model
         :param model: model to be evaluated
+        :param val_dataloader: validation dataloader
         :param experiment: comet ml experiment
         :param epoch_no: epoch number for validation step - mostly for logging
         :param logging_interval: interval for logs within epoch
@@ -601,19 +687,20 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
-        for batch_idx, (batch, _) in enumerate(self.val_dataloader):
-            batch = batch.to(self.device)
-            model_output = model(batch)
-            loss = model.loss_fn(batch, model_output)
+        with torch.no_grad:
+            for batch_idx, (batch, _) in enumerate(val_dataloader):
+                batch = batch.to(self.device)
+                model_output = model(batch)
+                loss = model.loss_fn(batch, model_output)
 
-            loss_float = loss.item()
-            val_loss.append(loss_float)
-            experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
+                loss_float = loss.item()
+                val_loss.append(loss_float)
+                experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
 
-            if logging_interval != -1 and batch_idx % logging_interval == 0:
-                logging.info(f'=== validation epoch {epoch_no}, '
-                             f'[{batch_idx * len(batch)}/{len(self.val_dataloader.dataset)}]'
-                             f'-> batch loss: {loss.item()} ===')
+                if logging_interval != -1 and batch_idx % logging_interval == 0:
+                    logging.info(f'=== validation epoch {epoch_no}, '
+                                 f'[{batch_idx * len(batch)}/{len(val_dataloader.dataset)}]'
+                                 f'-> batch loss: {loss.item()} ===')
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 

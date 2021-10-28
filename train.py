@@ -97,22 +97,23 @@ def main():
                                                                                              learning_config.get(
                                                                                                  'batch_size', 32))
 
-        model_runner = ModelRunner(train_loader, val_loader, args.model_output, feature_config=feature_config,
-                                   comet_config_file=args.comet_config, comet_project_name="bee-sound-anomaly")
+        model_runner = ModelRunner(args.model_output, comet_config_file=args.comet_config,
+                                   comet_project_name="bee-sound-anomaly")
         if args.find_best is not None:
-            model_runner.find_best(args.model, data_shape, learning_config, n_trials=args.find_best,
-                                   output_folder=Path('output/model'))
+            model_runner.find_best(args.model, train_loader, learning_config, n_trials=args.find_best,
+                                   output_folder=Path('output/model'), feature_config=feature_config)
         else:
             model = HiveModelFactory.build_model(args.model, data_shape, model_config['model'])
             if args.model.num >= HiveModelType.CONTRASTIVE_VAE.num:
                 discriminator = HiveModelFactory.get_discriminator(model_config['discriminator'],
                                                                    model_config['model']['latent'])
-                model = model_runner.train_contrastive_with_discriminator(model, learning_config, discriminator)
+                model = model_runner.train_contrastive_with_discriminator(model, train_loader, learning_config,
+                                                                          discriminator, val_loader, feature_config)
             elif args.model.num >= HiveModelType.CONTRASTIVE_AE.num:
-                model = model_runner.train_contrastive(model, learning_config)
+                model = model_runner.train_contrastive(model, train_loader, learning_config, val_loader, feature_config)
             else:
                 model = HiveModelFactory.build_model_and_check(args.model, data_shape, model_config['model'])
-                model = model_runner.train(model, learning_config)
+                model = model_runner.train(model, train_loader, learning_config, val_loader, feature_config)
 
 
 if __name__ == "__main__":
