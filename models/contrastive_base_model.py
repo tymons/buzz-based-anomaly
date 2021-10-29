@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+import torch
 from torch import nn
 from features.contrastive_feature_dataset import ContrastiveOutput
 
@@ -15,4 +16,8 @@ class ContrastiveBaseModel(ABC, nn.Module):
 
     @abstractmethod
     def forward(self, target, background) -> ContrastiveOutput:
+        pass
+
+    @abstractmethod
+    def inference(self, data) -> torch.Tensor:
         pass

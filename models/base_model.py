@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+import torch
 from torch import nn
 
 
@@ -14,4 +15,8 @@ class BaseModel(ABC, nn.Module):
 
     @abstractmethod
     def forward(self, x):
+        pass
+
+    @abstractmethod
+    def inference(self, x) -> torch.Tensor:
         pass

@@ -192,11 +192,11 @@ class ModelRunner:
     device: device
 
     def __init__(self, output_folder: Path = None, comet_api_key: str = None, comet_config_file: Path = None,
-                 comet_project_name: str = "Default Project"):
+                 comet_project_name: str = "Default Project", device: torch.device = None):
         self.comet_api_key = comet_api_key if comet_api_key is not None else _read_comet_key(comet_config_file)
         self.comet_proj_name = comet_project_name
         self.output_folder = output_folder
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device is None else device
 
         self._curr_patience = -1
         self._curr_best_loss = sys.maxsize
@@ -331,12 +331,18 @@ class ModelRunner:
     def inference_latent(self, model: Union[BM, CBM, CVBM], dataloader: DataLoader):
         """
         Wrapper for model inference
+        :param dataloader: data where inference should be performed
         :param model: model
         :return:
         """
         model = model.to(self.device)
-        return
+        model.eval()
+        output = torch.Tensor()
+        with torch.no_grad():
+            for (batch, _) in dataloader:
+                output = torch.cat((output, model.inference(batch).cpu()))
 
+        return output
 
     def train(self,
               model: BM,
