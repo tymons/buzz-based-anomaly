@@ -13,6 +13,7 @@ from models.variational.conv2d_vae import Conv2DVAE
 from models.variational.contrastive.contrastive_vae import ContrastiveVAE
 from models.variational.contrastive.contrastive_variational_base_model import ContrastiveVariationalBaseModel
 from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel
+from models.variational.vae_base_model import VaeBaseModel
 from models.discriminator import Discriminator
 from models.vanilla.contrastive.contrastive_ae import ContrastiveAE
 from models.vanilla.contrastive.contrastive_conv1d_ae import ContrastiveConv1DAE
@@ -23,6 +24,7 @@ from typing import Callable, Tuple, Union
 
 CVBM = ContrastiveVariationalBaseModel
 CBM = ContrastiveBaseModel
+VBM = VaeBaseModel
 
 
 def model_check(model, input_shape, device="cuda"):
@@ -350,7 +352,7 @@ class HiveModelFactory:
 
     @staticmethod
     def build_model(model_type: HiveModelType, input_shape: Tuple, config: dict) \
-            -> Union[BaseModel, CBM, CVBM]:
+            -> Union[BaseModel, VBM, CBM, CVBM]:
         """
         Method for building ML models
         :param model_type: model type enum

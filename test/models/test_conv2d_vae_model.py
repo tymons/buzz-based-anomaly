@@ -2,7 +2,7 @@ import unittest
 import torch
 from typing import Tuple
 
-from models.vanilla.base_model import BaseModel
+from models.variational.vae_base_model import VaeBaseModel
 from models.model_type import HiveModelType
 from utils.model_factory import HiveModelFactory, model_check
 
@@ -22,13 +22,12 @@ def get_default_config() -> Tuple[dict, Tuple]:
            }, (256, 2048)
 
 
-class Conv2DVAEModelTest(unittest.TestCase):
+class TestConvolutional2DVAEModelMethods(unittest.TestCase):
 
-    def test_model_is_build_basic_setup(self):
+    def test_conv2d_vae_model_is_build_basic_setup(self):
         config, input_size = get_default_config()
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size,
-                                                        config)
+        model: VaeBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size, config)
 
         self.assertIsNotNone(model, "model build failed!")
         self.assertIsNotNone(model_check(model, (1, *input_size), device='cpu'), "model verification failed!")
@@ -42,12 +41,11 @@ class Conv2DVAEModelTest(unittest.TestCase):
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).mean.shape[1])
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).log_var.shape[1])
 
-    def test_model_is_build_different_input_size(self):
+    def test_conv2d_vae_model_is_build_with_input_size_175_4523(self):
         config, _ = get_default_config()
         input_size = (175, 4523)
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size,
-                                                        config)
+        model: VaeBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size, config)
 
         self.assertIsNotNone(model, "model build failed!")
         self.assertIsNotNone(model_check(model, (1, *input_size), device='cpu'), "model verification failed!")
@@ -61,12 +59,11 @@ class Conv2DVAEModelTest(unittest.TestCase):
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).mean.shape[1])
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).log_var.shape[1])
 
-    def test_model_is_build_bigger_max_pool(self):
+    def test_conv2d_vae_model_is_build_with_max_pool_5(self):
         config, input_size = get_default_config()
         config['max_pool'] = 5
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size,
-                                                        config)
+        model: VaeBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size, config)
 
         self.assertIsNotNone(model, "model build failed!")
         self.assertIsNotNone(model_check(model, (1, *input_size), device='cpu'), "model verification failed!")
@@ -80,12 +77,11 @@ class Conv2DVAEModelTest(unittest.TestCase):
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).mean.shape[1])
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).log_var.shape[1])
 
-    def test_model_is_build_different_padding(self):
+    def test_conv2d_vae_model_is_build_with_padding_4(self):
         config, input_size = get_default_config()
         config['padding'] = 4
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size,
-                                                        config)
+        model: VaeBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size, config)
 
         self.assertIsNotNone(model, "model build failed!")
         self.assertIsNotNone(model_check(model, (1, *input_size), device='cpu'), "model verification failed!")
@@ -99,12 +95,11 @@ class Conv2DVAEModelTest(unittest.TestCase):
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).mean.shape[1])
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).log_var.shape[1])
 
-    def test_model_is_build_different_kernel(self):
+    def test_conv2d_vae_model_is_build_with_kernel_6(self):
         config, input_size = get_default_config()
         config['kernel'] = 6
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size,
-                                                        config)
+        model: VaeBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size, config)
 
         self.assertIsNotNone(model, "model build failed!")
         self.assertIsNotNone(model_check(model, (1, *input_size), device='cpu'), "model verification failed!")
@@ -117,6 +112,13 @@ class Conv2DVAEModelTest(unittest.TestCase):
         self.assertEqual(input_size, model(torch.empty(size=(1, 1, *input_size))).output.shape[2:])
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).mean.shape[1])
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).log_var.shape[1])
+
+    def test_conv2d_vae_conv2d_autoencoder_model_inference(self):
+        config, input_size = get_default_config()
+        batch_size = 32
+        input_tensor = torch.empty((batch_size, 1, *input_size))
+        model: VaeBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size, config)
+        self.assertTupleEqual(model.get_latent(input_tensor).shape, (batch_size, config['latent']))
 
 
 if __name__ == '__main__':
