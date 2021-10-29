@@ -328,13 +328,15 @@ class ModelRunner:
         except RuntimeError as e:
             logging.error(f'hive model build failed for config: {optuna_model_config} with exception: {e}')
 
-    def inference_latent(self, model: BM):
+    def inference_latent(self, model: Union[BM, CBM, CVBM], dataloader: DataLoader):
         """
         Wrapper for model inference
         :param model: model
         :return:
         """
-        pass
+        model = model.to(self.device)
+        return
+
 
     def train(self,
               model: BM,
@@ -597,8 +599,7 @@ class ModelRunner:
                               val_dataloader: DataLoader,
                               experiment: Experiment,
                               epoch_no: int,
-                              logging_interval: int,
-                              discriminator: Union[nn.Module, nn.DataParallel] = None) -> EpochLoss:
+                              logging_interval: int) -> EpochLoss:
         """
         Function for performing validation step for model
         :param model: model to be evaluated
@@ -616,8 +617,7 @@ class ModelRunner:
                 background_batch = background.to(self.device)
                 model_output = model(target_batch, background_batch)
 
-                loss = model.loss_fn(target_batch, background_batch, model_output, discriminator) \
-                    if discriminator is not None else model.loss_fn(target_batch, background_batch, model_output)
+                loss = model.loss_fn(target_batch, background_batch, model_output)
                 loss_float = loss.item()
                 val_loss.append(loss_float)
                 experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
