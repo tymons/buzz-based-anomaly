@@ -2,7 +2,7 @@ import unittest
 import torch
 
 from utils.model_factory import HiveModelFactory, HiveModelType, model_check
-from models.base_model import BaseModel
+from models.vanilla.base_model import BaseModel
 
 
 class TestModelFactoryMethods(unittest.TestCase):

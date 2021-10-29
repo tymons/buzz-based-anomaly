@@ -3,8 +3,8 @@ from torch import functional, Tensor
 
 from typing import List, Union
 
-from models.contrastive_base_model import ContrastiveBaseModel
-from models.ae import EncoderWithLatent, Decoder
+from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel
+from models.vanilla.ae import EncoderWithLatent, Decoder
 
 from features.contrastive_feature_dataset import ContrastiveOutput
 
@@ -54,7 +54,7 @@ class ContrastiveAE(ContrastiveBaseModel):
 
     def get_params(self) -> dict:
         """
-        Function for getting model params
+        Method for getting model params
         :return:
         """
         return {

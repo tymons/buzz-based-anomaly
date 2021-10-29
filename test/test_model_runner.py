@@ -4,12 +4,12 @@ import torch
 from torch.utils.data import TensorDataset, DataLoader
 
 from utils.model_factory import HiveModelFactory, HiveModelType
-from models.base_model import BaseModel
+from models.vanilla.base_model import BaseModel
 from utils.model_runner import ModelRunner
 
 
 class TestModelRunnerMethods(unittest.TestCase):
-    def test_methods_inference(self):
+    def test_method_inference_for_autoencoder(self):
         input_size = 512
         config = {
             'layers': [64, 32, 16],
@@ -23,7 +23,7 @@ class TestModelRunnerMethods(unittest.TestCase):
         dataset = TensorDataset(data, labels)
         dataloader = DataLoader(dataset, batch_size=32)
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('autoencoder'), (input_size,), config)
-        model_runner: ModelRunner = ModelRunner(comet_api_key='dev', device=torch.device('cpu'))
+        model_runner: ModelRunner = ModelRunner(comet_api_key='dev', torch_device=torch.device('cpu'))
 
         latent = model_runner.inference_latent(model, dataloader).cpu()
         self.assertIsNotNone(latent, "latent not build")

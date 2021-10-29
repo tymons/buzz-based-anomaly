@@ -2,7 +2,7 @@ import unittest
 import torch
 from typing import Tuple
 
-from models.base_model import BaseModel
+from models.variational.contrastive.contrastive_variational_base_model import ContrastiveVariationalBaseModel as CVBM
 from models.model_type import HiveModelType
 from utils.model_factory import HiveModelFactory
 
@@ -22,13 +22,13 @@ def get_default_config() -> Tuple[dict, int]:
            }, 2048
 
 
-class ContrastiveConv1DVAEModelTest(unittest.TestCase):
+class TestContrastiveConv1dVAEModelMethods(unittest.TestCase):
 
-    def test_model_is_build_basic_setup(self):
+    def test_contrastive_conv1d_vae_model_is_build_basic_setup(self):
         config, input_size = get_default_config()
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'), (input_size,),
-                                                        config)
+        model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'), (input_size,),
+                                                   config)
 
         self.assertIsNotNone(model, "model build failed!")
         self.assertListEqual(model.get_params().get('model_feature_map'), config['layers'])
@@ -43,12 +43,13 @@ class ContrastiveConv1DVAEModelTest(unittest.TestCase):
         self.assertEqual(model(target, background).background.shape[-1], input_size)
         self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
 
-    def test_model_is_build_different_input_size(self):
+    def test_contrastive_conv1d_vae_model_is_build_with_input_size_4523(self):
         config, _ = get_default_config()
         input_size = 4523
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'), (input_size,),
-                                                        config)
+        model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'),
+                                                   (input_size,),
+                                                   config)
 
         self.assertIsNotNone(model, "model build failed!")
         self.assertListEqual(model.get_params().get('model_feature_map'), config['layers'])
@@ -63,12 +64,12 @@ class ContrastiveConv1DVAEModelTest(unittest.TestCase):
         self.assertEqual(model(target, background).background.shape[-1], input_size)
         self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
 
-    def test_model_is_build_bigger_max_pool(self):
+    def test_contrastive_conv1d_vae_model_is_build_with_max_pool_5(self):
         config, input_size = get_default_config()
         config['max_pool'] = 5
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'), (input_size,),
-                                                        config)
+        model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'), (input_size,),
+                                                   config)
 
         self.assertIsNotNone(model, "model build failed!")
         self.assertListEqual(model.get_params().get('model_feature_map'), config['layers'])
@@ -83,12 +84,13 @@ class ContrastiveConv1DVAEModelTest(unittest.TestCase):
         self.assertEqual(model(target, background).background.shape[-1], input_size)
         self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
 
-    def test_model_is_build_different_padding(self):
+    def test_contrastive_conv1d_vae_model_is_build_with_padding_4(self):
         config, input_size = get_default_config()
         config['padding'] = 4
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'), (input_size,),
-                                                        config)
+        model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'),
+                                                   (input_size,),
+                                                   config)
 
         self.assertIsNotNone(model, "model build failed!")
         self.assertListEqual(model.get_params().get('model_feature_map'), config['layers'])
@@ -103,12 +105,12 @@ class ContrastiveConv1DVAEModelTest(unittest.TestCase):
         self.assertEqual(model(target, background).background.shape[-1], input_size)
         self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
 
-    def test_model_is_build_different_kernel(self):
+    def test_contrastive_conv1d_vae_model_is_build_with_kernel_6(self):
         config, input_size = get_default_config()
         config['kernel'] = 6
 
-        model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'), (input_size,),
-                                                        config)
+        model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'), (input_size,),
+                                                   config)
 
         self.assertIsNotNone(model, "model build failed!")
         self.assertListEqual(model.get_params().get('model_feature_map'), config['layers'])
@@ -122,6 +124,14 @@ class ContrastiveConv1DVAEModelTest(unittest.TestCase):
         self.assertEqual(model(target, background).target.shape[-1], input_size)
         self.assertEqual(model(target, background).background.shape[-1], input_size)
         self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
+
+    def test_contrastive_conv1d_vae_model_inference(self):
+        config, input_size = get_default_config()
+        batch_size = 32
+        input_tensor = torch.empty((batch_size, 1, input_size))
+        model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'), (input_size,),
+                                                   config)
+        self.assertTupleEqual(model.get_latent(input_tensor).shape, (batch_size, config['latent']))
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@ import unittest
 import torch
 
 from utils.model_factory import HiveModelFactory, HiveModelType, model_check
-from models.base_model import BaseModel
+from models.vanilla.base_model import BaseModel
 
 
 class TestAutoencoderModelMethods(unittest.TestCase):
@@ -28,9 +28,9 @@ class TestAutoencoderModelMethods(unittest.TestCase):
             'latent': 8
         }
         batch_size = 32
-        input_tensor = torch.empty((batch_size, 512))
+        input_tensor = torch.empty((batch_size, input_size))
         model: BaseModel = HiveModelFactory.build_model(HiveModelType.from_name('autoencoder'), (input_size,), config)
-        self.assertTupleEqual(model.inference(input_tensor).shape, (batch_size, config['latent']))
+        self.assertTupleEqual(model.get_latent(input_tensor).shape, (batch_size, config['latent']))
 
 
 if __name__ == '__main__':

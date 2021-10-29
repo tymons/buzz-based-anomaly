@@ -3,16 +3,16 @@ from torch import functional, Tensor
 
 from typing import List
 
-from models.contrastive_base_model import ContrastiveBaseModel
+from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel
 from models.conv_utils import convolutional_to_mlp
-from models.conv2d_ae import Conv2DEncoderWithLatent, Conv2DDecoder
+from models.vanilla.conv1d_ae import Conv1DEncoderWithLatent, Conv1DDecoder
 
 from features.contrastive_feature_dataset import ContrastiveOutput
 
 
-class ContrastiveConv2DAE(ContrastiveBaseModel):
+class ContrastiveConv1DAE(ContrastiveBaseModel):
     def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int,
-                 latent: int, input_size: tuple):
+                 latent: int, input_size: int):
         super().__init__()
         self._feature_map = features
         self._dropout_probs = dropout_probs
@@ -22,11 +22,11 @@ class ContrastiveConv2DAE(ContrastiveBaseModel):
         self._max_pool = max_pool
 
         connector_size, conv_temporal = convolutional_to_mlp(input_size, len(features), kernel_size, padding, max_pool)
-        self.s_encoder = Conv2DEncoderWithLatent(features, dropout_probs, kernel_size, padding, max_pool, latent,
+        self.s_encoder = Conv1DEncoderWithLatent(features, dropout_probs, kernel_size, padding, max_pool, latent,
                                                  features[-1] * connector_size)
-        self.z_encoder = Conv2DEncoderWithLatent(features, dropout_probs, kernel_size, padding, max_pool, latent,
+        self.z_encoder = Conv1DEncoderWithLatent(features, dropout_probs, kernel_size, padding, max_pool, latent,
                                                  features[-1] * connector_size)
-        self.decoder = Conv2DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, 2 * latent,
+        self.decoder = Conv1DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, 2 * latent,
                                      features[-1] * connector_size, conv_temporal[::-1])
 
     def loss_fn(self, target, background, model_output: ContrastiveOutput, discriminator=None) -> Tensor:
@@ -61,8 +61,8 @@ class ContrastiveConv2DAE(ContrastiveBaseModel):
 
     def get_params(self) -> dict:
         """
-        Function for getting model params
-        :return:
+        Method for getting model params
+        :return: dcitionary with parameters
         """
         return {
             'model_feature_map': self._feature_map,

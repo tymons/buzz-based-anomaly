@@ -2,7 +2,7 @@ import unittest
 import torch
 from typing import Tuple
 
-from models.base_model import BaseModel
+from models.vanilla.base_model import BaseModel
 from models.model_type import HiveModelType
 from utils.model_factory import HiveModelFactory, model_check
 
