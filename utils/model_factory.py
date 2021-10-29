@@ -3,26 +3,28 @@ import optuna
 
 from models.model_type import HiveModelType
 from torchsummary import summary
-from models.base_model import BaseModel
-from models.ae import Autoencoder
-from models.conv1d_ae import Conv1DAE
-from models.conv2d_ae import Conv2DAE
-from models.vae import VAE
-from models.conv1d_vae import Conv1DVAE
-from models.conv2d_vae import Conv2DVAE
-from models.contrastive_vae import ContrastiveVAE
-from models.contrastive_variational_base_model import ContrastiveVariationalBaseModel
-from models.contrastive_base_model import ContrastiveBaseModel
+from models.vanilla.base_model import BaseModel
+from models.vanilla.ae import Autoencoder
+from models.vanilla.conv1d_ae import Conv1DAE
+from models.vanilla.conv2d_ae import Conv2DAE
+from models.variational.vae import VAE
+from models.variational.conv1d_vae import Conv1DVAE
+from models.variational.conv2d_vae import Conv2DVAE
+from models.variational.contrastive.contrastive_vae import ContrastiveVAE
+from models.variational.contrastive.contrastive_variational_base_model import ContrastiveVariationalBaseModel
+from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel
+from models.variational.vae_base_model import VaeBaseModel
 from models.discriminator import Discriminator
-from models.contrastive_ae import ContrastiveAE
-from models.contrastive_conv1d_ae import ContrastiveConv1DAE
-from models.contrastive_conv2d_ae import ContrastiveConv2DAE
-from models.contrastive_conv1d_vae import ContrastiveConv1DVAE
-from models.contrastive_conv2d_vae import ContrastiveConv2DVAE
+from models.vanilla.contrastive.contrastive_ae import ContrastiveAE
+from models.vanilla.contrastive.contrastive_conv1d_ae import ContrastiveConv1DAE
+from models.vanilla.contrastive.contrastive_conv2d_ae import ContrastiveConv2DAE
+from models.variational.contrastive.contrastive_conv1d_vae import ContrastiveConv1DVAE
+from models.variational.contrastive.contrastive_conv2d_vae import ContrastiveConv2DVAE
 from typing import Callable, Tuple, Union
 
 CVBM = ContrastiveVariationalBaseModel
 CBM = ContrastiveBaseModel
+VBM = VaeBaseModel
 
 
 def model_check(model, input_shape, device="cuda"):
@@ -350,7 +352,7 @@ class HiveModelFactory:
 
     @staticmethod
     def build_model(model_type: HiveModelType, input_shape: Tuple, config: dict) \
-            -> Union[BaseModel, CBM, CVBM]:
+            -> Union[BaseModel, VBM, CBM, CVBM]:
         """
         Method for building ML models
         :param model_type: model type enum

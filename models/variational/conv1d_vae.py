@@ -1,15 +1,14 @@
 import torch
 
-from models.base_model import BaseModel
 from torch import nn, functional
 from typing import List
 from models.conv_utils import convolutional_to_mlp
 
-from models.conv1d_ae import Conv1DEncoder, Conv1DDecoder
-from models.vae import VaeOutput, kld_loss, reparameterize
+from models.vanilla.conv1d_ae import Conv1DEncoder, Conv1DDecoder
+from models.variational.vae_base_model import VaeOutput, kld_loss, reparameterize, VaeBaseModel, Flattener
 
 
-class Conv1DVAE(BaseModel):
+class Conv1DVAE(VaeBaseModel):
     def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int,
                  latent: int, input_size: int):
         super().__init__()
@@ -21,7 +20,7 @@ class Conv1DVAE(BaseModel):
         self._max_pool = max_pool
 
         connector_size, conv_temporal = convolutional_to_mlp(input_size, len(features), kernel_size, padding, max_pool)
-        self.encoder = Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool)
+        self.encoder = Flattener(Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool))
         self.decoder = Conv1DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, latent,
                                      features[-1] * connector_size, conv_temporal[::-1])
 
@@ -36,7 +35,6 @@ class Conv1DVAE(BaseModel):
         :return: vae model output
         """
         y = self.encoder(x)
-        y = self.flatten(y)
         means = self.linear_means(y)
         log_var = self.linear_log_var(y)
         z = reparameterize(means, log_var)
@@ -45,7 +43,7 @@ class Conv1DVAE(BaseModel):
 
     def loss_fn(self, x: torch.Tensor, y: VaeOutput):
         """
-        Function for calculating convolutional autoencoder loss
+        Method for calculating convolutional autoencoder loss
         :param x: input data
         :param y: model output
         :return:
@@ -55,6 +53,10 @@ class Conv1DVAE(BaseModel):
         return mse + kld
 
     def get_params(self):
+        """
+        Method for getting params of the model
+        :return: dictionary with params
+        """
         return {
             'model_feature_map': self._feature_map,
             'model_dropouts': self._dropout_probs,

@@ -1,7 +1,7 @@
 import torch
 
 from torch import nn
-from models.base_model import BaseModel
+from models.vanilla.base_model import BaseModel
 import torch.nn.functional as F
 
 from typing import Union, List
@@ -33,10 +33,6 @@ class Autoencoder(BaseModel):
     def forward(self, x):
         y = self.encoder(x)
         y = self.decoder(y)
-        return y
-
-    def inference(self, x):
-        y = self.encoder(x)
         return y
 
     def get_params(self) -> dict:

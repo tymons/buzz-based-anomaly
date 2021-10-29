@@ -16,10 +16,11 @@ from pathlib import Path
 from typing import Any, Dict
 
 from models.model_type import HiveModelType
-from models.base_model import BaseModel as BM
-from models.contrastive_base_model import ContrastiveBaseModel
-from models.contrastive_variational_base_model import ContrastiveVariationalBaseModel
-from models.contrastive_vae import latent_permutation
+from models.vanilla.base_model import BaseModel
+from models.variational.vae_base_model import VaeBaseModel
+from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel
+from models.variational.contrastive.contrastive_variational_base_model import ContrastiveVariationalBaseModel
+from models.variational.contrastive.contrastive_variational_base_model import latent_permutation
 
 from typing import List, Callable, Union, Optional
 from torch import nn, device
@@ -32,6 +33,8 @@ from utils.model_factory import HiveModelFactory, build_optuna_model_config
 
 CVBM = ContrastiveVariationalBaseModel
 CBM = ContrastiveBaseModel
+VBM = VaeBaseModel
+BM = BaseModel
 
 
 @dataclass
@@ -40,7 +43,7 @@ class EpochLoss:
     discriminator_loss: Optional[float] = None
 
 
-def clear_memory(model: Union[BM, CBM, nn.DataParallel],
+def clear_memory(model: Union[BM, VBM, CBM, nn.DataParallel],
                  optimizer: torch.optim.Optimizer,
                  discriminator: nn.Module = None,
                  discriminator_optimizer: torch.optim.Optimizer = None):
@@ -112,8 +115,8 @@ def _read_comet_key(path: Path) -> str:
         return [b.split('=')[-1] for b in f.read().splitlines() if b.startswith('api_key')][0]
 
 
-def model_save(model: Union[BM, nn.DataParallel], output_path: Path, optimizer: Optimizer, epoch_no: int,
-               loss: float) -> None:
+def model_save(model: Union[BM, VBM, CBM, CVBM, nn.DataParallel], output_path: Path, optimizer: Optimizer,
+               epoch_no: int, loss: float) -> None:
     """
     Function for saving model on disc
     :param model: model to be saved
@@ -127,7 +130,8 @@ def model_save(model: Union[BM, nn.DataParallel], output_path: Path, optimizer: 
          'loss': loss}, output_path)
 
 
-def model_load(checkpoint_filepath: Path, model: Union[BM, nn.DataParallel], optimizer: Optimizer = None):
+def model_load(checkpoint_filepath: Path, model: Union[BM, VBM, CVBM, CBM, nn.DataParallel],
+               optimizer: Optimizer = None):
     """
     Function for loading model from disc
     :param checkpoint_filepath: checkpoint path
@@ -192,11 +196,11 @@ class ModelRunner:
     device: device
 
     def __init__(self, output_folder: Path = None, comet_api_key: str = None, comet_config_file: Path = None,
-                 comet_project_name: str = "Default Project"):
+                 comet_project_name: str = "Default Project", torch_device: torch.device = None):
         self.comet_api_key = comet_api_key if comet_api_key is not None else _read_comet_key(comet_config_file)
         self.comet_proj_name = comet_project_name
         self.output_folder = output_folder
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device is None else torch_device
 
         self._curr_patience = -1
         self._curr_best_loss = sys.maxsize
@@ -328,16 +332,24 @@ class ModelRunner:
         except RuntimeError as e:
             logging.error(f'hive model build failed for config: {optuna_model_config} with exception: {e}')
 
-    def inference_latent(self, model: BM):
+    def inference_latent(self, model: Union[BM, VBM, CBM, CVBM], dataloader: DataLoader):
         """
         Wrapper for model inference
+        :param dataloader: data where inference should be performed
         :param model: model
         :return:
         """
-        pass
+        model = model.to(self.device)
+        model.eval()
+        output = torch.Tensor()
+        with torch.no_grad():
+            for (batch, _) in dataloader:
+                output = torch.cat((output, model.get_latent(batch).cpu()))
+
+        return output
 
     def train(self,
-              model: BM,
+              model: Union[BM, VBM],
               train_dataloader: DataLoader,
               train_config: dict,
               val_dataloader: DataLoader = None,
@@ -392,7 +404,7 @@ class ModelRunner:
         return self._train_contrastive_with_discriminator(model, train_dataloader, train_config, discriminator,
                                                           val_dataloader, feature_config)
 
-    def _train(self, model: Union[BM, CBM],
+    def _train(self, model: Union[BM, VBM, CBM],
                train_dataloader: DataLoader,
                train_config: dict,
                train_step_func: T_train_step,
@@ -597,8 +609,7 @@ class ModelRunner:
                               val_dataloader: DataLoader,
                               experiment: Experiment,
                               epoch_no: int,
-                              logging_interval: int,
-                              discriminator: Union[nn.Module, nn.DataParallel] = None) -> EpochLoss:
+                              logging_interval: int) -> EpochLoss:
         """
         Function for performing validation step for model
         :param model: model to be evaluated
@@ -616,8 +627,7 @@ class ModelRunner:
                 background_batch = background.to(self.device)
                 model_output = model(target_batch, background_batch)
 
-                loss = model.loss_fn(target_batch, background_batch, model_output, discriminator) \
-                    if discriminator is not None else model.loss_fn(target_batch, background_batch, model_output)
+                loss = model.loss_fn(target_batch, background_batch, model_output)
                 loss_float = loss.item()
                 val_loss.append(loss_float)
                 experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
@@ -632,7 +642,7 @@ class ModelRunner:
     T_train_step = Callable[[Union[BM, CBM, nn.DataParallel], DataLoader, Optimizer, Experiment, int, int], EpochLoss]
 
     def _train_step(self,
-                    model: Union[BM, CBM, nn.DataParallel],
+                    model: Union[BM, VBM, CBM, nn.DataParallel],
                     dataloader: DataLoader,
                     optimizer: torch.optim.Optimizer,
                     experiment: Experiment,
@@ -671,7 +681,7 @@ class ModelRunner:
     T_val_step = Callable[[Union[BM, CBM, CVBM, nn.DataParallel], DataLoader, Experiment, int, int], EpochLoss]
 
     def _val_step(self,
-                  model: Union[BM, CBM, nn.DataParallel],
+                  model: Union[BM, VBM, CBM, nn.DataParallel],
                   val_dataloader: DataLoader,
                   experiment: Experiment,
                   epoch_no: int,

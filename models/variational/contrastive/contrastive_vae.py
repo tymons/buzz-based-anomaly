@@ -5,14 +5,14 @@ from torch import nn, Tensor
 from typing import Union, List
 
 from models.discriminator import Discriminator
-from models.contrastive_variational_base_model import ContrastiveVariationalBaseModel
-from models.ae import Encoder, Decoder
-from models.vae import reparameterize, kld_loss
+import models.variational.contrastive.contrastive_variational_base_model as cvbm
+from models.vanilla.ae import Encoder, Decoder
+from models.variational.vae_base_model import reparameterize, kld_loss
 
 from features.contrastive_feature_dataset import ContrastiveOutput
 
 
-class ContrastiveVAE(ContrastiveVariationalBaseModel):
+class ContrastiveVAE(cvbm.ContrastiveVariationalBaseModel):
     def __init__(self, layers: List[int], latent_size: int, input_size: int,
                  dropout: Union[List[float], float] = 0.2):
         super().__init__()
@@ -51,7 +51,7 @@ class ContrastiveVAE(ContrastiveVariationalBaseModel):
         # total correction loss
         with torch.no_grad():
             q = torch.cat((model_output.target_qs_latent, model_output.target_qz_latent), dim=-1).squeeze()
-            q_bar = latent_permutation(q)
+            q_bar = cvbm.latent_permutation(q)
             q_score, q_bar_score = discriminator(q, q_bar)
             disc_loss = discriminator.loss_fn(q_score, q_bar_score)
             loss += disc_loss
@@ -97,21 +97,3 @@ class ContrastiveVAE(ContrastiveVariationalBaseModel):
             'model_latent': self._latent_size,
             'model_dropouts': self._dropout
         }
-
-
-def latent_permutation(latent_batch: Tensor, inplace: bool = False):
-    """
-    Function for latent permutation.
-    :param latent_batch: concatenated batch of z's and s's
-    :param inplace: flag for inplace operation
-    :return:
-    """
-    latent_batch = latent_batch.squeeze()
-
-    data = latent_batch.clone() if inplace is False else latent_batch
-    rand_indices = torch.randperm(data[:, 0:data.shape[1] // 2].shape[0])
-    data[:, 0:data.shape[1] // 2] = data[:, 0:data.shape[1] // 2][rand_indices]
-    rand_indices = torch.randperm(data[:, data.shape[1] // 2:].shape[0])
-    data[:, data.shape[1] // 2:] = data[:, data.shape[1] // 2:][rand_indices]
-
-    return data

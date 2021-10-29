@@ -3,14 +3,13 @@ import torch
 from torch import nn, functional
 
 from models.conv_utils import convolutional_to_mlp
-from models.base_model import BaseModel
 from typing import List
 
-from models.vae import reparameterize, kld_loss, VaeOutput
-from models.conv2d_ae import Conv2DDecoder, Conv2DEncoder
+import models.variational.vae_base_model as vbm
+from models.vanilla.conv2d_ae import Conv2DDecoder, Conv2DEncoder
 
 
-class Conv2DVAE(BaseModel):
+class Conv2DVAE(vbm.VaeBaseModel):
     def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int,
                  latent: int, input_size: tuple):
         super().__init__()
@@ -22,7 +21,7 @@ class Conv2DVAE(BaseModel):
         self._max_pool = max_pool
 
         connector_size, conv_temporal = convolutional_to_mlp(input_size, len(features), kernel_size, padding, max_pool)
-        self.encoder = Conv2DEncoder(features, dropout_probs, kernel_size, padding, max_pool)
+        self.encoder = vbm.Flattener(Conv2DEncoder(features, dropout_probs, kernel_size, padding, max_pool))
         self.decoder = Conv2DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, latent,
                                      features[-1] * connector_size, conv_temporal[::-1])
 
@@ -38,7 +37,7 @@ class Conv2DVAE(BaseModel):
         :return:
         """
         mse = functional.F.mse_loss(y.output, x, reduction='mean')
-        kld = kld_loss(y.mean, y.log_var)
+        kld = vbm.kld_loss(y.mean, y.log_var)
         return mse + kld
 
     def get_params(self) -> dict:
@@ -58,9 +57,8 @@ class Conv2DVAE(BaseModel):
         :return: model output VaeOutput
         """
         y = self.encoder(x)
-        y = self.flatten(y)
         means = self.linear_means(y)
         log_var = self.linear_log_var(y)
-        z = reparameterize(means, log_var)
+        z = vbm.reparameterize(means, log_var)
         recon_x = self.decoder(z)
-        return VaeOutput(output=recon_x, mean=means, log_var=log_var)
+        return vbm.VaeOutput(output=recon_x, mean=means, log_var=log_var)

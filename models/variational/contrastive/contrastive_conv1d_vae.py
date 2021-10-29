@@ -5,18 +5,17 @@ from torch import nn, Tensor
 from typing import List
 
 from models.discriminator import Discriminator
-from models.contrastive_variational_base_model import ContrastiveVariationalBaseModel
-from models.conv2d_ae import Conv2DEncoder, Conv2DDecoder
-from models.contrastive_vae import latent_permutation
+import models.variational.contrastive.contrastive_variational_base_model as cvbm
+from models.vanilla.conv1d_ae import Conv1DEncoder, Conv1DDecoder
 from models.conv_utils import convolutional_to_mlp
-from models.vae import reparameterize, kld_loss
+from models.variational.vae_base_model import reparameterize, kld_loss
 
 from features.contrastive_feature_dataset import ContrastiveOutput
 
 
-class ContrastiveConv2DVAE(ContrastiveVariationalBaseModel):
+class ContrastiveConv1DVAE(cvbm.ContrastiveVariationalBaseModel):
     def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int,
-                 latent_size: int, input_size: tuple):
+                 latent_size: int, input_size: int):
         super().__init__()
 
         self._feature_map = features
@@ -27,9 +26,9 @@ class ContrastiveConv2DVAE(ContrastiveVariationalBaseModel):
         self._max_pool = max_pool
 
         connector_size, conv_temporal = convolutional_to_mlp(input_size, len(features), kernel_size, padding, max_pool)
-        self.s_encoder = Conv2DEncoder(features, dropout_probs, kernel_size, padding, max_pool)
-        self.z_encoder = Conv2DEncoder(features, dropout_probs, kernel_size, padding, max_pool)
-        self.decoder = Conv2DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, 2 * latent_size,
+        self.s_encoder = Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool)
+        self.z_encoder = Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool)
+        self.decoder = Conv1DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, 2 * latent_size,
                                      features[-1] * connector_size, conv_temporal[::-1])
 
         self.flatten = nn.Flatten()
@@ -60,7 +59,7 @@ class ContrastiveConv2DVAE(ContrastiveVariationalBaseModel):
         # total correction loss
         with torch.no_grad():
             q = torch.cat((model_output.target_qs_latent, model_output.target_qz_latent), dim=-1).squeeze()
-            q_bar = latent_permutation(q)
+            q_bar = cvbm.latent_permutation(q)
             q_score, q_bar_score = discriminator(q, q_bar)
             disc_loss = discriminator.loss_fn(q_score, q_bar_score)
             loss += disc_loss
@@ -101,7 +100,7 @@ class ContrastiveConv2DVAE(ContrastiveVariationalBaseModel):
 
     def get_params(self) -> dict:
         """
-        Function for returning model layer sizes
+        Method for returning model layer sizes
         :return: dictionary with model layer sizes
         """
         return {

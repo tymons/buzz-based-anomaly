@@ -2,33 +2,13 @@ import torch
 
 from torch import nn, functional
 
-from models.base_model import BaseModel
-from models.ae import Encoder, Decoder
+from models.variational.vae_base_model import VaeBaseModel, VaeOutput, kld_loss, reparameterize
+from models.vanilla.ae import Encoder, Decoder
 
 from typing import List, Union
-from dataclasses import dataclass
 
 
-@dataclass
-class VaeOutput:
-    output: torch.Tensor
-    log_var: torch.Tensor
-    mean: torch.Tensor
-
-
-def kld_loss(mean, log_var):
-    """ KLD loss for normal distribution"""
-    return -0.5 * torch.sum(1 + log_var - mean ** 2 - log_var.exp())
-
-
-def reparameterize(mu, log_var):
-    """ Function for reparametrization trick """
-    std = torch.exp(0.5 * log_var)
-    eps = torch.randn_like(std)
-    return mu + eps * std
-
-
-class VAE(BaseModel):
+class VAE(VaeBaseModel):
     def __init__(self, layers: List[int], latent_size: int, input_size: int,
                  dropout: Union[List[float], float] = 0.2):
         super().__init__()
