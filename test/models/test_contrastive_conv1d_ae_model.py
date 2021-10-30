@@ -5,17 +5,22 @@ from utils.model_factory import HiveModelFactory, HiveModelType
 from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel as CBM
 
 
+def get_default_config():
+    input_size = 256
+    config = {
+        'layers': [16, 8, 4],
+        'dropout': [0.3, 0.3, 0.3],
+        'latent': 8,
+        'kernel': 4,
+        'padding': 2,
+        'max_pool': 2
+    }
+    return config, input_size
+
+
 class TestContrastiveConv1dAutoencoderModelMethods(unittest.TestCase):
     def test_contrastive_conv1d_autoencoder_model_is_build(self):
-        input_size = 512
-        config = {
-            'layers': [64, 32, 16],
-            'dropout': [0.3, 0.3, 0.3],
-            'latent': 8,
-            'kernel': 4,
-            'padding': 2,
-            'max_pool': 2
-        }
+        config, input_size = get_default_config()
 
         model: CBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_autoencoder'),
                                                   (input_size,), config)
@@ -32,12 +37,7 @@ class TestContrastiveConv1dAutoencoderModelMethods(unittest.TestCase):
         self.assertEqual(model(target, background).background.shape[-1], input_size)
 
     def test_contrastive_conv1d_autoencoder_model_inference(self):
-        input_size = 512
-        config = {
-            'layers': [64, 32, 16],
-            'dropout': [0.3, 0.3, 0.3],
-            'latent': 8
-        }
+        config, input_size = get_default_config()
         batch_size = 32
         input_tensor = torch.empty((batch_size, input_size))
         model: CBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_autoencoder'), (input_size,),

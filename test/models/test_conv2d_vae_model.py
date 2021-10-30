@@ -13,13 +13,13 @@ def get_default_config() -> Tuple[dict, Tuple]:
     :return: config, input_size
     """
     return {
-               'layers': [64, 32, 16],
+               'layers': [8, 4, 2],
                'dropout': [0.3, 0.3, 0.3],
                'latent': 8,
                'kernel': 4,
                'padding': 2,
                'max_pool': 2
-           }, (256, 2048)
+           }, (64, 256)
 
 
 class TestConvolutional2DVAEModelMethods(unittest.TestCase):
@@ -41,9 +41,9 @@ class TestConvolutional2DVAEModelMethods(unittest.TestCase):
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).mean.shape[1])
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).log_var.shape[1])
 
-    def test_conv2d_vae_model_is_build_with_input_size_175_4523(self):
+    def test_conv2d_vae_model_is_build_with_input_size_33_134(self):
         config, _ = get_default_config()
-        input_size = (175, 4523)
+        input_size = (33, 134)
 
         model: VaeBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size, config)
 
@@ -59,9 +59,9 @@ class TestConvolutional2DVAEModelMethods(unittest.TestCase):
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).mean.shape[1])
         self.assertEqual(config['latent'], model(torch.empty(size=(1, 1, *input_size))).log_var.shape[1])
 
-    def test_conv2d_vae_model_is_build_with_max_pool_5(self):
+    def test_conv2d_vae_model_is_build_with_max_pool_3(self):
         config, input_size = get_default_config()
-        config['max_pool'] = 5
+        config['max_pool'] = 3
 
         model: VaeBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('conv2d_vae'), input_size, config)
 

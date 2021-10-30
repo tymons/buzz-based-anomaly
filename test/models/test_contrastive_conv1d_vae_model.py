@@ -13,13 +13,13 @@ def get_default_config() -> Tuple[dict, int]:
     :return: config, input_size
     """
     return {
-               'layers': [64, 32, 16],
+               'layers': [8, 4, 2],
                'dropout': [0.3, 0.3, 0.3],
                'latent': 8,
                'kernel': 4,
                'padding': 2,
                'max_pool': 2
-           }, 2048
+           }, 256
 
 
 class TestContrastiveConv1dVAEModelMethods(unittest.TestCase):

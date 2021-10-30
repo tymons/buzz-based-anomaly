@@ -19,7 +19,7 @@ def get_default_config() -> Tuple[dict, Tuple]:
                'kernel': 4,
                'padding': 2,
                'max_pool': 2
-           }, (256, 2048)
+           }, (64, 256)
 
 
 class TestContrastiveConv2dVAEModelMethods(unittest.TestCase):
@@ -42,9 +42,9 @@ class TestContrastiveConv2dVAEModelMethods(unittest.TestCase):
         self.assertEqual(model(target, background).target.shape[-2:], input_size)
         self.assertEqual(model(target, background).background.shape[-2:], input_size)
 
-    def test_contrastive_conv2d_vae_model_is_build_with_input_size_175_4523(self):
+    def test_contrastive_conv2d_vae_model_is_build_with_input_size_33_134(self):
         config, _ = get_default_config()
-        input_size = (175, 4523)
+        input_size = (33, 134)
 
         model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv2d_vae'), input_size,
                                                    config)
@@ -61,9 +61,9 @@ class TestContrastiveConv2dVAEModelMethods(unittest.TestCase):
         self.assertEqual(model(target, background).target.shape[-2:], input_size)
         self.assertEqual(model(target, background).background.shape[-2:], input_size)
 
-    def test_contrastive_conv2d_vae_model_is_build_with_max_pool_5(self):
+    def test_contrastive_conv2d_vae_model_is_build_with_max_pool_3(self):
         config, input_size = get_default_config()
-        config['max_pool'] = 5
+        config['max_pool'] = 3
 
         model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv2d_vae'), input_size,
                                                    config)
