@@ -6,9 +6,15 @@ import utils.utils as utils
 
 from pathlib import Path
 from typing import List
+from torch.utils.data import DataLoader
 
 from features.feature_type import SoundFeatureType
+from utils.gmm_anomaly_scorer import AnomalyScorer
+from utils.model_runner import model_load
 from utils.feature_factory import SoundFeatureFactory
+from utils.model_factory import HiveModelFactory, HiveModelType
+from utils.model_runner import ModelRunner
+from utils.anomaly_scorer_type import AnomalyScorerType
 
 
 def main():
@@ -24,7 +30,9 @@ def main():
                         help='anomaly data folder for hive data')
     # optional arguments
     parser.add_argument('--feature_config', default=Path(__file__).absolute().parent / "feature_config.yml", type=Path)
+    parser.add_argument('--model_config', default=Path(__file__).absolute().parent / "model_config.yml", type=Path)
     parser.add_argument('--log_folder', default=Path(__file__).absolute().parent / "output/", type=Path)
+    parser.add_argument('--anomaly-model', default=AnomalyScorerType.GMM, type=AnomalyScorerType.from_name)
 
     args = parser.parse_args()
 
@@ -44,21 +52,34 @@ def main():
             smartula_hive_sound_list = utils.filter_by_datetime(smartula_hive_sound_list, args.filter_dates[0],
                                                                 args.filter_dates[1])
 
-        # prepare sound filenames
         target_labels: List[int] = [1] * len(smartula_hive_sound_list)
         anomaly_labels: List[int] = [0] * len(anomaly_sound_list)
 
-        sound_list = smartula_hive_sound_list + anomaly_sound_list
-        labels = target_labels + anomaly_labels
+        hive_dataset = SoundFeatureFactory.build_dataset(args.feature, smartula_hive_sound_list, target_labels,
+                                                         feature_config)
+        anomaly_dataset = SoundFeatureFactory.build_dataset(args.feature, anomaly_sound_list, anomaly_labels,
+                                                            feature_config)
+        hive_data_shape = hive_dataset[0][0].squeeze().shape
+        anomaly_data_shape = hive_dataset[0][0].squeeze().shape
 
-        # build datasets and dataloader
+        assert hive_data_shape == anomaly_data_shape, "anomaly and hive data are not consistent!"
 
-        # TODO: ensure same shape for target and anomaly data
-        dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, labels, feature_config)
-        data_shape = dataset[0][0].squeeze().shape
-        logging.debug(f'got dataset of shape: {data_shape}')
+        logging.debug(f'got dataset of shape: {hive_data_shape}')
+        hive_dataloader = DataLoader(hive_dataset, batch_size=64, shuffle=True, drop_last=False, num_workers=0)
+        anomaly_dataloader = DataLoader(anomaly_dataset, batch_size=64, shuffle=True, drop_last=False, num_workers=0)
 
-        train_loader, val_loader = SoundFeatureFactory.build_train_and_validation_dataloader(dataset, 64)
+        model_type: HiveModelType = HiveModelType.from_name(args.model_path.stem.split('-')[0])
+        model = HiveModelFactory.build_model(model_type, hive_data_shape, args.model_config)
+        last_epoch, last_loss = model_load(args.model_path, model)
+        logging.info(f'model {model_type.model_name} has been loaded from epoch {last_epoch} with loss: {last_loss}')
+
+        model_runner = ModelRunner()
+        hive_latent = model_runner.inference_latent(model, hive_dataloader)
+        anomaly_latent = model_runner.inference_latent(model, anomaly_dataloader)
+
+        anomaly = AnomalyScorer(args.anomaly_model)
+        score = anomaly.fit(hive_latent, anomaly_latent).score()
+        print(f'score: {score}')
 
 
 if __name__ == "__main__":
