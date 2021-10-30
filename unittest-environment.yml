@@ -3,6 +3,7 @@ channels:
   - defaults
   - conda-forge
   - pytorch
+  - comet_ml
 dependencies:
   - python==3.8.5
   - numpy
@@ -12,6 +13,7 @@ dependencies:
   - pydub
   - pip
   - optuna
+  - comet_ml
   - librosa
   - pip:
     - torchsummary
