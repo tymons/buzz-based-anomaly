@@ -51,3 +51,5 @@ class GMMAnomalyScorer:
         w_factor = 0.2 / self.model.weights_.max()
         for pos, covar, w in zip(self.model.means_, self.model.covariances_, self.model.weights_):
             draw_ellipse(pos, covar, alpha=w * w_factor)
+
+        return ax
