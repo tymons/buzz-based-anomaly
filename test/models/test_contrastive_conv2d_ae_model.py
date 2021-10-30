@@ -80,25 +80,6 @@ class TestContrastiveConv2dAEModelMethods(unittest.TestCase):
         self.assertEqual(model(target, background).target.shape[-2:], input_size)
         self.assertEqual(model(target, background).background.shape[-2:], input_size)
 
-    def test_contrastive_conv2d_autoencoder_model_is_build_with_padding_4(self):
-        config, input_size = get_default_config()
-        config['padding'] = 4
-
-        model: CBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv2d_autoencoder'),
-                                                  input_size, config)
-
-        self.assertIsNotNone(model, "model build failed!")
-        self.assertListEqual(config['layers'], model.get_params().get('model_feature_map'))
-        self.assertListEqual(config['dropout'], model.get_params().get('model_dropouts'))
-        self.assertEqual(config['kernel'], model.get_params().get('model_kernel_size'))
-        self.assertEqual(config['padding'], model.get_params().get('model_padding'))
-        self.assertEqual(config['latent'], model.get_params().get('model_latent'))
-        self.assertEqual(config['max_pool'], model.get_params().get('model_max_pool'))
-
-        target, background = torch.empty(size=(32, 1, *input_size)), torch.empty(size=(32, 1, *input_size))
-        self.assertEqual(model(target, background).target.shape[-2:], input_size)
-        self.assertEqual(model(target, background).background.shape[-2:], input_size)
-
     def test_contrastive_conv2d_autoencoder_model_is_build_with_kernel_3(self):
         config, input_size = get_default_config()
         config['kernel'] = 3
