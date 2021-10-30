@@ -9,7 +9,7 @@ from typing import List
 from torch.utils.data import DataLoader
 
 from features.feature_type import SoundFeatureType
-from utils.gmm_anomaly_scorer import AnomalyScorer
+from utils.gmm_anomaly_scorer import GMMAnomalyScorer
 from utils.model_runner import model_load
 from utils.feature_factory import SoundFeatureFactory
 from utils.model_factory import HiveModelFactory, HiveModelType
@@ -77,7 +77,7 @@ def main():
         hive_latent = model_runner.inference_latent(model, hive_dataloader)
         anomaly_latent = model_runner.inference_latent(model, anomaly_dataloader)
 
-        anomaly = AnomalyScorer(args.anomaly_model)
+        anomaly = GMMAnomalyScorer(args.anomaly_model)
         score = anomaly.fit(hive_latent, anomaly_latent).score()
         print(f'score: {score}')
 
