@@ -5,14 +5,19 @@ from utils.model_factory import HiveModelFactory, HiveModelType, model_check
 from models.variational.vae_base_model import VaeBaseModel
 
 
+def get_default_config():
+    input_size = 256
+    config = {
+        'layers': [16, 8, 4],
+        'dropout': [0.3, 0.3, 0.3],
+        'latent': 8
+    }
+    return config, input_size
+
+
 class TestVAEModelMethods(unittest.TestCase):
     def test_vae_model_is_build(self):
-        input_size = 512
-        config = {
-            'layers': [64, 32, 16],
-            'dropout': [0.3, 0.3, 0.3],
-            'latent': 8
-        }
+        config, input_size = get_default_config()
         model: VaeBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('vae'), (input_size,), config)
         self.assertIsNotNone(model_check(model, (1, input_size), device='cpu'), "model verification failed!")
         self.assertListEqual(model.get_params().get('model_layers'), config['layers'])
@@ -23,12 +28,7 @@ class TestVAEModelMethods(unittest.TestCase):
         self.assertEqual(model(torch.empty(size=(1, input_size))).log_var.shape[1], config['latent'])
 
     def test_vae_model_inference(self):
-        input_size = 512
-        config = {
-            'layers': [64, 32, 16],
-            'dropout': [0.3, 0.3, 0.3],
-            'latent': 8
-        }
+        config, input_size = get_default_config()
         batch_size = 32
         input_tensor = torch.empty((batch_size, input_size))
         model: VaeBaseModel = HiveModelFactory.build_model(HiveModelType.from_name('vae'), (input_size,), config)

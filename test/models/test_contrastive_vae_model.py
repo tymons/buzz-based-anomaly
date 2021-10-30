@@ -6,14 +6,20 @@ from models.variational.contrastive.contrastive_variational_base_model import Co
 from models.model_type import HiveModelType
 
 
+def get_vae_default_config():
+    config, input_size = {
+                             'layers': [16, 8, 4],
+                             'dropout': [0.3, 0.3, 0.3],
+                             'latent': 8
+                         }, 256
+
+    return config, input_size
+
+
 class TestContrastiveVAEModelMethods(unittest.TestCase):
 
     def test_contrastive_vae_model_is_built_basic_setup(self):
-        config, input_size = {
-                                 'layers': [64, 32, 16],
-                                 'dropout': [0.3, 0.3, 0.3],
-                                 'latent': 8
-                             }, 2048
+        config, input_size = get_vae_default_config()
 
         model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_vae'), (input_size,), config)
         self.assertListEqual(model.get_params().get('model_layers'), config['layers'])
@@ -41,11 +47,7 @@ class TestContrastiveVAEModelMethods(unittest.TestCase):
                              "discriminator output should be scaled")
 
     def test_contrastive_vae_model_inference(self):
-        config, input_size = {
-                                 'layers': [64, 32, 16],
-                                 'dropout': [0.3, 0.3, 0.3],
-                                 'latent': 8
-                             }, 2048
+        config, input_size = get_vae_default_config()
         batch_size = 32
         input_tensor = torch.empty((batch_size, input_size))
         model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_vae'), (input_size,),

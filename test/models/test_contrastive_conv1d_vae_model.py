@@ -13,13 +13,13 @@ def get_default_config() -> Tuple[dict, int]:
     :return: config, input_size
     """
     return {
-               'layers': [64, 32, 16],
+               'layers': [8, 4, 2],
                'dropout': [0.3, 0.3, 0.3],
                'latent': 8,
                'kernel': 4,
                'padding': 2,
                'max_pool': 2
-           }, 2048
+           }, 256
 
 
 class TestContrastiveConv1dVAEModelMethods(unittest.TestCase):
@@ -43,9 +43,9 @@ class TestContrastiveConv1dVAEModelMethods(unittest.TestCase):
         self.assertEqual(model(target, background).background.shape[-1], input_size)
         self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
 
-    def test_contrastive_conv1d_vae_model_is_build_with_input_size_4523(self):
+    def test_contrastive_conv1d_vae_model_is_build_with_input_size_2049(self):
         config, _ = get_default_config()
-        input_size = 4523
+        input_size = 2049
 
         model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'),
                                                    (input_size,),
@@ -69,27 +69,6 @@ class TestContrastiveConv1dVAEModelMethods(unittest.TestCase):
         config['max_pool'] = 5
 
         model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'), (input_size,),
-                                                   config)
-
-        self.assertIsNotNone(model, "model build failed!")
-        self.assertListEqual(model.get_params().get('model_feature_map'), config['layers'])
-        self.assertListEqual(model.get_params().get('model_dropouts'), config['dropout'])
-        self.assertEqual(model.get_params().get('model_kernel_size'), config['kernel'])
-        self.assertEqual(model.get_params().get('model_padding'), config['padding'])
-        self.assertEqual(model.get_params().get('model_latent'), config['latent'])
-        self.assertEqual(model.get_params().get('model_max_pool'), config['max_pool'])
-
-        target, background = torch.empty(size=(32, 1, input_size)), torch.empty(size=(32, 1, input_size))
-        self.assertEqual(model(target, background).target.shape[-1], input_size)
-        self.assertEqual(model(target, background).background.shape[-1], input_size)
-        self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
-
-    def test_contrastive_conv1d_vae_model_is_build_with_padding_4(self):
-        config, input_size = get_default_config()
-        config['padding'] = 4
-
-        model: CVBM = HiveModelFactory.build_model(HiveModelType.from_name('contrastive_conv1d_vae'),
-                                                   (input_size,),
                                                    config)
 
         self.assertIsNotNone(model, "model build failed!")
