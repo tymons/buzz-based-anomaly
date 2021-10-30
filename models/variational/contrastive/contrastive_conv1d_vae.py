@@ -1,15 +1,13 @@
 import torch
 import torch.nn.functional as F
-from torch import nn, Tensor
-
-from typing import List
-
-from models.discriminator import Discriminator
 import models.variational.contrastive.contrastive_variational_base_model as cvbm
+
+from torch import nn, Tensor
+from typing import List
+from models.discriminator import Discriminator
 from models.vanilla.conv1d_ae import Conv1DEncoder, Conv1DDecoder
 from models.conv_utils import convolutional_to_mlp
-from models.variational.vae_base_model import reparameterize, kld_loss
-
+from models.variational.vae_base_model import reparameterize, kld_loss, Flattener
 from features.contrastive_feature_dataset import ContrastiveOutput
 
 
@@ -26,8 +24,8 @@ class ContrastiveConv1DVAE(cvbm.ContrastiveVariationalBaseModel):
         self._max_pool = max_pool
 
         connector_size, conv_temporal = convolutional_to_mlp(input_size, len(features), kernel_size, padding, max_pool)
-        self.s_encoder = Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool)
-        self.z_encoder = Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool)
+        self.s_encoder = Flattener(Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool))
+        self.z_encoder = Flattener(Conv1DEncoder(features, dropout_probs, kernel_size, padding, max_pool))
         self.decoder = Conv1DDecoder(features[::-1], dropout_probs[::-1], kernel_size, padding, 2 * latent_size,
                                      features[-1] * connector_size, conv_temporal[::-1])
 

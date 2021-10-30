@@ -42,4 +42,4 @@ jobs:
       - name: Run unittests
         run: |
           echo " ====== Running unitests ======"
-          python -m unittest discover --start-directory test/ -p "*_test.py"
+          python -m unittest discover -p "test_*.py"
