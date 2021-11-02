@@ -3,6 +3,7 @@ import glob
 import math
 import logging
 import collections
+import requests
 
 import torch
 import numpy as np
@@ -235,3 +236,13 @@ def truncate_lists_to_smaller_size(arg1, arg2):
         arg2 = arg2[:len(arg1)]
 
     return arg1, arg2
+
+
+def beecolony_fingerprint_filtering(sound_list: List[Path], csv_feature_path: Path) -> List[Path]:
+    """
+    Function for fingerprint filtering method from https://www.sciencedirect.com/science/article/pii/S0168169921005068
+    :param csv_feature_path: Path to csv file with feature (temperature for the basic case)
+    :param sound_list: sound list path
+    :return: filtered sound list
+    """
+    return sound_list
