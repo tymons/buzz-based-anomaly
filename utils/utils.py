@@ -3,7 +3,6 @@ import glob
 import math
 import logging
 import collections
-import requests
 
 import torch
 import numpy as np
