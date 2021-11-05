@@ -26,7 +26,7 @@ def main():
                         type=SoundFeatureType.from_name, help='Input feature')
     parser.add_argument('smartula_data_folder', metavar='data_folder', type=Path, help='Smartula folder for sound data')
     # optional arguments
-    parser.add_argument('--filter_hives', default=[], nargs='+', help="Hive names to be excluded from dataset")
+    parser.add_argument('--hives', default=[], nargs='+', help="Hive names to be included in dataset")
     parser.add_argument('--filter_dates', nargs=2, type=datetime.fromisoformat,
                         help="Start and end date for sound data with format YYYY-MM-DD", metavar='START_DATE END_DATE')
     parser.add_argument('--model_config', default=Path(__file__).absolute().parent / "model_config.yml", type=Path)
@@ -38,13 +38,14 @@ def main():
     parser.add_argument('--find_best', type=int, metavar='N', help="how many trials for finding best architecture")
     parser.add_argument('--log_folder', default=Path(__file__).absolute().parent / "output/", type=Path)
     parser.add_argument('--use_fingerprint_filtering', dest='use_fingerprint', action='store_true')
-    parser.add_argument('--fingerprint_feature_file', default=Path(__file__).absolute().parent / "feature.csv", type=Path)
+    parser.add_argument('--fingerprint_feature_file', default=Path(__file__).absolute().parent / "feature.csv",
+                        type=Path)
     parser.add_argument('--contrastive_data_folder', type=Path)
 
     parser.set_defaults(use_fingerprint=False)
     args = parser.parse_args()
 
-    utils.logger_setup(args.log_folder, f"{args.model.value}-{args.feature.value}")
+    utils.logger_setup(args.log_folder, f"{args.model.model_name}-{args.feature.value}")
 
     logging.info(f'runing {args.model.model_name} model with {args.feature.value}...')
     logging.info(f'data folder located at: {args.smartula_data_folder}')
@@ -69,7 +70,7 @@ def main():
             sound_list = utils.filter_by_datetime(sound_list, args.filter_dates[0], args.filter_dates[1])
 
         # prepare sound filenames
-        sound_list = utils.filter_string_list(sound_list, *args.filter_hives)
+        sound_list = utils.filter_string_list(sound_list, *args.hives)
         available_labels = list(set([path.stem.split("-")[0] for path in sound_list]))
         sound_labels: List[int] = [list(available_labels).index(sound_name.stem.split('-')[0])
                                    for sound_name in sound_list]

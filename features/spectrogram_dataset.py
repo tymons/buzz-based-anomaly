@@ -12,7 +12,7 @@ from utils.utils import adjust_matrix, closest_power_2, adjust_linear_ndarray
 
 
 def calculate_spectrogram(samples, sampling_rate: int, n_fft: int, hop_len: int, slice_freq: SliceFrequency = None,
-                          convert_db=True, window_name: str = 'blackman') -> (np.ndarray, np.ndarray, np.ndarray):
+                          convert_db=False, window_name: str = 'blackman') -> (np.ndarray, np.ndarray, np.ndarray):
     """ Function for calculating spectrogram
     :param window_name: window name, see scipy.signal.get_window function
     :param samples: audio samples from which spectrogram should be calculated
