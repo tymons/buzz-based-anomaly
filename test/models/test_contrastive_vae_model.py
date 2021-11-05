@@ -33,7 +33,7 @@ class TestContrastiveVAEModelMethods(unittest.TestCase):
 
     def test_discriminator_is_built_basic_setup(self):
         config = {
-            'layers': [8, 32, 64]
+            'layers': [2, 4, 8]
         }
 
         discriminator_model: torch.nn.Module = HiveModelFactory.get_discriminator(config, 2)
