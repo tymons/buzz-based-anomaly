@@ -13,7 +13,8 @@ def compute_aci(spectro, j_bin):
     """
     Compute the Acoustic Complexity Index from the spectrogram of an audio signal.
 
-    Reference: Pieretti N, Farina A, Morri FD (2011) A new methodology to infer the singing activity of an avian community: the Acoustic Complexity Index (ACI). Ecological Indicators, 11, 868-873.
+    Reference: Pieretti N, Farina A, Morri FD (2011) A new methodology to infer the singing activity of an
+    avian community: the Acoustic Complexity Index (ACI). Ecological Indicators, 11, 868-873.
 
     Ported from the soundecology R package.
 
@@ -37,13 +38,15 @@ def compute_aci(spectro, j_bin):
 def compute_bi(spectro, frequencies, dbfs_max, min_freq=2000, max_freq=8000):
     """
     Compute the Bioacoustic Index from the spectrogram of an audio signal.
-    In this code, the Bioacoustic Index correspond to the area under the mean spectre (in dB) minus the minimum frequency value of this mean spectre.
+    In this code, the Bioacoustic Index correspond to the area under the mean spectre (in dB) minus
+    the minimum frequency value of this mean spectre.
 
-    Reference: Boelman NT, Asner GP, Hart PJ, Martin RE. 2007. Multi-trophic invasion resistance in Hawaii: bioacoustics, field surveys, and airborne remote sensing. Ecological Applications 17: 2137-2144.
+    Reference: Boelman NT, Asner GP, Hart PJ, Martin RE. 2007. Multi-trophic invasion resistance in Hawaii:
+    bioacoustics, field surveys, and airborne remote sensing. Ecological Applications 17: 2137-2144.
 
     spectro: the spectrogram of the audio signal
     frequencies: list of the frequencies of the spectrogram
-    dbfs_max: max value for dbfs 
+    dbfs_max: max value for dbfs
     min_freq: minimum frequency (in Hertz)
     max_freq: maximum frequency (in Hertz)
 
@@ -113,7 +116,8 @@ def compute_aei(pcm_spectro, dbfs_max, freq_band_hz, max_freq=10000, dbfs_thresh
     """
     Compute Acoustic Evenness Index of an audio signal.
 
-    Reference: Villanueva-Rivera, L. J., B. C. Pijanowski, J. Doucette, and B. Pekin. 2011. A primer of acoustic analysis for landscape ecologists. Landscape Ecology 26: 1233-1246.
+    Reference: Villanueva-Rivera, L. J., B. C. Pijanowski, J. Doucette, and B. Pekin. 2011.
+    A primer of acoustic analysis for landscape ecologists. Landscape Ecology 26: 1233-1246.
 
     spectro: spectrogram of the audio signal
     freq_band_Hz: frequency band size of one bin of the spectrogram (in Hertz)
@@ -139,7 +143,8 @@ def compute_adi(pcm_spectro, dbfs_max, freq_band_hz, max_freq=10000, dbfs_thresh
     """
     Compute Acoustic Diversity Index.
 
-    Reference: Villanueva-Rivera, L. J., B. C. Pijanowski, J. Doucette, and B. Pekin. 2011. A primer of acoustic analysis for landscape ecologists. Landscape Ecology 26: 1233-1246.
+    Reference: Villanueva-Rivera, L. J., B. C. Pijanowski, J. Doucette, and B. Pekin. 2011.
+    A primer of acoustic analysis for landscape ecologists. Landscape Ecology 26: 1233-1246.
 
     spectro: spectrogram of the audio signal
     dbfs_max: max value for decibel full scale

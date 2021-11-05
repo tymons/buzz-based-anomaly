@@ -31,9 +31,7 @@ def main():
     parser.add_argument('longitude', default='28.468998124', metavar='longitude', type=float, help='location latitude')
     parser.add_argument('key', metavar='key', default='deadbeef', type=str, help='open weather api key')
     args = parser.parse_args()
-
-    features = pd.read_csv(args.file, skiprows=1, names=['series', 'datetime', 'outdoor_temperature'])
-
+    print(len(args))
 
 
 if __name__ == "__main__":
