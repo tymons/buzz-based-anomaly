@@ -8,7 +8,7 @@ from features.sound_indices.si_feature_type import SoundIndicesFeatureType
 from features.sound_dataset import read_samples
 from features.spectrogram_dataset import calculate_spectrogram
 from features.slice_frequency_dataclass import SliceFrequency
-from datetime import datetime, timedelta
+from datetime import datetime
 from utils import utils as ut
 from multiprocessing.pool import ThreadPool
 from tqdm import tqdm
