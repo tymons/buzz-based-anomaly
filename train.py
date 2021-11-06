@@ -47,7 +47,7 @@ def main():
 
     utils.logger_setup(args.log_folder, f"{args.model.model_name}-{args.feature.value}")
 
-    logging.info(f'runing {args.model.model_name} model with {args.feature.value}...')
+    logging.info(f'running {args.model.model_name} model with {args.feature.value}...')
     logging.info(f'data folder located at: {args.smartula_data_folder}')
     logging.info(f'output folder for ML models located at: {args.model_output}')
     logging.info(f'output folder for logs located at: {args.log_folder}')

@@ -1,6 +1,7 @@
 import argparse
 import features.sound_indices.indices as indices
 import pandas as pd
+import pytz
 
 from pathlib import Path
 from features.sound_indices.si_feature_type import SoundIndicesFeatureType
@@ -30,15 +31,20 @@ parser.add_argument('--output-file', metavar='csv_file', default='feature.csv', 
                     help='csv feature output file path')
 parser.add_argument('--num-workers', type=int, default=1, help='number of work threads')
 parser.add_argument('--feature', metavar='feature', type=get_feature_func, default='entropy', help="Sound Indice type")
-parser.add_argument('--nfft', metavar='nfft', type=int, default=512, help="number of fft smaples")
+parser.add_argument('--timezone', metavar='timezone', type=pytz.timezone, default='UTC',
+                    help="timezone to be applied")
+parser.add_argument('--nfft', metavar='nfft', type=int, default=512, help="number of fft samples")
 parser.add_argument('--hop-len', metavar='hop_len', type=int, default=256, help="hop length for spectrogram")
 args = parser.parse_args()
 
 
 def process(filename):
     hive_name = filename.split('\\')[-2].split('_')[0]
-    sound_datetime = datetime.strptime('-'.join(filename.split('\\')[-1].split('.')[0].split('-')[1:]),
-                                       '%Y-%m-%dT%H-%M-%S')
+    utc_timezone = pytz.timezone('UTC')
+    utc_sound_datetime = utc_timezone.localize(
+        datetime.strptime('-'.join(filename.split('\\')[-1].split('.')[0].split('-')[1:]),
+                          '%Y-%m-%dT%H-%M-%S'))
+    sound_datetime = args.timezone.normalize(utc_sound_datetime)
     samples, sampling_freq = read_samples(filename, raw=True)
     spectrogram, _, _ = calculate_spectrogram(samples, sampling_freq, n_fft=args.nfft, hop_len=args.hop_len,
                                               slice_freq=SliceFrequency(0, 3000), convert_db=False)
@@ -59,7 +65,7 @@ def main():
     with ThreadPool(args.num_workers) as pool:
         feature_tuples = list(tqdm(pool.imap(process, sound_list), total=len(sound_list)))
         df = pd.DataFrame(feature_tuples, columns=['datetime', 'hive', 'feature'])
-        df.to_csv(args.output_file, sep=';')
+        df.to_csv(args.output_file, index=False)
 
 
 if __name__ == "__main__":
