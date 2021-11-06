@@ -7,7 +7,7 @@ from features.sound_indices.si_feature_type import SoundIndicesFeatureType
 from features.sound_dataset import read_samples
 from features.spectrogram_dataset import calculate_spectrogram
 from features.slice_frequency_dataclass import SliceFrequency
-from datetime import datetime
+from datetime import datetime, timedelta
 from utils import utils as ut
 from multiprocessing.pool import ThreadPool
 from tqdm import tqdm
@@ -30,7 +30,9 @@ parser.add_argument('--output-file', metavar='csv_file', default='feature.csv', 
                     help='csv feature output file path')
 parser.add_argument('--num-workers', type=int, default=1, help='number of work threads')
 parser.add_argument('--feature', metavar='feature', type=get_feature_func, default='entropy', help="Sound Indice type")
-parser.add_argument('--nfft', metavar='nfft', type=int, default=512, help="number of fft smaples")
+parser.add_argument('--timezone_offset', metavar='hours_offset', type=int, default=0, help="timezone hour offset "
+                                                                                           "to be added")
+parser.add_argument('--nfft', metavar='nfft', type=int, default=512, help="number of fft samples")
 parser.add_argument('--hop-len', metavar='hop_len', type=int, default=256, help="hop length for spectrogram")
 args = parser.parse_args()
 
@@ -38,7 +40,7 @@ args = parser.parse_args()
 def process(filename):
     hive_name = filename.split('\\')[-2].split('_')[0]
     sound_datetime = datetime.strptime('-'.join(filename.split('\\')[-1].split('.')[0].split('-')[1:]),
-                                       '%Y-%m-%dT%H-%M-%S')
+                                       '%Y-%m-%dT%H-%M-%S') + timedelta(hours=args.timezone_offset)
     samples, sampling_freq = read_samples(filename, raw=True)
     spectrogram, _, _ = calculate_spectrogram(samples, sampling_freq, n_fft=args.nfft, hop_len=args.hop_len,
                                               slice_freq=SliceFrequency(0, 3000), convert_db=False)
@@ -59,7 +61,7 @@ def main():
     with ThreadPool(args.num_workers) as pool:
         feature_tuples = list(tqdm(pool.imap(process, sound_list), total=len(sound_list)))
         df = pd.DataFrame(feature_tuples, columns=['datetime', 'hive', 'feature'])
-        df.to_csv(args.output_file, sep=';')
+        df.to_csv(args.output_file, sep=';', index=False)
 
 
 if __name__ == "__main__":
