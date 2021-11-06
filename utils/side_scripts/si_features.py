@@ -1,7 +1,4 @@
 import argparse
-
-from sqlalchemy.util import timezone
-
 import features.sound_indices.indices as indices
 import pandas as pd
 import pytz
