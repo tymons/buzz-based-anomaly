@@ -1,29 +1,9 @@
-import requests
 import pandas as pd
 import argparse
 import pytz
 
 from pathlib import Path
 from weather_feature_type import WeatherFeatureType
-
-OPEN_WEATHER_API = 'http://history.openweathermap.org/data/2.5/history/city'
-
-
-def update_row_with_openweather(x: pd.DataFrame, weather_feature: WeatherFeatureType, api_key: str, lat: float,
-                                long: float):
-    start_utc = int((x['datetime'].tz_convert('UTC')).timestamp())
-    print(f'making api call for: {start_utc}...', end=' ')
-
-    payload = {'lat': str(lat), 'lon': str(long), 'type': 'hour', 'appid': api_key, 'start': str(start_utc), 'cnt': '1'}
-    r = requests.get(OPEN_WEATHER_API, params=payload)
-    if r.status_code == 200:
-        print('success!')
-        r_json = r.json()
-        if weather_feature == WeatherFeatureType.TEMPERATURE:
-            x[weather_feature.value] = round(r_json['list'][0]['main']['temp'] - 273.15, 2)
-        return x
-    else:
-        raise ValueError(f"Error at http call: {r.text}")
 
 
 def main():
@@ -36,10 +16,12 @@ def main():
                         type=Path, help='csv output merged file')
     parser.add_argument('--open-weather-file', metavar='weather_file', default='open-weather.csv',
                         type=Path, help='csv open weather file')
-    parser.add_argument('--weather-file-feature-name', default='temperature', type=str,
+    parser.add_argument('--weather-file-feature-name', default=WeatherFeatureType.TEMPERATURE,
+                        choices=list(WeatherFeatureType), type=WeatherFeatureType.from_name,
                         help='feature name to be used with weather csv file')
-    parser.add_argument('--open-weather-file-feature-name', default='temperature', type=str,
-                        help='feature name to be used with weather csv file')
+    parser.add_argument('--open-weather-file-feature-name', default=WeatherFeatureType.TEMPERATURE,
+                        choices=list(WeatherFeatureType), type=WeatherFeatureType.from_name,
+                        help='feature name to be used with open weather csv file')
     parser.add_argument('--timezone', metavar='timezone', type=pytz.timezone, default='UTC',
                         help="timezone to be applied to concatenated dataframe")
 
@@ -63,7 +45,7 @@ def main():
         print(f'got some missing data on {args.weather_file_feature_name} with len '
               f'{data[args.weather_file_feature_name].isna().sum()}/{data[args.weather_file_feature_name].count()}'
               f' updating with open weather file...')
-        # TODO implement merging with supplementary file
+        # TODO implement
         return
 
     print(f'saving data to file {args.output_file}...')
