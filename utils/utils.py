@@ -3,6 +3,7 @@ import glob
 import math
 import logging
 import collections
+import pandas as pd
 
 import torch
 import numpy as np
@@ -13,7 +14,9 @@ from typing import Callable
 from datetime import datetime
 from tqdm import tqdm
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Optional
+
+from utils.side_scripts.weather_feature_type import WeatherFeatureType
 
 
 def logger_setup(log_folder: Path, filename_prefix: str) -> None:
@@ -237,11 +240,35 @@ def truncate_lists_to_smaller_size(arg1, arg2):
     return arg1, arg2
 
 
-def beecolony_fingerprint_filtering(sound_list: List[Path], csv_feature_path: Path) -> List[Path]:
+def _sort_hourly_average_feature(df: pd.DataFrame, weather_type: WeatherFeatureType):
+    """
+    Function for sorting and hourly averagin
+    :param df: dataframe with index of datetime
+    :return: sorted and averaged df
+    """
+    df = df.sort_values('datetime')
+    hour_means = df.groupby(pd.Grouper(freq='1H')).mean()
+    hour_means[weather_type.value] = hour_means[weather_type.value].round()
+    return hour_means
+
+
+def hive_fingerprint(csv_feature_weather_path: Path,
+                     weather_type: WeatherFeatureType,
+                     hive_name: Optional[str] = None) -> List[Path]:
     """
     Function for fingerprint filtering method from https://www.sciencedirect.com/science/article/pii/S0168169921005068
-    :param csv_feature_path: Path to csv file with feature (temperature for the basic case)
-    :param sound_list: sound list path
+    :param hive_name: hive which should be used form csv, if none - csv file should contain only data for one hive
+    :param weather_type:
+    :param csv_feature_weather_path: Path to csv file with feature (temperature for the basic case)
     :return: filtered sound list
     """
-    return sound_list
+    df = pd.read_csv(csv_feature_weather_path, usecols=['datetime', 'hive', 'feature', weather_type.value])
+    if hive_name is not None:
+        df = df[df['hive'] == hive_name]
+    original_timezones = pd.to_datetime(df['datetime']).map(lambda x: x.astimezone().tzinfo)
+
+    df['datetime'] = pd.to_datetime(df['datetime'], utc=True)
+    df = df.set_index('datetime')
+    df = _sort_hourly_average_feature(df, weather_type)
+
+    return df
