@@ -13,7 +13,7 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from datetime import datetime
 from tqdm import tqdm
 from pathlib import Path
-from typing import List, Union, Optional, Callable, Dict
+from typing import List, Union, Optional, Callable, Dict, Tuple
 
 from utils.side_scripts.weather_feature_type import WeatherFeatureType
 
@@ -251,30 +251,33 @@ def _sort_and_haverage_feature(df: pd.DataFrame, weather_type: WeatherFeatureTyp
     return hour_means
 
 
-def common_state_per_hour(df: pd.DataFrame) -> Dict:
+def _common_state_per_hour(df: pd.DataFrame, bars_no: int = 30) -> Dict:
     """
-    Function for calculating most common feature value range along with mean temperature
-    for that range
-    :return:
+    Function for calculating most common feature value range and temperature for every hour in df.
+    :return: dict(tuple, int)
     """
+    q1 = df['feature'].quantile(0.05)
+    q2 = df['feature'].quantile(0.95)
+    feature_bins = np.arange(q1, q2, abs(q1 - q2) / bars_no)
+
     hour_dict = {}
     for hour, df_group in df.groupby(df.index.map(lambda x: x.hour)):
         data = df_group.dropna()
-        hist, bins = np.histogram(data['feature'], bins=20)
+        hist, bins = np.histogram(data['feature'], bins=feature_bins)
         bin_intervals = list(zip(bins[:-1], bins[1:]))
-        hist_mean_temperatures = [round(data.loc[(data['feature'] > low_lim)
-                                                 & (data['feature'] <= up_lim)]['temperature'].mean())
-                                  for low_lim, up_lim in bin_intervals]
+        hist_mean_temperatures = pd.Series([data.loc[(data['feature'] > low_lim)
+                                                     & (data['feature'] <= up_lim)]['temperature'].mean()
+                                            for low_lim, up_lim in bin_intervals])
 
         arg_max_idx = np.argmax(hist)
-        hour_dict[hour] = (bin_intervals[arg_max_idx], hist_mean_temperatures[arg_max_idx])
+        hour_dict[hour] = bin_intervals[arg_max_idx], hist_mean_temperatures.values[arg_max_idx]
 
     return hour_dict
 
 
 def hive_fingerprint(csv_feature_weather_path: Path,
                      weather_type: WeatherFeatureType,
-                     hive_name: Optional[str] = None) -> List[Path]:
+                     hive_name: Optional[str] = None):
     """
     Function for fingerprint filtering method from https://www.sciencedirect.com/science/article/pii/S0168169921005068
     :param hive_name: hive which should be used form csv, if none - csv file should contain only data for one hive
@@ -290,6 +293,6 @@ def hive_fingerprint(csv_feature_weather_path: Path,
     df['datetime'] = pd.to_datetime(df['datetime'], utc=True)
     df = df.set_index('datetime')
     df = _sort_and_haverage_feature(df, weather_type)
-    most_common_temperatures = {key: value[1] for key, value in common_state_per_hour(df).items()}
+    most_common_temperatures = {key: value[1] for key, value in _common_state_per_hour(df).items()}
 
-    return df
+    return most_common_temperatures
