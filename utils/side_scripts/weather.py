@@ -36,7 +36,6 @@ def main():
                         help="timezone to be applied to concatenated dataframe")
 
     args = parser.parse_args()
-
     f_name = args.weather_file_feature_name.value
 
     df_weather = pd.read_csv(args.weather_file, usecols=['datetime', f_name])
