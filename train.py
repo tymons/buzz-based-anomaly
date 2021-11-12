@@ -75,7 +75,7 @@ def main():
         sound_labels: List[int] = [list(available_labels).index(sound_name.stem.split('-')[0])
                                    for sound_name in sound_list]
         if args.use_fingerprint:
-            sound_list = utils.beecolony_fingerprint_filtering(sound_list, args.fingerprint_feature_file)
+            sound_list = utils.beecolony_fingerprint_filtering(args.fingerprint_feature_file)
 
         # preparse background filenames if needed
         if args.contrastive_data_folder is not None:

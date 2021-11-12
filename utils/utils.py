@@ -10,11 +10,10 @@ import numpy as np
 
 from scipy.io import wavfile
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from typing import Callable
 from datetime import datetime
 from tqdm import tqdm
 from pathlib import Path
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Callable, Dict
 
 from utils.side_scripts.weather_feature_type import WeatherFeatureType
 
@@ -240,7 +239,7 @@ def truncate_lists_to_smaller_size(arg1, arg2):
     return arg1, arg2
 
 
-def _sort_hourly_average_feature(df: pd.DataFrame, weather_type: WeatherFeatureType):
+def _sort_and_haverage_feature(df: pd.DataFrame, weather_type: WeatherFeatureType) -> pd.DataFrame:
     """
     Function for sorting and hourly averagin
     :param df: dataframe with index of datetime
@@ -250,6 +249,27 @@ def _sort_hourly_average_feature(df: pd.DataFrame, weather_type: WeatherFeatureT
     hour_means = df.groupby(pd.Grouper(freq='1H')).mean()
     hour_means[weather_type.value] = hour_means[weather_type.value].round()
     return hour_means
+
+
+def common_state_per_hour(df: pd.DataFrame) -> Dict:
+    """
+    Function for calculating most common feature value range along with mean temperature
+    for that range
+    :return:
+    """
+    hour_dict = {}
+    for hour, df_group in df.groupby(df.index.map(lambda x: x.hour)):
+        data = df_group.dropna()
+        hist, bins = np.histogram(data['feature'], bins=20)
+        bin_intervals = list(zip(bins[:-1], bins[1:]))
+        hist_mean_temperatures = [round(data.loc[(data['feature'] > low_lim)
+                                                 & (data['feature'] <= up_lim)]['temperature'].mean())
+                                  for low_lim, up_lim in bin_intervals]
+
+        arg_max_idx = np.argmax(hist)
+        hour_dict[hour] = (bin_intervals[arg_max_idx], hist_mean_temperatures[arg_max_idx])
+
+    return hour_dict
 
 
 def hive_fingerprint(csv_feature_weather_path: Path,
@@ -269,6 +289,7 @@ def hive_fingerprint(csv_feature_weather_path: Path,
 
     df['datetime'] = pd.to_datetime(df['datetime'], utc=True)
     df = df.set_index('datetime')
-    df = _sort_hourly_average_feature(df, weather_type)
+    df = _sort_and_haverage_feature(df, weather_type)
+    most_common_temperatures = {key: value[1] for key, value in common_state_per_hour(df).items()}
 
     return df
