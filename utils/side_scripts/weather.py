@@ -67,7 +67,7 @@ def main():
 
     print(f'saving data to file {args.output_file}...')
     data.to_csv(args.output_file, index=False)
-    print(f'success!')
+    print('success!')
 
 
 if __name__ == "__main__":
