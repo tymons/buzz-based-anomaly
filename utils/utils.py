@@ -239,9 +239,11 @@ def truncate_lists_to_smaller_size(arg1, arg2):
     return arg1, arg2
 
 
-def _sort_and_haverage_feature(df: pd.DataFrame, weather_type: WeatherFeatureType) -> pd.DataFrame:
+def sort_and_haverage_feature(df: pd.DataFrame, weather_type: WeatherFeatureType) -> pd.DataFrame:
     """
-    Function for sorting and hourly averagin
+    Function for sorting, hourly averaging faeture and rounding weather feature
+    This function basically prepares data for fingerprint analysis
+    :param weather_type: type of weather feature which should be used
     :param df: dataframe with index of datetime
     :return: sorted and averaged df
     """
@@ -251,7 +253,7 @@ def _sort_and_haverage_feature(df: pd.DataFrame, weather_type: WeatherFeatureTyp
     return hour_means
 
 
-def _common_state_per_hour(df: pd.DataFrame, bars_no: int = 30) -> Dict:
+def common_state_per_hour(df: pd.DataFrame, bars_no: int = 30) -> Dict:
     """
     Function for calculating most common feature value range and temperature for every hour in df.
     :return: dict(tuple, int)
@@ -261,8 +263,8 @@ def _common_state_per_hour(df: pd.DataFrame, bars_no: int = 30) -> Dict:
     feature_bins = np.arange(q1, q2, abs(q1 - q2) / bars_no)
 
     hour_dict = {}
-    for hour, df_group in df.groupby(df.index.map(lambda x: x.hour)):
-        data = df_group.dropna()
+    for hour, df_hour in df.groupby(df.index.map(lambda x: x.hour)):
+        data = df_hour.dropna()
         hist, bins = np.histogram(data['feature'], bins=feature_bins)
         bin_intervals = list(zip(bins[:-1], bins[1:]))
         hist_mean_temperatures = pd.Series([data.loc[(data['feature'] > low_lim)
@@ -270,9 +272,58 @@ def _common_state_per_hour(df: pd.DataFrame, bars_no: int = 30) -> Dict:
                                             for low_lim, up_lim in bin_intervals])
 
         arg_max_idx = np.argmax(hist)
-        hour_dict[hour] = bin_intervals[arg_max_idx], hist_mean_temperatures.values[arg_max_idx]
+        hour_dict[hour] = bin_intervals[arg_max_idx], round(hist_mean_temperatures.values[arg_max_idx])
 
     return hour_dict
+
+
+def trend_std(series: pd.Series, reference: float):
+    """
+    Function for calculating std with respect to given reference instead of mean value
+    :param series: pandas series with data
+    :param reference: reference value
+    :return: reference std value
+    """
+    return np.sqrt((1 / len(series)) * np.sum((series - reference) ** 2))
+
+
+def temperature_threshold_per_hour(df: pd.DataFrame, hour_common_temperature: dict,
+                                   weather_type: WeatherFeatureType) -> Dict:
+    """
+    Function for calculating start temperatures for every hour within 24-h day cycle where bees
+    produces distinctive tones. Start temperatures could be used as thresholds for filtering data to contains sound
+    samples recorded during preferable for bees work weather conditions.
+    :param df: dataframe with sound features and weather features
+    :param hour_common_temperature: dict with hour and most common temperature
+                                    from that hour (calculated by common_state_per_hour function)
+    :param weather_type:
+    :return:
+    """
+    hour_temperature_threshold = {}
+    for hour, df_hour in df.groupby(df.index.map(lambda x: x.hour)):
+        data = df_hour.dropna()
+
+        # calculate feature trend across temperatures within given hour
+        z = np.polyfit(data[weather_type.value], data['feature'], 2)
+        x_temperatures = sorted(df[weather_type.value].unique())
+        trend = np.polyval(z, np.arange(x_temperatures[0], x_temperatures[-1] + 1, 1))
+        trend_plot_data = dict(zip(x_temperatures, trend))
+
+        # calculate residuals for every temperature within given hour
+        residuals = {}
+        for temperature, features_within_temperature in data.groupby(df[weather_type.value]):
+            residuals[temperature] = trend_std(features_within_temperature['feature'], trend_plot_data[temperature])
+
+        # calculate start temperature for given hour
+        residual_threshold = residuals[hour_common_temperature[hour]]
+        try:
+            start_temperature = next(temperature for temperature, residual in residuals.items() if
+                                     residual > residual_threshold and temperature > hour_temperature_threshold[hour])
+        except StopIteration:
+            start_temperature = hour_common_temperature[hour]
+        hour_temperature_threshold[hour] = start_temperature
+
+    return hour_temperature_threshold
 
 
 def hive_fingerprint(csv_feature_weather_path: Path,
@@ -292,7 +343,8 @@ def hive_fingerprint(csv_feature_weather_path: Path,
 
     df['datetime'] = pd.to_datetime(df['datetime'], utc=True)
     df = df.set_index('datetime')
-    df = _sort_and_haverage_feature(df, weather_type)
-    most_common_temperatures = {key: value[1] for key, value in _common_state_per_hour(df).items()}
+    df = sort_and_haverage_feature(df, weather_type)
+    hour_common_temperature_dict = {key: value[1] for key, value in common_state_per_hour(df).items()}
+    hour_start_temperature = temperature_threshold_per_hour(df, hour_common_temperature_dict, weather_type)
 
-    return most_common_temperatures
+    return hour_start_temperature
