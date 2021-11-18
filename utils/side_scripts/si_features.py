@@ -2,6 +2,7 @@ import argparse
 import features.sound_indices.indices as indices
 import pandas as pd
 import pytz
+import json
 
 from pathlib import Path
 from features.sound_indices.si_feature_type import SoundIndicesFeatureType
@@ -15,8 +16,11 @@ from tqdm import tqdm
 
 
 def get_feature_func(feature_name: str):
-    if SoundIndicesFeatureType.from_name(feature_name) == SoundIndicesFeatureType.SPECTRAL_ENTROPY:
+    sound_feature = SoundIndicesFeatureType.from_name(feature_name)
+    if sound_feature == SoundIndicesFeatureType.SPECTRAL_ENTROPY:
         return indices.compute_sh
+    elif sound_feature == SoundIndicesFeatureType.ACI:
+        return indices.compute_aci
     else:
         raise ValueError(f'{feature_name} not supported!')
 
@@ -35,6 +39,9 @@ parser.add_argument('--timezone', metavar='timezone', type=pytz.timezone, defaul
                     help="timezone to be applied")
 parser.add_argument('--nfft', metavar='nfft', type=int, default=512, help="number of fft samples")
 parser.add_argument('--hop-len', metavar='hop_len', type=int, default=256, help="hop length for spectrogram")
+parser.add_argument('--indice-param', type=json.loads, default=None, help="dictionary for sound indices feature "
+                                                                          "calculation")
+
 args = parser.parse_args()
 
 
@@ -47,8 +54,10 @@ def process(filename):
     sound_datetime = args.timezone.normalize(utc_sound_datetime)
     samples, sampling_freq = read_samples(filename, raw=True)
     spectrogram, _, _ = calculate_spectrogram(samples, sampling_freq, n_fft=args.nfft, hop_len=args.hop_len,
-                                              slice_freq=SliceFrequency(0, 3000), convert_db=False)
-    feature_val = args.feature(spectrogram)
+                                              slice_freq=SliceFrequency(0, 8000), convert_db=False)
+    feature_val = args.feature(spectrogram) if args.indice_param is None else args.feature(spectrogram, **args.indice_param)
+    if type(feature_val) == tuple:
+        feature_val = feature_val[0]
     return sound_datetime, hive_name, feature_val
 
 

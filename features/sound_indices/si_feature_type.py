@@ -3,6 +3,7 @@ from enum import Enum
 
 class SoundIndicesFeatureType(Enum):
     SPECTRAL_ENTROPY = 'entropy'
+    ACI = 'aci'
 
     @classmethod
     def from_name(cls, name):
