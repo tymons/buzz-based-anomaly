@@ -20,8 +20,7 @@ def calculate_spectrogram(samples, sampling_rate: int, n_fft: int, hop_len: int,
     :param n_fft: samples for fft calculation
     :param hop_len: samples for hop (next fft calculation)
     :param slice_freq: min/max frequency for calculated spectrogram to be constrained
-    :param normalize: should scale spectrogram between 0 and 1
-    :param convert_db: should magnitued be converted to db
+    :param convert_db: should magnitude be converted to db
     :return: spectrogram_magnitude: spectrogram
     """
     frequencies, times, spectrogram = signal.spectrogram(samples, sampling_rate, nperseg=n_fft,
