@@ -393,7 +393,7 @@ def hour_feature_trend(df: pd.DataFrame, temperature_threshold: dict = None) -> 
     hive_trend = {}
     for hour, df_hour in df.groupby(df.index.map(lambda x: x.hour)):
         threshold = temperature_threshold.get(hour, -math.inf) if temperature_threshold is not None else -math.inf
-        hive_trend[hour] = df[df[WeatherFeatureType.TEMPERATURE.value] >= threshold]['feature'].mean()
+        hive_trend[hour] = df_hour[df_hour[WeatherFeatureType.TEMPERATURE.value] >= threshold]['feature'].mean()
 
     return hive_trend
 
