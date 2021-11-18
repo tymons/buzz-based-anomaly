@@ -411,7 +411,7 @@ def hive_fingerprint(csv_feature_weather_path: Path,
     df = pd.read_csv(csv_feature_weather_path, usecols=['datetime', 'hive', 'feature', weather_type.value])
     if hive_name is not None:
         df = df[df['hive'] == hive_name]
-    original_timezones = pd.to_datetime(df['datetime']).map(lambda x: x.astimezone().tzinfo)
+    # original_timezones = pd.to_datetime(df['datetime']).map(lambda x: x.astimezone().tzinfo)
     df['datetime'] = pd.to_datetime(df['datetime'], utc=True)
     df = df.set_index('datetime')
 
