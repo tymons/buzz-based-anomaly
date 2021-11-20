@@ -26,7 +26,7 @@ def main():
                         type=SoundFeatureType.from_name, help='Input feature')
     parser.add_argument('smartula_data_folder', metavar='data_folder', type=Path, help='Smartula folder for sound data')
     # optional arguments
-    parser.add_argument('--hives', default=[], nargs='+', help="Hive names to be included in main dataset. If")
+    parser.add_argument('--hives', default=[], nargs='+', help="Hive names to be included in main dataset.")
     parser.add_argument('--filter_dates', nargs=2, type=datetime.fromisoformat,
                         help="Start and end date for sound data with format YYYY-MM-DD", metavar='START_DATE END_DATE')
     parser.add_argument('--model_config', default=Path(__file__).absolute().parent / "model_config.yml", type=Path)
