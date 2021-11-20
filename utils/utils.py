@@ -11,12 +11,13 @@ import torch
 import numpy as np
 import utils.plotting as plots
 
+from datetime import time
 from scipy.io import wavfile
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from datetime import datetime
 from tqdm import tqdm
 from pathlib import Path
-from typing import List, Union, Optional, Callable, Dict
+from typing import List, Union, Tuple, Callable, Dict
 from scipy.signal import resample
 
 from utils.side_scripts.weather_feature_type import WeatherFeatureType
@@ -116,8 +117,8 @@ def filter_by_datetime(files: List[Path], start: datetime, end: datetime) -> Lis
     Filtering list of Path based on their datetime encoded within filename. Note that filename should be of format:
     "HIVENAME-YYYY-MM-DDTHH-mm-ss" e.g. DEADBEEF94-2020-08-09T22-10-25"
     :param files:   list of sound files paths which should be filtered
-    :param start:   start datetime
-    :param end:     end datetime
+    :param start:   start datetime (UTC)
+    :param end:     end datetime (UTC)
     :return: list of filtered paths
     """
 
@@ -285,7 +286,8 @@ def common_state_per_hour(df: pd.DataFrame, bars_no: int = 30, fig_path: Path = 
         if fig_path is not None:
             ax = fig.add_subplot(8, 3, idx + 1)
             ax.set_title(f'hour: {hour}')
-            plots.histogram_feature_weather(ax, hist, (bins[1:]+bins[:-1])/2, hist_mean_temperatures, abs(q1-q2)/bars_no)
+            plots.histogram_feature_weather(ax, hist, (bins[1:] + bins[:-1]) / 2, hist_mean_temperatures,
+                                            abs(q1 - q2) / bars_no)
 
     if fig_path is not None:
         fig.tight_layout()
@@ -306,7 +308,7 @@ def trend_std(series: pd.Series, reference: float):
 
 
 def temperature_threshold_per_hour(df: pd.DataFrame, wt: WeatherFeatureType, hour_common_temperature: dict,
-                                   polyval_dev: int = 2, fig_path: Path = None) -> Dict:
+                                   polyval_dev: int = 2, std_alpha=1.0, fig_path: Path = None) -> Dict:
     """
     Function for calculating start temperatures for every hour within 24-h day cycle where bees
     produces distinctive tones. Start temperatures could be used as thresholds for filtering data to contains sound
@@ -316,7 +318,8 @@ def temperature_threshold_per_hour(df: pd.DataFrame, wt: WeatherFeatureType, hou
     :param df: dataframe with sound features and weather features
     :param hour_common_temperature: dict with hour and most common temperature
                                     from that hour (calculated by common_state_per_hour function)
-    :param wt:
+    :param wt: weather type enum
+    :param std_alpha: scaler for std threshold value
     :return: dictionary with hours as keys and values as lower bound of temperature range
     """
     hour_temperature_threshold = {}
@@ -342,10 +345,13 @@ def temperature_threshold_per_hour(df: pd.DataFrame, wt: WeatherFeatureType, hou
             residuals[temperature] = trend_std(features, trend_plot_data[temperature]) if not features.empty else 0
 
         # calculate start temperature for given hour
-        residual_threshold = residuals[hour_common_temperature[hour]]
+        lowband_residuals = [res for temperature, res in residuals.items()
+                             if temperature <= hour_common_temperature[hour]]
+        residual_threshold = sum(lowband_residuals) / len(lowband_residuals)
         try:
             start_temperature = next(temperature for temperature, residual in residuals.items() if
-                                     residual > residual_threshold and temperature > hour_common_temperature[hour])
+                                     residual > std_alpha * residual_threshold and temperature >
+                                     hour_common_temperature[hour])
         except StopIteration:
             start_temperature = hour_common_temperature[hour]
         hour_temperature_threshold[hour] = start_temperature
@@ -371,7 +377,7 @@ def compare_feature_trends(main_trend, aux_trend):
     pass
 
 
-def signal_upsample(sig, upsample_ratio=4, x_offset=0) -> List:
+def signal_upsample_with_x(sig, upsample_ratio=4, x_offset=0) -> List[Tuple]:
     """
     Method for upsampling signal
     :param sig: signal to be upsampled
@@ -393,30 +399,153 @@ def hour_feature_trend(df: pd.DataFrame, temperature_threshold: dict = None) -> 
     hive_trend = {}
     for hour, df_hour in df.groupby(df.index.map(lambda x: x.hour)):
         threshold = temperature_threshold.get(hour, -math.inf) if temperature_threshold is not None else -math.inf
-        hive_trend[hour] = df[df[WeatherFeatureType.TEMPERATURE.value] >= threshold]['feature'].mean()
+        hive_trend[hour] = df_hour[df_hour[WeatherFeatureType.TEMPERATURE.value] >= threshold]['feature'].mean()
 
     return hive_trend
 
 
+def temperature_step_filter(df_hive: pd.DataFrame, weather_type: WeatherFeatureType, hour_beeday_start: int,
+                            hour_beeday_end: int, upsample: int = 4, std_alpha: float = 1.0, bars_no: int = 30):
+    """
+    Method for calulating beehive upsampled, temperature-filtered feature trend across all 24 hour within day
+    :param df_hive: pandas dataframe with data for particular hive
+    :param weather_type: weather type for reading proper column from csv file
+    :param hour_beeday_start: assumed beeday hour start for narrowing data
+    :param hour_beeday_end: assumed beeday hour end for narrowing data
+    :param upsample: upsample ratio for Fourier upsample method
+    :param std_alpha: std multiple for thresholding step, we get only those sounds from temperatures where std
+                      was bigger than std_alpha*(mean(stds_for_common_temperature_and_lower))
+    :param bars_no: bars no for common temperature histogram calculation
+    :return: upsampled filtered feature 24-cycle hive trend, start_temperature dictionary (for every hour there is
+             the temperature which maximizes sound entropy)
+    """
+    hour_common_temperature_dict = {key: value[1] for key, value in
+                                    common_state_per_hour(df_hive, bars_no=bars_no).items()}
+    hour_start_temperature = temperature_threshold_per_hour(df_hive, weather_type, hour_common_temperature_dict,
+                                                            std_alpha=std_alpha)
+    main_trend_filtered = hour_feature_trend(df_hive, hour_start_temperature)
+    main_trend_filtered_list = [value for key, value in main_trend_filtered.items()
+                                if hour_beeday_start <= key <= hour_beeday_end]
+    upsampled = signal_upsample_with_x(main_trend_filtered_list, upsample_ratio=upsample, x_offset=hour_beeday_start)
+
+    return upsampled, hour_start_temperature
+
+
+def hour_step_filter(xy_trend: List[Tuple], aux_trends: Dict[str, List[Tuple]],
+                     step_sensitivity: int) -> Tuple[datetime.time, datetime.time]:
+    """
+    Method for calculating hour fingerprint ranges based on gradient value from mse between trends
+    :param xy_trend: main hive 24-cycle feature trend
+    :param aux_trends: auxiliary hives feature trends
+    :param step_sensitivity: min length of interval between cross-section indexes
+    :return: tuple of two times object reflecting most distinctive period of time (start_time, end)
+    """
+    xy_trend = sorted(xy_trend)
+    y_trend = np.array([x[1] for x in xy_trend])
+    x_trend = np.array([x[0] for x in xy_trend])
+    y_trend = y_trend - y_trend.mean()
+
+    start_daystamps = []
+    end_daystamps = []
+    for idx, (hive_name, aux_trend) in enumerate(aux_trends.items()):
+        aux_y_trend = np.array([x[1] for x in sorted(aux_trend)])
+        aux_y_trend = aux_y_trend - aux_y_trend.mean()
+
+        start_time, end_time = most_varied_interval(y_trend, aux_y_trend, x_trend, step_sensitivity)
+        print(f'core vs aux hive ({hive_name}) start/end: {start_time}/{end_time}')
+        start_daystamps.append(start_time.hour * 3600 + start_time.minute + 60 + start_time.second)
+        end_daystamps.append(end_time.hour * 3600 + end_time.minute + 60 + end_time.second)
+
+    start_mean = sum(start_daystamps) / len(start_daystamps)
+    end_mean = sum(end_daystamps) / len(end_daystamps)
+
+    averaged_start_time = time_from_daystamp(round(start_mean))
+    averaged_end_time = time_from_daystamp(round(end_mean))
+
+    return averaged_start_time, averaged_end_time
+
+
+def time_from_daystamp(daystamp: int):
+    """
+    Method for transforming daystamp to time object
+    :param daystamp: seconds offset within day
+    :return: time object
+    """
+    hours, mod_val = divmod(daystamp, 3600)
+    minutes, seconds = divmod(mod_val, 60)
+    return time(hour=hours, minute=minutes, second=seconds)
+
+
+def most_varied_interval(core_trend, aux_trend, x_values, step_sensitivity=1):
+    """
+    Method for calculating most different interval by calculating gradient from mse between two trends
+    :param core_trend: main data array
+    :param aux_trend: aux data array
+    :param x_values: x axis to perform calculation, should be in decimal
+    :param step_sensitivity: step_sensitivity: min length of interval between cross-section indexes
+    :return:
+    """
+    difference = np.sqrt((core_trend - aux_trend) ** 2)
+    gradient = np.gradient(difference)
+
+    # we choose spots where gradient change sign from - to +
+    crosssec_idxes = np.argwhere(np.diff(np.sign(gradient)) > 0).flatten()
+    crosssec_idxes = np.insert(crosssec_idxes, 0, 0)
+    crosssec_idxes = np.insert(crosssec_idxes, len(crosssec_idxes), len(difference) - 1)
+
+    # cross sec sensitivity
+    areas_idxes = list(zip(crosssec_idxes[:-1], crosssec_idxes[1:]))
+    areas_idxes = [(start, end) for start, end in areas_idxes if abs(start - end) > step_sensitivity]
+    crosssec_idxes = [start for start, _ in areas_idxes]
+    # build new area indexes based on sensitivity output
+    areas_idxes = list(zip(crosssec_idxes[:-1], crosssec_idxes[1:]))
+
+    # calculate integrals and get max
+    integral_values = [np.trapz(difference[start_idx:stop_idx], x=x_values[start_idx:stop_idx])
+                       for area_idx, (start_idx, stop_idx) in enumerate(areas_idxes)]
+    area_max_idx = np.argmax(integral_values)
+
+    start_hour, start_minutes = int(divmod(x_values[areas_idxes[area_max_idx][0]], 1)[0]), int(
+        60 * divmod(x_values[areas_idxes[area_max_idx][0]], 1)[1])
+    end_hour, end_minutes = int(divmod(x_values[areas_idxes[area_max_idx][1]], 1)[0]), int(
+        60 * divmod(x_values[areas_idxes[area_max_idx][1]], 1)[1])
+
+    return time(hour=start_hour, minute=start_minutes), time(hour=end_hour, minute=end_minutes)
+
+
 def hive_fingerprint(csv_feature_weather_path: Path,
-                     weather_type: WeatherFeatureType,
-                     hive_name: Optional[str] = None):
+                     fingerprint_hive_name: str,
+                     weather_type: WeatherFeatureType = WeatherFeatureType.TEMPERATURE,
+                     hour_beeday_start: int = 4,
+                     hour_beeday_end: int = 23):
     """
     Function for fingerprint filtering method from https://www.sciencedirect.com/science/article/pii/S0168169921005068
-    :param hive_name: hive which should be used form csv, if none - csv file should contain only data for one hive
+    :param hour_beeday_end:
+    :param hour_beeday_start:
+    :param fingerprint_hive_name: hive name for which fingerprint should be calculated
     :param weather_type:
     :param csv_feature_weather_path: Path to csv file with feature (temperature for the basic case)
-    :return: filtered sound list
+    :return: utc most distinctive start time, utc most distinctive end time,
+             temperatures threshold for every hour within day
     """
     df = pd.read_csv(csv_feature_weather_path, usecols=['datetime', 'hive', 'feature', weather_type.value])
-    if hive_name is not None:
-        df = df[df['hive'] == hive_name]
-    # original_timezones = pd.to_datetime(df['datetime']).map(lambda x: x.astimezone().tzinfo)
     df['datetime'] = pd.to_datetime(df['datetime'], utc=True)
     df = df.set_index('datetime')
 
-    df = sort_and_haverage_hive_feature(df, weather_type)
-    hour_common_temperature_dict = {key: value[1] for key, value in common_state_per_hour(df).items()}
-    hour_start_temperature = temperature_threshold_per_hour(df, weather_type, hour_common_temperature_dict)
+    hives_available = df['hive'].unique()
+    hive_filtered_trends = {}
+    hive_temperature_map = {}
+    for idx, hive_name in enumerate(hives_available):
+        df_hive = df[df['hive'] == hive_name]
+        df_hive = sort_and_haverage_hive_feature(df_hive, weather_type)
+        trend, temperatures = temperature_step_filter(df_hive, weather_type, hour_beeday_start=hour_beeday_start,
+                                                      hour_beeday_end=hour_beeday_end,
+                                                      upsample=4, std_alpha=1.0, bars_no=30)
 
-    return hour_start_temperature
+        hive_filtered_trends[hive_name]: Dict[str, List[Tuple]] = trend
+        hive_temperature_map[hive_name]: Dict[str, Dict] = temperatures
+
+    sorted_main_hive_trend: List[Tuple] = hive_filtered_trends.pop(fingerprint_hive_name)
+    start_time, end_time = hour_step_filter(sorted_main_hive_trend, hive_filtered_trends, 7)
+
+    return start_time, end_time, hive_temperature_map.pop(fingerprint_hive_name)

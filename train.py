@@ -26,7 +26,7 @@ def main():
                         type=SoundFeatureType.from_name, help='Input feature')
     parser.add_argument('smartula_data_folder', metavar='data_folder', type=Path, help='Smartula folder for sound data')
     # optional arguments
-    parser.add_argument('--hives', default=[], nargs='+', help="Hive names to be included in dataset")
+    parser.add_argument('--hives', default=[], nargs='+', help="Hive names to be included in main dataset.")
     parser.add_argument('--filter_dates', nargs=2, type=datetime.fromisoformat,
                         help="Start and end date for sound data with format YYYY-MM-DD", metavar='START_DATE END_DATE')
     parser.add_argument('--model_config', default=Path(__file__).absolute().parent / "model_config.yml", type=Path)
@@ -75,7 +75,7 @@ def main():
         sound_labels: List[int] = [list(available_labels).index(sound_name.stem.split('-')[0])
                                    for sound_name in sound_list]
         if args.use_fingerprint:
-            sound_list = utils.beecolony_fingerprint_filtering(args.fingerprint_feature_file)
+            sound_list = utils.hive_fingerprint(args.fingerprint_feature_file, args.hives[0])
 
         # preparse background filenames if needed
         if args.contrastive_data_folder is not None:
