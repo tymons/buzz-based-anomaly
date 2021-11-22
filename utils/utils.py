@@ -112,6 +112,32 @@ def get_valid_sounds_from_folders(folder_list: List[Path], valid_file_filename: 
     return sound_filenames
 
 
+def _parse_smartula_datetime(filename: Path) -> datetime:
+    """
+    Method for parsing smartula filename to extract datetime object
+    :param filename:
+    :return:
+    """
+    elem = "-".join(filename.stem.split('-')[1:]).split('.')[0]
+    return datetime.strptime(elem, '%Y-%m-%dT%H-%M-%S')
+
+
+def filter_by_time(files: List[Path], start_time: datetime.time, end_time: datetime.time) -> List[Path]:
+    """
+    Method for filtering list smartula sound files paths by hours
+    :param files: list of paths objects
+    :param start_time: start time
+    :param end_time: end time
+    :return: filtered list
+    """
+    def _is_within_timerange(elem):
+        """ predicate for datetime filtering within given day"""
+        time_elem = _parse_smartula_datetime(elem).time()
+        return start_time <= time_elem <= end_time
+
+    return list(filter(_is_within_timerange, files))
+
+
 def filter_by_datetime(files: List[Path], start: datetime, end: datetime) -> List[Path]:
     """
     Filtering list of Path based on their datetime encoded within filename. Note that filename should be of format:
@@ -122,13 +148,12 @@ def filter_by_datetime(files: List[Path], start: datetime, end: datetime) -> Lis
     :return: list of filtered paths
     """
 
-    def _is_within_timerange(elem):
+    def _is_within_daytimerange(elem):
         """ predicate performing filename datetime parsing and checking timerange """
-        elem = "-".join(elem.stem.split('-')[1:]).split('.')[0]
-        datetime_elem = datetime.strptime(elem, '%Y-%m-%dT%H-%M-%S')
+        datetime_elem = _parse_smartula_datetime(elem)
         return start <= datetime_elem <= end
 
-    return list(filter(_is_within_timerange, files))
+    return list(filter(_is_within_daytimerange, files))
 
 
 def filter_string_list(paths: List[Path], *names: str) -> List[Path]:
