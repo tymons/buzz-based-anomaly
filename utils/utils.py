@@ -445,7 +445,7 @@ def temperature_step_filter(df_hive: pd.DataFrame, weather_type: WeatherFeatureT
     :param hour_beeday_end: assumed beeday hour end for narrowing data
     :param upsample: upsample ratio for Fourier upsample method
     :param std_alpha: std multiple for thresholding step, we get only those sounds from temperatures where std
-                      was bigger than std_alpha*(mean(stds_for_common_temperature_and_lower))
+                      was bigger than std_alpha*(mean(stds_ for_common_temperature_and_lower))
     :param bars_no: bars no for common temperature histogram calculation
     :return: upsampled filtered feature 24-cycle hive trend, start_temperature dictionary (for every hour there is
              the temperature which maximizes sound entropy)

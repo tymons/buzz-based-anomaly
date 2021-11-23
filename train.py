@@ -73,6 +73,7 @@ def main():
         available_labels = list(set([path.stem.split("-")[0] for path in sound_list]))
         sound_labels: List[int] = [list(available_labels).index(sound_name.stem.split('-')[0])
                                    for sound_name in sound_list]
+
         # fingerprint filtering
         if args.fingerprint_main_hive is not None:
             sound_list = utils.filter_hive_fingerprint(args.fingerprint_feature_file,
