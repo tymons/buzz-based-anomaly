@@ -37,12 +37,11 @@ def main():
     parser.add_argument('--comet_config', default=Path(__file__).absolute().parent / ".comet.config", type=Path)
     parser.add_argument('--find_best', type=int, metavar='N', help="how many trials for finding best architecture")
     parser.add_argument('--log_folder', default=Path(__file__).absolute().parent / "output/", type=Path)
-    parser.add_argument('--use_fingerprint_filtering', dest='use_fingerprint', action='store_true')
+    parser.add_argument('--fingerprint_main_hive', type=str, help="hive name for which fingerprint should be calculated")
     parser.add_argument('--fingerprint_feature_file', default=Path(__file__).absolute().parent / "feature.csv",
                         type=Path)
     parser.add_argument('--contrastive_data_folder', type=Path)
 
-    parser.set_defaults(use_fingerprint=False)
     args = parser.parse_args()
 
     utils.logger_setup(args.log_folder, f"{args.model.model_name}-{args.feature.value}")
@@ -70,12 +69,15 @@ def main():
             sound_list = utils.filter_by_datetime(sound_list, args.filter_dates[0], args.filter_dates[1])
 
         # prepare sound filenames
-        sound_list = utils.filter_string_list(sound_list, *args.hives)
+        sound_list = utils.filter_path_list(sound_list, *args.hives)
         available_labels = list(set([path.stem.split("-")[0] for path in sound_list]))
         sound_labels: List[int] = [list(available_labels).index(sound_name.stem.split('-')[0])
                                    for sound_name in sound_list]
-        if args.use_fingerprint:
-            sound_list = utils.hive_fingerprint(args.fingerprint_feature_file, args.hives[0])
+        # fingerprint filtering
+        if args.fingerprint_main_hive is not None:
+            sound_list = utils.filter_hive_fingerprint(args.fingerprint_feature_file,
+                                                       args.fingerptint_main_hive,
+                                                       sound_list)
 
         # preparse background filenames if needed
         if args.contrastive_data_folder is not None:
