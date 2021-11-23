@@ -3,6 +3,7 @@ import glob
 import math
 import logging
 import collections
+import pytz
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -112,6 +113,41 @@ def get_valid_sounds_from_folders(folder_list: List[Path], valid_file_filename: 
     return sound_filenames
 
 
+def parse_smartula_hivename(filename: Path) -> str:
+    """
+    Method for parsing sound filename and extracting hive name
+    :param filename:
+    """
+    return filename.stem.split('-')[0]
+
+
+def parse_smartula_datetime(filename: Path) -> datetime:
+    """
+    Method for parsing smartula filename to extract datetime object
+    :param filename:
+    :return:
+    """
+    elem = "-".join(filename.stem.split('-')[1:]).split('.')[0]
+    return datetime.strptime(elem, '%Y-%m-%dT%H-%M-%S')
+
+
+def filter_by_time(files: List[Path], start_time: datetime.time, end_time: datetime.time) -> List[Path]:
+    """
+    Method for filtering list smartula sound files paths by hours
+    :param files: list of paths objects
+    :param start_time: start time
+    :param end_time: end time
+    :return: filtered list
+    """
+
+    def _is_within_timerange(elem):
+        """ predicate for datetime filtering within given day"""
+        time_elem = parse_smartula_datetime(elem).time()
+        return start_time <= time_elem <= end_time
+
+    return list(filter(_is_within_timerange, files))
+
+
 def filter_by_datetime(files: List[Path], start: datetime, end: datetime) -> List[Path]:
     """
     Filtering list of Path based on their datetime encoded within filename. Note that filename should be of format:
@@ -122,16 +158,15 @@ def filter_by_datetime(files: List[Path], start: datetime, end: datetime) -> Lis
     :return: list of filtered paths
     """
 
-    def _is_within_timerange(elem):
+    def _is_within_daytimerange(elem):
         """ predicate performing filename datetime parsing and checking timerange """
-        elem = "-".join(elem.stem.split('-')[1:]).split('.')[0]
-        datetime_elem = datetime.strptime(elem, '%Y-%m-%dT%H-%M-%S')
+        datetime_elem = parse_smartula_datetime(elem)
         return start <= datetime_elem <= end
 
-    return list(filter(_is_within_timerange, files))
+    return list(filter(_is_within_daytimerange, files))
 
 
-def filter_string_list(paths: List[Path], *names: str) -> List[Path]:
+def filter_path_list(paths: List[Path], *names: str) -> List[Path]:
     """
     Filter sounds based on filenames. Returning only these files which filename contains something from names param
     Note that filename should be of format: "HIVENAME-YYYY-MM-DDTHH-mm-ss" e.g. DEADBEEF94-2020-08-09T22-10-25"
@@ -373,10 +408,6 @@ def temperature_threshold_per_hour(df: pd.DataFrame, wt: WeatherFeatureType, hou
     return hour_temperature_threshold
 
 
-def compare_feature_trends(main_trend, aux_trend):
-    pass
-
-
 def signal_upsample_with_x(sig, upsample_ratio=4, x_offset=0) -> List[Tuple]:
     """
     Method for upsampling signal
@@ -414,7 +445,7 @@ def temperature_step_filter(df_hive: pd.DataFrame, weather_type: WeatherFeatureT
     :param hour_beeday_end: assumed beeday hour end for narrowing data
     :param upsample: upsample ratio for Fourier upsample method
     :param std_alpha: std multiple for thresholding step, we get only those sounds from temperatures where std
-                      was bigger than std_alpha*(mean(stds_for_common_temperature_and_lower))
+                      was bigger than std_alpha*(mean(stds_ for_common_temperature_and_lower))
     :param bars_no: bars no for common temperature histogram calculation
     :return: upsampled filtered feature 24-cycle hive trend, start_temperature dictionary (for every hour there is
              the temperature which maximizes sound entropy)
@@ -513,22 +544,16 @@ def most_varied_interval(core_trend, aux_trend, x_values, step_sensitivity=1):
     return time(hour=start_hour, minute=start_minutes), time(hour=end_hour, minute=end_minutes)
 
 
-def hive_fingerprint(csv_feature_weather_path: Path,
-                     fingerprint_hive_name: str,
-                     weather_type: WeatherFeatureType = WeatherFeatureType.TEMPERATURE,
-                     hour_beeday_start: int = 4,
-                     hour_beeday_end: int = 23):
+def hive_fingerprint(df: pd.DataFrame, fingerprint_hive_name: str, weather_type: WeatherFeatureType,
+                     hour_beeday_start: int = 4, hour_beeday_end: int = 23):
     """
-    Function for fingerprint filtering method from https://www.sciencedirect.com/science/article/pii/S0168169921005068
-    :param hour_beeday_end:
-    :param hour_beeday_start:
-    :param fingerprint_hive_name: hive name for which fingerprint should be calculated
-    :param weather_type:
-    :param csv_feature_weather_path: Path to csv file with feature (temperature for the basic case)
-    :return: utc most distinctive start time, utc most distinctive end time,
-             temperatures threshold for every hour within day
+    Method for extracting bee fingerprint
+    :param df: pandas dataframe with all hives, features and outdoor feature (temperature, humidity etc.)
+    :param fingerprint_hive_name: hivename for main fingerprint calculation
+    :param weather_type: weather type used in csv file (eg. temperature)
+    :param hour_beeday_start: bee day start hour
+    :param hour_beeday_end: bee day end hour
     """
-    df = pd.read_csv(csv_feature_weather_path, usecols=['datetime', 'hive', 'feature', weather_type.value])
     df['datetime'] = pd.to_datetime(df['datetime'], utc=True)
     df = df.set_index('datetime')
 
@@ -548,4 +573,52 @@ def hive_fingerprint(csv_feature_weather_path: Path,
     sorted_main_hive_trend: List[Tuple] = hive_filtered_trends.pop(fingerprint_hive_name)
     start_time, end_time = hour_step_filter(sorted_main_hive_trend, hive_filtered_trends, 7)
 
-    return start_time, end_time, hive_temperature_map.pop(fingerprint_hive_name)
+    return (start_time, end_time), hive_temperature_map[fingerprint_hive_name]
+
+
+def filter_hive_fingerprint(csv_feature_weather_path: Path,
+                            fingerprint_hive_name: str,
+                            fingerprint_sound_list: List[Path],
+                            weather_type: WeatherFeatureType = WeatherFeatureType.TEMPERATURE,
+                            hour_beeday_start: int = 4,
+                            hour_beeday_end: int = 23,
+                            quiet=False):
+    """
+    Function for fingerprint filtering method from https://www.sciencedirect.com/science/article/pii/S0168169921005068
+    :param fingerprint_sound_list: sound list to be filtered note that this should be sounds only for fingerprint hive!
+    :param hour_beeday_end:
+    :param hour_beeday_start:
+    :param fingerprint_hive_name: hive name for which fingerprint should be calculated
+    :param weather_type:
+    :param csv_feature_weather_path: Path to csv file with feature (temperature for the basic case)
+    :param quiet: verbose level
+    :return: utc most distinctive start time, utc most distinctive end time,
+             temperatures threshold for every hour within day
+    """
+    f_hive_sound_list = filter_path_list(fingerprint_sound_list.copy(), fingerprint_hive_name)
+
+    df = pd.read_csv(csv_feature_weather_path, usecols=['datetime', 'hive', 'feature', weather_type.value])
+
+    # calculate main fingerprint
+    (f_start, f_end), f_temperatures = hive_fingerprint(df, fingerprint_hive_name, weather_type, hour_beeday_start,
+                                                        hour_beeday_end)
+
+    # fingerprint filter by temperature
+    hive_tfiltered_sound_timestamps = []
+    df_fingerprint_hive = df[df['hive'] == fingerprint_hive_name]
+    for hour, hgroup in df_fingerprint_hive.groupby(df_fingerprint_hive.index.map(lambda x: x.hour)):
+        hive_tfiltered_sound_timestamps.extend(hgroup[hgroup[weather_type.value] >= f_temperatures[hour]].index.values)
+
+    # fingerprint filter by time
+    f_hive_sound_datetime = set(map(lambda x: parse_smartula_datetime(x).replace(tzinfo=pytz.UTC), f_hive_sound_list))
+    temperature_filtered_datetime = set(map(lambda x: x.to_pydatetime(), hive_tfiltered_sound_timestamps))
+    fingerprint_datetimes = f_hive_sound_datetime & temperature_filtered_datetime
+    fingerprint_datetimes = list(filter(lambda x: f_start <= x.time() <= f_end, fingerprint_datetimes))
+    fingerprint_datetimes = list(map(lambda y: y.strftime("%Y-%m-%dT%H-%M-%S"), fingerprint_datetimes))
+    f_hive_sound_list = filter_path_list(f_hive_sound_list, *fingerprint_datetimes)
+
+    if not quiet:
+        logging.info(f'fingerprint time range: {f_start}/{f_end}')
+        logging.info(f'fingerprint temperatures: {f_temperatures}')
+
+    return f_hive_sound_list

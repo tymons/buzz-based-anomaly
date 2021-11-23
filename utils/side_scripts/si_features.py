@@ -69,7 +69,7 @@ def main():
     if args.filter_dates:
         sound_list = ut.filter_by_datetime(sound_list, args.filter_dates[0], args.filter_dates[1])
 
-    sound_list = ut.filter_string_list(sound_list, *args.hives)
+    sound_list = ut.filter_path_list(sound_list, *args.hives)
     sound_list = list(map(str, sound_list))
     with ThreadPool(args.num_workers) as pool:
         feature_tuples = list(tqdm(pool.imap(process, sound_list), total=len(sound_list)))
