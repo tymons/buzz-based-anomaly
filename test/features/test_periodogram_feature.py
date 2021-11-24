@@ -16,7 +16,8 @@ def _get_default_config() -> dict:
             'start': 0,
             'stop': 20000
         },
-        'convert_db': False
+        'convert_db': False,
+        'window': 'blackman'
     }
 
 
