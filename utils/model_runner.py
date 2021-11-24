@@ -363,9 +363,8 @@ class ModelRunner:
         :param train_config: train config
         :return:
         """
-        model, _ = self._train(model, train_dataloader, train_config, self._train_step, self._val_step,
-                               val_dataloader, feature_config)
-        return model
+        return self._train(model, train_dataloader, train_config, self._train_step, self._val_step,
+                           val_dataloader, feature_config)
 
     def train_contrastive(self,
                           model: CBM,
@@ -697,7 +696,7 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
-        with torch.no_grad:
+        with torch.no_grad():
             for batch_idx, (batch, _) in enumerate(val_dataloader):
                 batch = batch.to(self.device)
                 model_output = model(batch)
