@@ -27,6 +27,15 @@ CBM = ContrastiveBaseModel
 VBM = VaeBaseModel
 
 
+def count_parameters(model):
+    """
+    Method for counting the number of trainable parameters
+    :param model: model where parameters should be counted
+    :return: number of trainable parameters
+    """
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
 def model_check(model, input_shape, device="cuda"):
     """ Function for model check """
     summary(model, input_shape, device=device)
@@ -363,7 +372,11 @@ class HiveModelFactory:
         model_func: Callable[[dict, tuple], (BaseModel, dict)] = \
             getattr(HiveModelFactory, f'_get_{model_type.model_name.lower()}_model',
                     lambda x, y: logging.error('invalid model type!'))
-        return model_func(config, input_shape)
+
+        model = model_func(config, input_shape)
+        logging.info(f'model {model_type.model_name.lower()} has {count_parameters(model)} trainable parameters')
+
+        return model
 
     @staticmethod
     def build_model_and_check(model_type: HiveModelType, input_shape: Tuple, config: dict) -> \
