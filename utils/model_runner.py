@@ -318,7 +318,7 @@ class ModelRunner:
                                                                    self.device,
                                                                    optuna_learning_config['discriminator'])
 
-            for epoch in range(1, optuna_learning_config.get('epochs', 10) + 1):
+            for epoch in range(optuna_learning_config.get('epochs', 10)):
                 epoch_loss = self._train_step(model, train_dataloader, optim, experiment, epoch, log_interval) \
                     if model_type.num < HiveModelType.CONTRASTIVE_AE.num else \
                     self._train_contrastive_step(model, train_dataloader,
@@ -451,7 +451,7 @@ class ModelRunner:
                 'learning_rate',
                 0.0001))
         log_interval = train_config.get('logging_batch_interval', 10)
-        for epoch in range(1, train_config.get('epochs', 10) + 1):
+        for epoch in range(train_config.get('epochs', 10)):
             train_epoch_loss = train_step_func(model, train_dataloader, optimizer, experiment, epoch, log_interval)
             experiment.log_metric('train_epoch_loss', train_epoch_loss.model_loss, step=epoch)
 
@@ -515,7 +515,7 @@ class ModelRunner:
                                                                                 'learning_rate', 0.0001))
 
         log_interval = train_config.get('logging_batch_interval', 10)
-        for epoch in range(1, train_config.get('epochs', 10) + 1):
+        for epoch in range(train_config.get('epochs', 10)):
             epoch_loss = self._train_contrastive_step(model, train_dataloader,
                                                       model_optimizer, experiment, epoch, log_interval,
                                                       discriminator, discriminator_optimizer)
@@ -599,7 +599,7 @@ class ModelRunner:
 
                 discriminator_loss_float = dloss.item()
                 discriminator_mean_loss.append(discriminator_loss_float)
-                experiment.log_metric("discriminator_batch_train_loss", dloss, step=epoch * batch_idx)
+                experiment.log_metric("discriminator_batch_train_loss", dloss, step=(epoch*len(dataloader))+batch_idx)
                 if logging_interval != -1 and batch_idx % logging_interval == 0:
                     log.info(f'-> discriminator loss: {discriminator_loss_float}')
 
@@ -634,7 +634,7 @@ class ModelRunner:
                 loss = model.loss_fn(target_batch, background_batch, model_output)
                 loss_float = loss.item()
                 val_loss.append(loss_float)
-                experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
+                experiment.log_metric("batch_val_loss", loss_float, step=(epoch_no * len(val_dataloader)) + batch_idx)
 
                 if logging_interval != -1 and batch_idx % logging_interval == 0:
                     log.info(f'=== validation epoch {epoch_no}, '
@@ -675,7 +675,7 @@ class ModelRunner:
 
             loss_float = loss.item()
             mean_loss.append(loss_float)
-            experiment.log_metric("batch_train_loss", loss_float, step=epoch_no * batch_idx)
+            experiment.log_metric("batch_train_loss", loss_float, step=(epoch_no * len(dataloader)) + batch_idx)
 
             if logging_interval != -1 and batch_idx % logging_interval == 0:
                 log.info(f'=== train epoch {epoch_no},'
@@ -711,7 +711,7 @@ class ModelRunner:
 
                 loss_float = loss.item()
                 val_loss.append(loss_float)
-                experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
+                experiment.log_metric("batch_val_loss", loss_float, step=(epoch_no * len(val_dataloader)) + batch_idx)
 
                 if logging_interval != -1 and batch_idx % logging_interval == 0:
                     log.info(f'=== validation epoch {epoch_no}, '
