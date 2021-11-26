@@ -642,7 +642,8 @@ class ModelRunner:
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
-    T_train_step = Callable[[Union[BM, CBM, nn.parallel.DistributedDataParallel], DataLoader, Optimizer, Experiment, int, int], EpochLoss]
+    T_train_step = Callable[[Union[BM, CBM, nn.parallel.DistributedDataParallel], DataLoader, Optimizer,
+                             Experiment, int, int], EpochLoss]
 
     def _train_step(self,
                     model: Union[BM, VBM, CBM, nn.parallel.DistributedDataParallel],
@@ -681,7 +682,8 @@ class ModelRunner:
                              f'-> batch loss: {loss_float}')
         return EpochLoss(sum(mean_loss) / len(mean_loss))
 
-    T_val_step = Callable[[Union[BM, CBM, CVBM, nn.parallel.DistributedDataParallel], DataLoader, Experiment, int, int], EpochLoss]
+    T_val_step = Callable[[Union[BM, CBM, CVBM, nn.parallel.DistributedDataParallel], DataLoader,
+                           Experiment, int, int], EpochLoss]
 
     def _val_step(self,
                   model: Union[BM, VBM, CBM, nn.parallel.DistributedDataParallel],
