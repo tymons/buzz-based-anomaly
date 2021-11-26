@@ -2,9 +2,8 @@
 
 ![unittest](https://github.com/tymons/buzz-based-anomaly/actions/workflows/code-check-anaconda.yml/badge.svg)
 
-This repo contains scripts and utils for buzz-based bee anomaly detection models. We utilize multiple different methods for e.g. swarming, pest attact, queenless detection tasks.
-Models are tested against anomalies which are (for now) just different colonies sounds. In presented paper [NU-HIVE](https://zenodo.org/record/1321278) project data are labeled as anomalies for ML models. This reflects real world scenario
-as the data comes from different devices and bees subspecies. 
+This repo contains scripts and utils for buzz-based bee anomaly detection models. We utilize different methods for e.g. swarming, pest attact, queenless detection tasks.
+Models are tested against anomalies which are (for now) just different colonies sounds. The [NU-HIVE](https://zenodo.org/record/1321278) project data are labeled as anomalies for ML models. This reflects real world scenario as the data comes from different devices and bees subspecies. 
 
 # Data preprocess
 
