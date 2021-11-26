@@ -30,6 +30,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Optimizer
 from features.contrastive_feature_dataset import ContrastiveOutput
 from utils.model_factory import HiveModelFactory, build_optuna_model_config
+from utils.sm_data_parallel import SmDataParallel
 
 CVBM = ContrastiveVariationalBaseModel
 CBM = ContrastiveBaseModel
@@ -43,7 +44,7 @@ class EpochLoss:
     discriminator_loss: Optional[float] = None
 
 
-def clear_memory(model: Union[BM, VBM, CBM, nn.parallel.DistributedDataParallel],
+def clear_memory(model: Union[BM, VBM, CBM, SmDataParallel],
                  optimizer: torch.optim.Optimizer,
                  discriminator: nn.Module = None,
                  discriminator_optimizer: torch.optim.Optimizer = None):
@@ -115,7 +116,7 @@ def _read_comet_key(path: Path) -> str:
         return [b.split('=')[-1] for b in f.read().splitlines() if b.startswith('api_key')][0]
 
 
-def model_save(model: Union[BM, VBM, CBM, CVBM, nn.parallel.DistributedDataParallel],
+def model_save(model: Union[BM, VBM, CBM, CVBM, SmDataParallel],
                output_path: Path, optimizer: Optimizer, epoch_no: int, loss: float) -> None:
     """
     Function for saving model on disc
@@ -130,7 +131,7 @@ def model_save(model: Union[BM, VBM, CBM, CVBM, nn.parallel.DistributedDataParal
          'loss': loss}, output_path)
 
 
-def model_load(checkpoint_filepath: Path, model: Union[BM, VBM, CVBM, CBM, nn.parallel.DistributedDataParallel],
+def model_load(checkpoint_filepath: Path, model: Union[BM, VBM, CVBM, CBM, SmDataParallel],
                optimizer: Optimizer = None, gpu_ids=None):
     """
     Function for loading model from disc
@@ -142,7 +143,7 @@ def model_load(checkpoint_filepath: Path, model: Union[BM, VBM, CVBM, CBM, nn.pa
     """
     checkpoint = torch.load(checkpoint_filepath)
     if any([key.startswith('module') for key in checkpoint['model_state_dict'].keys()]):
-        model = nn.parallel.DistributedDataParallel(model, device_ids=gpu_ids)
+        model = SmDataParallel(model, gpu_ids)
 
     model.load_state_dict(checkpoint['model_state_dict'])
     if optimizer:
@@ -299,7 +300,7 @@ class ModelRunner:
                           f' for model {type(model).__name__.lower()} with following config: {optuna_learning_config}')
 
             if torch.cuda.device_count() > 1:
-                model = nn.parallel.DistributedDataParallel(model, device_ids=self.gpu_ids)
+                model = SmDataParallel.SmDataParallel(model, device_ids=self.gpu_ids)
             model = model.to(self.device)
 
             optimizer_class = _parse_optimizer(optuna_learning_config['model']['optimizer']['type'])
@@ -438,9 +439,8 @@ class ModelRunner:
         logging.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
                       f' for model {checkpoint_path.stem.upper()} with following config: {train_config}')
 
-        if torch.cuda.device_count() > 1:
-            model = nn.parallel.DistributedDataParallel(model, device_ids=self.gpu_ids)
-        model = model.to(self.device)
+        model = SmDataParallel(model, self.gpu_ids) if torch.cuda.device_count() > 1 else model.to(self.device)
+
         optimizer: Optimizer = _parse_optimizer(train_config['model']['optimizer'].get('type', 'Adam'))(
             model.parameters(),
             lr=train_config.get(
@@ -500,11 +500,8 @@ class ModelRunner:
         logging.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
                       f' for model {model_checkpoint_path.stem.upper()} with following config: {train_config}')
 
-        if torch.cuda.device_count() > 1:
-            model = nn.parallel.DistributedDataParallel(model, device_ids=self.gpu_ids)
-            discriminator = nn.parallel.DistributedDataParallel(discriminator, device_ids=self.gpu_ids)
-        model = model.to(self.device)
-        discriminator = discriminator.to(self.device)
+        model, discriminator = (SmDataParallel(model, self.gpu_ids), SmDataParallel(discriminator, self.gpu_ids)) \
+            if torch.cuda.device_count() > 1 else (model.to(self.device), discriminator.to(self.device))
 
         model_optimizer: Optimizer = _parse_optimizer(train_config['model']['optimizer'].get('type', 'Adam'))(
             model.parameters(), lr=train_config.get('learning_rate', 0.0001))
@@ -543,7 +540,7 @@ class ModelRunner:
         return model
 
     def _train_contrastive_step(self,
-                                model: Union[CBM, CVBM, nn.parallel.DistributedDataParallel],
+                                model: Union[CBM, CVBM, SmDataParallel],
                                 dataloader: DataLoader,
                                 model_optimizer: Optimizer,
                                 experiment: Experiment,
@@ -608,7 +605,7 @@ class ModelRunner:
         return epoch_loss
 
     def _val_contrastive_step(self,
-                              model: Union[CBM, CVBM, nn.parallel.DistributedDataParallel],
+                              model: Union[CBM, CVBM, SmDataParallel],
                               val_dataloader: DataLoader,
                               experiment: Experiment,
                               epoch_no: int,
@@ -642,11 +639,11 @@ class ModelRunner:
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
-    T_train_step = Callable[[Union[BM, CBM, nn.parallel.DistributedDataParallel], DataLoader, Optimizer,
+    T_train_step = Callable[[Union[BM, CBM, SmDataParallel], DataLoader, Optimizer,
                              Experiment, int, int], EpochLoss]
 
     def _train_step(self,
-                    model: Union[BM, VBM, CBM, nn.parallel.DistributedDataParallel],
+                    model: Union[BM, VBM, CBM, SmDataParallel],
                     dataloader: DataLoader,
                     optimizer: torch.optim.Optimizer,
                     experiment: Experiment,
@@ -682,11 +679,11 @@ class ModelRunner:
                              f'-> batch loss: {loss_float}')
         return EpochLoss(sum(mean_loss) / len(mean_loss))
 
-    T_val_step = Callable[[Union[BM, CBM, CVBM, nn.parallel.DistributedDataParallel], DataLoader,
+    T_val_step = Callable[[Union[BM, CBM, CVBM, SmDataParallel], DataLoader,
                            Experiment, int, int], EpochLoss]
 
     def _val_step(self,
-                  model: Union[BM, VBM, CBM, nn.parallel.DistributedDataParallel],
+                  model: Union[BM, VBM, CBM, SmDataParallel],
                   val_dataloader: DataLoader,
                   experiment: Experiment,
                   epoch_no: int,
