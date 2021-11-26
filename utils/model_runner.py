@@ -43,7 +43,7 @@ class EpochLoss:
     discriminator_loss: Optional[float] = None
 
 
-def clear_memory(model: Union[BM, VBM, CBM, nn.DataParallel],
+def clear_memory(model: Union[BM, VBM, CBM, nn.parallel.DistributedDataParallel],
                  optimizer: torch.optim.Optimizer,
                  discriminator: nn.Module = None,
                  discriminator_optimizer: torch.optim.Optimizer = None):
@@ -115,8 +115,8 @@ def _read_comet_key(path: Path) -> str:
         return [b.split('=')[-1] for b in f.read().splitlines() if b.startswith('api_key')][0]
 
 
-def model_save(model: Union[BM, VBM, CBM, CVBM, nn.DataParallel], output_path: Path, optimizer: Optimizer,
-               epoch_no: int, loss: float) -> None:
+def model_save(model: Union[BM, VBM, CBM, CVBM, nn.parallel.DistributedDataParallel],
+               output_path: Path, optimizer: Optimizer, epoch_no: int, loss: float) -> None:
     """
     Function for saving model on disc
     :param model: model to be saved
@@ -130,10 +130,11 @@ def model_save(model: Union[BM, VBM, CBM, CVBM, nn.DataParallel], output_path: P
          'loss': loss}, output_path)
 
 
-def model_load(checkpoint_filepath: Path, model: Union[BM, VBM, CVBM, CBM, nn.DataParallel],
-               optimizer: Optimizer = None):
+def model_load(checkpoint_filepath: Path, model: Union[BM, VBM, CVBM, CBM, nn.parallel.DistributedDataParallel],
+               optimizer: Optimizer = None, gpu_ids=None):
     """
     Function for loading model from disc
+    :param gpu_ids: ids of gpus to be used
     :param checkpoint_filepath: checkpoint path
     :param model: empty object of BaseClass
     :param optimizer: optimizer
@@ -141,7 +142,7 @@ def model_load(checkpoint_filepath: Path, model: Union[BM, VBM, CVBM, CBM, nn.Da
     """
     checkpoint = torch.load(checkpoint_filepath)
     if any([key.startswith('module') for key in checkpoint['model_state_dict'].keys()]):
-        model = nn.DataParallel(model)
+        model = nn.parallel.DistributedDataParallel(model, device_ids=gpu_ids)
 
     model.load_state_dict(checkpoint['model_state_dict'])
     if optimizer:
@@ -196,7 +197,7 @@ class ModelRunner:
     device: device
 
     def __init__(self, output_folder: Path = None, comet_api_key: str = None, comet_config_file: Path = None,
-                 comet_project_name: str = "Default Project", torch_device: torch.device = None):
+                 comet_project_name: str = "Default Project", torch_device: torch.device = None, gpu_ids: List[int] = None):
         self.comet_api_key = comet_api_key if comet_api_key is not None else _read_comet_key(comet_config_file)
         self.comet_proj_name = comet_project_name
         self.output_folder = output_folder
@@ -204,6 +205,7 @@ class ModelRunner:
         if torch_device is not None:
             self.device = torch_device
 
+        self.gpu_ids = gpu_ids if self.device == torch.device("cuda") else None
         self._curr_patience = -1
         self._curr_best_loss = sys.maxsize
 
@@ -297,7 +299,7 @@ class ModelRunner:
                           f' for model {type(model).__name__.lower()} with following config: {optuna_learning_config}')
 
             if torch.cuda.device_count() > 1:
-                model = nn.DataParallel(model)
+                model = nn.parallel.DistributedDataParallel(model, device_ids=self.gpu_ids)
             model = model.to(self.device)
 
             optimizer_class = _parse_optimizer(optuna_learning_config['model']['optimizer']['type'])
@@ -437,7 +439,7 @@ class ModelRunner:
                       f' for model {checkpoint_path.stem.upper()} with following config: {train_config}')
 
         if torch.cuda.device_count() > 1:
-            model = nn.DataParallel(model)
+            model = nn.parallel.DistributedDataParallel(model, device_ids=self.gpu_ids)
         model = model.to(self.device)
         optimizer: Optimizer = _parse_optimizer(train_config['model']['optimizer'].get('type', 'Adam'))(
             model.parameters(),
@@ -463,7 +465,7 @@ class ModelRunner:
                 model_save(model, checkpoint_path, optimizer, epoch, train_epoch_loss.model_loss)
             elif patience == 0:
                 logging.info(f' ___ early stopping at epoch {epoch} ___')
-                epoch, _ = model_load(checkpoint_path, model, optimizer)
+                epoch, _ = model_load(checkpoint_path, model, optimizer, gpu_ids=self.gpu_ids)
                 break
 
         return model
@@ -499,8 +501,8 @@ class ModelRunner:
                       f' for model {model_checkpoint_path.stem.upper()} with following config: {train_config}')
 
         if torch.cuda.device_count() > 1:
-            model = nn.DataParallel(model)
-            discriminator = nn.DataParallel(discriminator)
+            model = nn.parallel.DistributedDataParallel(model, device_ids=self.gpu_ids)
+            discriminator = nn.parallel.DistributedDataParallel(discriminator, device_ids=self.gpu_ids)
         model = model.to(self.device)
         discriminator = discriminator.to(self.device)
 
@@ -535,13 +537,13 @@ class ModelRunner:
                            epoch_loss.discriminator_loss)
             elif patience == 0:
                 logging.info(f' ___ early stopping at epoch {epoch} ___')
-                epoch, _ = model_load(model_checkpoint_path, model, model_optimizer)
+                epoch, _ = model_load(model_checkpoint_path, model, model_optimizer, gpu_ids=self.gpu_ids)
                 break
 
         return model
 
     def _train_contrastive_step(self,
-                                model: Union[CBM, CVBM, nn.DataParallel],
+                                model: Union[CBM, CVBM, nn.parallel.DistributedDataParallel],
                                 dataloader: DataLoader,
                                 model_optimizer: Optimizer,
                                 experiment: Experiment,
@@ -606,7 +608,7 @@ class ModelRunner:
         return epoch_loss
 
     def _val_contrastive_step(self,
-                              model: Union[CBM, CVBM, nn.DataParallel],
+                              model: Union[CBM, CVBM, nn.parallel.DistributedDataParallel],
                               val_dataloader: DataLoader,
                               experiment: Experiment,
                               epoch_no: int,
@@ -640,10 +642,10 @@ class ModelRunner:
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
-    T_train_step = Callable[[Union[BM, CBM, nn.DataParallel], DataLoader, Optimizer, Experiment, int, int], EpochLoss]
+    T_train_step = Callable[[Union[BM, CBM, nn.parallel.DistributedDataParallel], DataLoader, Optimizer, Experiment, int, int], EpochLoss]
 
     def _train_step(self,
-                    model: Union[BM, VBM, CBM, nn.DataParallel],
+                    model: Union[BM, VBM, CBM, nn.parallel.DistributedDataParallel],
                     dataloader: DataLoader,
                     optimizer: torch.optim.Optimizer,
                     experiment: Experiment,
@@ -679,10 +681,10 @@ class ModelRunner:
                              f'-> batch loss: {loss_float}')
         return EpochLoss(sum(mean_loss) / len(mean_loss))
 
-    T_val_step = Callable[[Union[BM, CBM, CVBM, nn.DataParallel], DataLoader, Experiment, int, int], EpochLoss]
+    T_val_step = Callable[[Union[BM, CBM, CVBM, nn.parallel.DistributedDataParallel], DataLoader, Experiment, int, int], EpochLoss]
 
     def _val_step(self,
-                  model: Union[BM, VBM, CBM, nn.DataParallel],
+                  model: Union[BM, VBM, CBM, nn.parallel.DistributedDataParallel],
                   val_dataloader: DataLoader,
                   experiment: Experiment,
                   epoch_no: int,

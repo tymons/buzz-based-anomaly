@@ -42,6 +42,7 @@ def main():
     parser.add_argument('--fingerprint_feature_file', default=Path(__file__).absolute().parent / "feature.csv",
                         type=Path)
     parser.add_argument('--contrastive_data_folder', type=Path)
+    parser.add_argument('--gpu_ids', type=int, nargs='+', help="ids for gpus which should be used")
 
     args = parser.parse_args()
 
