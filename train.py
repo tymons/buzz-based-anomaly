@@ -16,6 +16,7 @@ from datetime import datetime
 
 import utils.utils as utils
 
+
 def main():
     parser = argparse.ArgumentParser(description='Process ML model training.')
     # positional arguments
@@ -36,7 +37,8 @@ def main():
     parser.add_argument('--comet_config', default=Path(__file__).absolute().parent / ".comet.config", type=Path)
     parser.add_argument('--find_best', type=int, metavar='N', help="how many trials for finding best architecture")
     parser.add_argument('--log_folder', default=Path(__file__).absolute().parent / "output/", type=Path)
-    parser.add_argument('--fingerprint_main_hive', type=str, help="hive name for which fingerprint should be calculated")
+    parser.add_argument('--fingerprint_main_hive', type=str,
+                        help="hive name for which fingerprint should be calculated")
     parser.add_argument('--fingerprint_feature_file', default=Path(__file__).absolute().parent / "feature.csv",
                         type=Path)
     parser.add_argument('--contrastive_data_folder', type=Path)
