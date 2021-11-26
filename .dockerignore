@@ -11,3 +11,4 @@ README.md
 .github/
 .gitignore
 .git-credentials
+docker-run-example-command.sh

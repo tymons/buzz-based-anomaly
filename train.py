@@ -3,11 +3,9 @@ import logging
 
 import yaml
 import random
-import utils.utils as utils
-
+from utils.model_runner import ModelRunner
 from typing import List
 from pathlib import Path
-from utils.model_runner import ModelRunner
 
 from models.model_type import HiveModelType
 from features.feature_type import SoundFeatureType
@@ -16,6 +14,7 @@ from utils.model_factory import HiveModelFactory
 from utils.feature_factory import SoundFeatureFactory
 from datetime import datetime
 
+import utils.utils as utils
 
 def main():
     parser = argparse.ArgumentParser(description='Process ML model training.')
