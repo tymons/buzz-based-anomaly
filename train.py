@@ -125,7 +125,6 @@ def main():
             elif args.model.num >= HiveModelType.CONTRASTIVE_AE.num:
                 model = model_runner.train_contrastive(model, train_loader, learning_config, val_loader, feature_config)
             else:
-                model = HiveModelFactory.build_model_and_check(args.model, data_shape, model_config['model'])
                 model = model_runner.train(model, train_loader, learning_config, val_loader, feature_config)
 
 
