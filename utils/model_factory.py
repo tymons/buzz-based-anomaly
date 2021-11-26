@@ -26,6 +26,8 @@ CVBM = ContrastiveVariationalBaseModel
 CBM = ContrastiveBaseModel
 VBM = VaeBaseModel
 
+log = logging.getLogger("smartula")
+
 
 def count_parameters(model):
     """
@@ -39,7 +41,7 @@ def count_parameters(model):
 def model_check(model, input_shape, device="cuda"):
     """ Function for model check """
     summary(model, input_shape, device=device)
-    logging.debug(f'model check success! {model}')
+    log.debug(f'model check success! {model}')
     return model
 
 
@@ -125,7 +127,7 @@ class HiveModelFactory:
         dropouts = config.get('dropout', [0.2, 0.2, 0.2])
         latent_size = config.get('latent', 2)
 
-        logging.debug(f'building ae model with config: layers({layers}), latent({latent_size}),'
+        log.debug(f'building ae model with config: layers({layers}), latent({latent_size}),'
                       f' dropout({dropouts})')
         return Autoencoder(layers, latent_size, input_shape[0], dropouts)
 
@@ -144,7 +146,7 @@ class HiveModelFactory:
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
 
-        logging.debug(f'building conv1d ae model with config: encoder_layers({layers}),'
+        log.debug(f'building conv1d ae model with config: encoder_layers({layers}),'
                       f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
                       f' max_pool({max_pool})')
         return Conv1DAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
@@ -165,7 +167,7 @@ class HiveModelFactory:
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
 
-        logging.debug(f'building conv2d ae model with config: encoder_layers({layers}),'
+        log.debug(f'building conv2d ae model with config: encoder_layers({layers}),'
                       f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
                       f' max_pool({max_pool})')
 
@@ -184,7 +186,7 @@ class HiveModelFactory:
         dropouts = config.get('dropout', [0.2, 0.2, 0.2])
         latent_size = config.get('latent', 2)
 
-        logging.debug(f'building vae model with config: layers({layers}), latent({latent_size}),'
+        log.debug(f'building vae model with config: layers({layers}), latent({latent_size}),'
                       f' dropout({dropouts})')
         return VAE(layers, latent_size, input_size[0], dropouts)
 
@@ -203,7 +205,7 @@ class HiveModelFactory:
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
 
-        logging.debug(f'building conv1d vae model with config: encoder_layers({layers}),'
+        log.debug(f'building conv1d vae model with config: encoder_layers({layers}),'
                       f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
                       f' max_pool({max_pool})')
         return Conv1DVAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
@@ -224,7 +226,7 @@ class HiveModelFactory:
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
 
-        logging.debug(f'building conv2d vae model with config: encoder_layers({layers}),'
+        log.debug(f'building conv2d vae model with config: encoder_layers({layers}),'
                       f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
                       f' max_pool({max_pool})')
 
@@ -243,7 +245,7 @@ class HiveModelFactory:
         dropouts = config.get('dropout', [0.2, 0.2, 0.2])
         latent_size = config.get('latent', 2)
 
-        logging.debug(f'building contrastive vae model with config: layers({layers}), latent({latent_size}),'
+        log.debug(f'building contrastive vae model with config: layers({layers}), latent({latent_size}),'
                       f' dropout({dropouts})')
         return ContrastiveVAE(layers, latent_size, input_size[0], dropouts)
 
@@ -259,7 +261,7 @@ class HiveModelFactory:
         dropouts = config.get('dropout', [0.2, 0.2, 0.2])
         latent_size = config.get('latent', 2)
 
-        logging.debug(f'building contrastive ae model with config: layers({layers}), latent({latent_size}),'
+        log.debug(f'building contrastive ae model with config: layers({layers}), latent({latent_size}),'
                       f' dropout({dropouts})')
         return ContrastiveAE(layers, latent_size, input_size[0], dropouts)
 
@@ -278,7 +280,7 @@ class HiveModelFactory:
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
 
-        logging.debug(f'building contrastive conv1d ae model with config: encoder_layers({layers}),'
+        log.debug(f'building contrastive conv1d ae model with config: encoder_layers({layers}),'
                       f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
                       f' max_pool({max_pool})')
         return ContrastiveConv1DAE(layers, dropout, kernel_size=kernel, padding=padding, latent=latent_size,
@@ -299,7 +301,7 @@ class HiveModelFactory:
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
 
-        logging.debug(f'building contrastive conv2d ae model with config: encoder_layers({layers}),'
+        log.debug(f'building contrastive conv2d ae model with config: encoder_layers({layers}),'
                       f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
                       f' max_pool({max_pool})')
 
@@ -321,7 +323,7 @@ class HiveModelFactory:
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
 
-        logging.debug(f'building contrastive conv1d vae model with config: encoder_layers({layers}),'
+        log.debug(f'building contrastive conv1d vae model with config: encoder_layers({layers}),'
                       f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
                       f' max_pool({max_pool})')
         return ContrastiveConv1DVAE(layers, dropout, kernel_size=kernel, padding=padding, latent_size=latent_size,
@@ -342,7 +344,7 @@ class HiveModelFactory:
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
 
-        logging.debug(f'building contrastive conv2d vae model with config: encoder_layers({layers}),'
+        log.debug(f'building contrastive conv2d vae model with config: encoder_layers({layers}),'
                       f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
                       f' max_pool({max_pool})')
         return ContrastiveConv2DVAE(layers, dropout, kernel_size=kernel, padding=padding, latent_size=latent_size,
@@ -371,10 +373,10 @@ class HiveModelFactory:
         """
         model_func: Callable[[dict, tuple], (BaseModel, dict)] = \
             getattr(HiveModelFactory, f'_get_{model_type.model_name.lower()}_model',
-                    lambda x, y: logging.error('invalid model type!'))
+                    lambda x, y: log.error('invalid model type!'))
 
         model = model_func(config, input_shape)
-        logging.info(f'model {model_type.model_name.lower()} has {count_parameters(model)} trainable parameters')
+        log.info(f'model {model_type.model_name.lower()} has {count_parameters(model)} trainable parameters')
 
         return model
 

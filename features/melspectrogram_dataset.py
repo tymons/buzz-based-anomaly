@@ -10,6 +10,8 @@ from features.sound_dataset import SoundDataset
 from features.slice_frequency_dataclass import SliceFrequency
 from utils.utils import adjust_matrix, adjust_linear_ndarray, closest_power_2
 
+log = logging.getLogger("smartula")
+
 
 class MelSpectrogramDataset(SoundDataset):
     def __init__(self, filenames: List[Path], labels: List[int], n_fft: int, hop_len: int,
@@ -59,7 +61,7 @@ class MelSpectrogramDataset(SoundDataset):
         if self.round_data_shape:
             if self.convert_db:
                 # for now we only extend linearly spaced values
-                logging.warning('ONLY LINEAR MELSPECTROGRAM COULD BE EXTENDED!')
+                log.warning('ONLY LINEAR MELSPECTROGRAM COULD BE EXTENDED!')
             else:
                 mel_spectrogram = adjust_matrix(mel_spectrogram, 2 ** closest_power_2(mel_spectrogram.shape[0]),
                                                 2 ** closest_power_2(mel_spectrogram.shape[1]),
