@@ -201,7 +201,8 @@ class ModelRunner:
     device: device
 
     def __init__(self, output_folder: Path = None, comet_api_key: str = None, comet_config_file: Path = None,
-                 comet_project_name: str = "Default Project", torch_device: torch.device = None, gpu_ids: List[int] = None):
+                 comet_project_name: str = "Default Project", torch_device: torch.device = None,
+                 gpu_ids: List[int] = None):
         self.comet_api_key = comet_api_key if comet_api_key is not None else _read_comet_key(comet_config_file)
         self.comet_proj_name = comet_project_name
         self.output_folder = output_folder
@@ -300,7 +301,7 @@ class ModelRunner:
                                                 ['optuna'])
 
             log.debug(f'performing optuna train task on {self.device}(s) ({torch.cuda.device_count()})'
-                          f' for model {type(model).__name__.lower()} with following config: {optuna_learning_config}')
+                      f' for model {type(model).__name__.lower()} with following config: {optuna_learning_config}')
 
             if torch.cuda.device_count() > 1:
                 model = SmDataParallel.SmDataParallel(model, device_ids=self.gpu_ids)
@@ -440,7 +441,7 @@ class ModelRunner:
         checkpoint_path = self.output_folder / f'{experiment.get_name()}-checkpoint.pth'
 
         log.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
-                      f' for model {checkpoint_path.stem.upper()} with following config: {train_config}')
+                  f' for model {checkpoint_path.stem.upper()} with following config: {train_config}')
 
         model = SmDataParallel(model, self.gpu_ids) if torch.cuda.device_count() > 1 else model.to(self.device)
 
@@ -501,7 +502,7 @@ class ModelRunner:
         discriminator_checkpoint_path = self.output_folder / f'{experiment.get_name()}-discriminator-checkpoint.pth'
 
         log.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
-                      f' for model {model_checkpoint_path.stem.upper()} with following config: {train_config}')
+                  f' for model {model_checkpoint_path.stem.upper()} with following config: {train_config}')
 
         model, discriminator = (SmDataParallel(model, self.gpu_ids), SmDataParallel(discriminator, self.gpu_ids)) \
             if torch.cuda.device_count() > 1 else (model.to(self.device), discriminator.to(self.device))
@@ -581,8 +582,8 @@ class ModelRunner:
             experiment.log_metric("batch_train_loss", loss_float, step=epoch * batch_idx)
             if logging_interval != -1 and batch_idx % logging_interval == 0:
                 log.info(f'=== train epoch {epoch},'
-                             f' [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
-                             f'-> batch loss: {loss_float}')
+                         f' [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
+                         f'-> batch loss: {loss_float}')
 
             if all([discriminator, discriminator_optimizer]):
                 q = torch.cat((model_output.target_qs_latent.clone().detach(),
@@ -637,8 +638,8 @@ class ModelRunner:
 
                 if logging_interval != -1 and batch_idx % logging_interval == 0:
                     log.info(f'=== validation epoch {epoch_no}, '
-                                 f'[{batch_idx * len(target)}/{len(val_dataloader.dataset)}]'
-                                 f'-> batch loss: {loss.item()} ===')
+                             f'[{batch_idx * len(target)}/{len(val_dataloader.dataset)}]'
+                             f'-> batch loss: {loss.item()} ===')
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
@@ -678,8 +679,8 @@ class ModelRunner:
 
             if logging_interval != -1 and batch_idx % logging_interval == 0:
                 log.info(f'=== train epoch {epoch_no},'
-                             f' [{batch_idx * len(batch)}/{len(dataloader.dataset)}] '
-                             f'-> batch loss: {loss_float}')
+                         f' [{batch_idx * len(batch)}/{len(dataloader.dataset)}] '
+                         f'-> batch loss: {loss_float}')
         return EpochLoss(sum(mean_loss) / len(mean_loss))
 
     T_val_step = Callable[[Union[BM, CBM, CVBM, SmDataParallel], DataLoader,
@@ -714,8 +715,8 @@ class ModelRunner:
 
                 if logging_interval != -1 and batch_idx % logging_interval == 0:
                     log.info(f'=== validation epoch {epoch_no}, '
-                                 f'[{batch_idx * len(batch)}/{len(val_dataloader.dataset)}]'
-                                 f'-> batch loss: {loss.item()} ===')
+                             f'[{batch_idx * len(batch)}/{len(val_dataloader.dataset)}]'
+                             f'-> batch loss: {loss.item()} ===')
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 

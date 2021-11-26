@@ -47,7 +47,7 @@ def main():
         anomaly_sound_list = args.anomaly_data_folder.glob('*')
         if not all([smartula_hive_sound_list, anomaly_sound_list]):
             log.error(f'one of smartula or anomaly sound list is empty! smartula:{len(smartula_hive_sound_list)},'
-                          f' anomaly: {anomaly_sound_list}')
+                      f' anomaly: {anomaly_sound_list}')
             raise Exception('sound list empty!')
 
         if args.filter_dates:

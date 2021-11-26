@@ -35,8 +35,8 @@ class SoundFeatureFactory:
         window = features_params_dict.get('window')
 
         log.debug(f'building periodogram dataset of length {len(sound_filenames)}'
-                      f' with params: db_scale({convert_db}),  slice_freq({slice_freq}),'
-                      f' window({window})')
+                  f' with params: db_scale({convert_db}),  slice_freq({slice_freq}),'
+                  f' window({window})')
 
         return PeriodogramDataset(sound_filenames, labels, convert_db, slice_freq=slice_freq, window=window)
 
