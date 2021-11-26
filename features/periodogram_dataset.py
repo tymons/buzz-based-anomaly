@@ -6,19 +6,16 @@ from pathlib import Path
 from features.slice_frequency_dataclass import SliceFrequency
 from sklearn.preprocessing import MinMaxScaler
 from scipy.fft import rfft, rfftfreq
-from scipy import signal
 from features.sound_dataset import SoundDataset
 
 
 class PeriodogramDataset(SoundDataset):
     """ Periodogram dataset """
 
-    def __init__(self, filenames: List[Path], labels, convert_db=False, slice_freq: SliceFrequency = None,
-                 window: str = 'hann'):
+    def __init__(self, filenames: List[Path], labels, convert_db=False, slice_freq: SliceFrequency = None):
         SoundDataset.__init__(self, filenames, labels)
         self.slice_freq = slice_freq
         self.convert_db = convert_db
-        self.window_name = window
 
     def get_params(self):
         """ Method for returning feature params """
@@ -30,8 +27,8 @@ class PeriodogramDataset(SoundDataset):
     def get_item(self, idx):
         """ Function for getting periodogram """
         sound_samples, sampling_rate, labels = SoundDataset.read_sound(self, idx=idx, raw=False)
-        window = signal.get_window(self.window_name, len(sound_samples))
-        periodogram = np.abs(rfft(sound_samples*window, sampling_rate)[1:])
+        sound_samples = MinMaxScaler().fit_transform(sound_samples.reshape(-1, 1)).squeeze()
+        periodogram = np.abs(rfft(sound_samples, sampling_rate)[1:])
         if self.convert_db:
             periodogram = 20 * np.log10(periodogram)
 
