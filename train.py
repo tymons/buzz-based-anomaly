@@ -114,7 +114,7 @@ def main():
                                                                                                  'batch_size', 32))
 
         model_runner = ModelRunner(args.model_output, comet_config_file=args.comet_config,
-                                   comet_project_name="bee-sound-anomaly")
+                                   comet_project_name="bee-sound-anomaly", gpu_ids=args.gpu_ids)
         if args.find_best is not None:
             model_runner.find_best(args.model, train_loader, learning_config, n_trials=args.find_best,
                                    output_folder=Path('output/model'), feature_config=feature_config)
