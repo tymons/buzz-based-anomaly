@@ -200,7 +200,9 @@ class ModelRunner:
         self.comet_api_key = comet_api_key if comet_api_key is not None else _read_comet_key(comet_config_file)
         self.comet_proj_name = comet_project_name
         self.output_folder = output_folder
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device is None else torch_device
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if torch_device is not None:
+            self.device = torch_device
 
         self._curr_patience = -1
         self._curr_best_loss = sys.maxsize
