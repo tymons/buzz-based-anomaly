@@ -23,6 +23,8 @@ from scipy.signal import resample
 
 from utils.side_scripts.weather_feature_type import WeatherFeatureType
 
+log = logging.getLogger("smartula")
+
 
 def logger_setup(log_folder: Path, filename_prefix: str) -> None:
     """
@@ -31,13 +33,10 @@ def logger_setup(log_folder: Path, filename_prefix: str) -> None:
     :param filename_prefix: log file filename prefix
     """
     log_folder.mkdir(parents=True, exist_ok=True)
-    log_level = os.environ.get('LOGLEVEL', 'DEBUG').upper()
     logging.basicConfig(
-        level=log_level,
         format='%(asctime)s [%(levelname)s] %(message)s',
         handlers=[
-            logging.FileHandler(log_folder / f"{filename_prefix}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-                                             f"-{log_level}.log"),
+            logging.FileHandler(log_folder / f"{filename_prefix}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"),
             logging.StreamHandler()
         ]
     )
@@ -71,7 +70,7 @@ def create_valid_sounds_datalist(root_folder: Union[str, Path], valid_file_filen
     folders = [folder for folder in glob.glob(f"{root_folder}\\{prefix}*\\")]
     valid_dict_count = {}
     for folder in folders:
-        logging.info(f"reading sounds in folder {folder.split(os.sep)[-2]}...", flush=True)
+        log.info(f"reading sounds in folder {folder.split(os.sep)[-2]}...", flush=True)
         files = [file for file in glob.glob(f"{folder}*.wav")]
         valid_files = []
         for filename in tqdm(files):
@@ -108,7 +107,7 @@ def get_valid_sounds_from_folders(folder_list: List[Path], valid_file_filename: 
             with summary_file.open('r') as f:
                 sound_filenames += list(map(lambda x: folder / x, f.read().splitlines()))
         else:
-            logging.warning(f'{valid_file_filename} for folder {folder} does not exists! skipping')
+            log.warning(f'{valid_file_filename} for folder {folder} does not exists! skipping')
 
     return sound_filenames
 
@@ -618,7 +617,7 @@ def filter_hive_fingerprint(csv_feature_weather_path: Path,
     f_hive_sound_list = filter_path_list(f_hive_sound_list, *fingerprint_datetimes)
 
     if not quiet:
-        logging.info(f'fingerprint time range: {f_start}/{f_end}')
-        logging.info(f'fingerprint temperatures: {f_temperatures}')
+        log.info(f'fingerprint time range: {f_start}/{f_end}')
+        log.info(f'fingerprint temperatures: {f_temperatures}')
 
     return f_hive_sound_list

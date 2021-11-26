@@ -16,6 +16,9 @@ from datetime import datetime
 
 import utils.utils as utils
 
+log = logging.getLogger("smartula")
+log.setLevel(logging.DEBUG)
+
 
 def main():
     parser = argparse.ArgumentParser(description='Process ML model training.')
@@ -48,10 +51,10 @@ def main():
 
     utils.logger_setup(args.log_folder, f"{args.model.model_name}-{args.feature.value}")
 
-    logging.info(f'running {args.model.model_name} model with {args.feature.value}...')
-    logging.info(f'data folder located at: {args.smartula_data_folder}')
-    logging.info(f'output folder for ML models located at: {args.model_output}')
-    logging.info(f'output folder for logs located at: {args.log_folder}')
+    log.info(f'running {args.model.model_name} model with {args.feature.value}...')
+    log.info(f'data folder located at: {args.smartula_data_folder}')
+    log.info(f'output folder for ML models located at: {args.model_output}')
+    log.info(f'output folder for logs located at: {args.log_folder}')
 
     # TODO: Check features and model type compatibility
 
@@ -64,7 +67,7 @@ def main():
         # data
         sound_list = utils.get_valid_sounds_from_folders(args.smartula_data_folder.glob('*'))
         if not sound_list:
-            logging.error('sound list empty!')
+            log.error('sound list empty!')
             raise Exception('sound list empty!')
 
         if args.filter_dates:
@@ -81,37 +84,37 @@ def main():
             sound_list = utils.filter_hive_fingerprint(args.fingerprint_feature_file,
                                                        args.fingerptint_main_hive,
                                                        sound_list)
-            logging.info(f'after fingerprint filtering got {len(sound_list)} recordings')
+            log.info(f'after fingerprint filtering got {len(sound_list)} recordings')
 
         # preparse background filenames if needed
         if args.contrastive_data_folder is not None:
             background_filenames = list(args.contrastive_data_folder.glob('**/*.wav'))
             random.shuffle(background_filenames)
             if len(sound_list) > len(background_filenames):
-                logging.info(f'truncating target dataset to the length of {len(background_filenames)}')
+                log.info(f'truncating taget dataset to the length of {len(background_filenames)}')
                 sound_list = sound_list[:len(background_filenames)]
                 sound_labels = sound_labels[:len(background_filenames)]
             else:
-                logging.info(f'truncating background dataset to the length of: {len(sound_list)}')
+                log.info(f'truncating background dataset to the length of: {len(sound_list)}')
                 background_filenames = background_filenames[:len(sound_list)]
 
         # build datasets and dataloader
         dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, sound_labels, feature_config)
         data_shape = dataset[0][0].squeeze().shape
-        logging.debug(f'got dataset of shape: {data_shape}')
+        log.debug(f'got dataset of shape: {data_shape}')
         if args.contrastive_data_folder is not None:
             background_dataset = SoundFeatureFactory.build_dataset(args.feature, background_filenames,
                                                                    [0] * len(background_filenames),
                                                                    feature_config)
-            logging.debug(f'got background dataset for contrastive learning of shape:'
-                          f' {background_dataset[0][0].squeeze().shape}')
+            log.debug(f'got background dataset for contrastive learning of shape:'
+                      f' {background_dataset[0][0].squeeze().shape}')
             dataset = SoundFeatureFactory.build_contrastive_feature_dataset(dataset, background_dataset)
         train_loader, val_loader = SoundFeatureFactory.build_train_and_validation_dataloader(dataset,
                                                                                              learning_config.get(
                                                                                                  'batch_size', 32))
 
         model_runner = ModelRunner(args.model_output, comet_config_file=args.comet_config,
-                                   comet_project_name="bee-sound-anomaly")
+                                   comet_project_name="bee-sound-anomaly", gpu_ids=args.gpu_ids)
         if args.find_best is not None:
             model_runner.find_best(args.model, train_loader, learning_config, n_trials=args.find_best,
                                    output_folder=Path('output/model'), feature_config=feature_config)

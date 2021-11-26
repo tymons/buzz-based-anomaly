@@ -16,6 +16,8 @@ from utils.model_factory import HiveModelFactory, HiveModelType
 from utils.model_runner import ModelRunner
 from utils.anomaly_scorer_type import AnomalyScorerType
 
+log = logging.getLogger("smartula")
+
 
 def main():
     parser = argparse.ArgumentParser(description='Inference and anomaly score for ML.')
@@ -44,8 +46,8 @@ def main():
         smartula_hive_sound_list = utils.get_valid_sounds_from_folders([args.smartula_hive_data_folder])
         anomaly_sound_list = args.anomaly_data_folder.glob('*')
         if not all([smartula_hive_sound_list, anomaly_sound_list]):
-            logging.error(f'one of smartula or anomaly sound list is empty! smartula:{len(smartula_hive_sound_list)},'
-                          f' anomaly: {anomaly_sound_list}')
+            log.error(f'one of smartula or anomaly sound list is empty! smartula:{len(smartula_hive_sound_list)},'
+                      f' anomaly: {anomaly_sound_list}')
             raise Exception('sound list empty!')
 
         if args.filter_dates:
@@ -64,14 +66,14 @@ def main():
 
         assert hive_data_shape == anomaly_data_shape, "anomaly and hive data are not consistent!"
 
-        logging.debug(f'got dataset of shape: {hive_data_shape}')
+        log.debug(f'got dataset of shape: {hive_data_shape}')
         hive_dataloader = DataLoader(hive_dataset, batch_size=64, shuffle=True, drop_last=False, num_workers=0)
         anomaly_dataloader = DataLoader(anomaly_dataset, batch_size=64, shuffle=True, drop_last=False, num_workers=0)
 
         model_type: HiveModelType = HiveModelType.from_name(args.model_path.stem.split('-')[0])
         model = HiveModelFactory.build_model(model_type, hive_data_shape, args.model_config)
         last_epoch, last_loss = model_load(args.model_path, model)
-        logging.info(f'model {model_type.model_name} has been loaded from epoch {last_epoch} with loss: {last_loss}')
+        log.info(f'model {model_type.model_name} has been loaded from epoch {last_epoch} with loss: {last_loss}')
 
         model_runner = ModelRunner()
         hive_latent = model_runner.inference_latent(model, hive_dataloader)

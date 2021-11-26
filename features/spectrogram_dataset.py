@@ -10,6 +10,8 @@ from features.sound_dataset import SoundDataset
 from features.slice_frequency_dataclass import SliceFrequency
 from utils.utils import adjust_matrix, closest_power_2, adjust_linear_ndarray
 
+log = logging.getLogger("smartula")
+
 
 def calculate_spectrogram(samples, sampling_rate: int, n_fft: int, hop_len: int, slice_freq: SliceFrequency = None,
                           convert_db=False, window_name: str = 'blackman') -> (np.ndarray, np.ndarray, np.ndarray):
@@ -27,7 +29,7 @@ def calculate_spectrogram(samples, sampling_rate: int, n_fft: int, hop_len: int,
                                                          window=window_name, noverlap=hop_len)
     spectrogram_magnitude = np.abs(spectrogram)
     if convert_db:
-        spectrogram_magnitude = 20*np.log10(spectrogram_magnitude)
+        spectrogram_magnitude = 20 * np.log10(spectrogram_magnitude)
 
     if slice_freq:
         freq_slice = np.where(np.logical_and((slice_freq.start < frequencies), (frequencies < slice_freq.stop)))
@@ -82,7 +84,7 @@ class SpectrogramDataset(SoundDataset):
         if self.round_data_shape:
             if self.convert_db:
                 # for now we only extend linearly spaced values
-                logging.warning('ONLY LINEAR SPECTROGRAM COULD BE EXTENDED!')
+                log.warning('ONLY LINEAR SPECTROGRAM COULD BE EXTENDED!')
             else:
                 spectrogram = adjust_matrix(spectrogram, 2 ** closest_power_2(spectrogram.shape[0]),
                                             2 ** closest_power_2(spectrogram.shape[1]), fill_with=spectrogram.min())

@@ -14,6 +14,8 @@ from features.contrastive_feature_dataset import ContrastiveFeatureDataset
 from typing import List, Callable
 from pathlib import Path
 
+log = logging.getLogger("smartula")
+
 
 class SoundFeatureFactory:
     """ Factory for data loaders """
@@ -30,13 +32,11 @@ class SoundFeatureFactory:
         """
         slice_freq = SliceFrequency(**features_params_dict.get('slice_frequency'))
         convert_db = features_params_dict.get('convert_db')
-        window = features_params_dict.get('window')
 
-        logging.debug(f'building periodogram dataset of length {len(sound_filenames)}'
-                      f' with params: db_scale({convert_db}),  slice_freq({slice_freq}),'
-                      f' window({window})')
+        log.debug(f'building periodogram dataset of length {len(sound_filenames)}'
+                  f' with params: db_scale({convert_db}),  slice_freq({slice_freq})')
 
-        return PeriodogramDataset(sound_filenames, labels, convert_db, slice_freq=slice_freq, window=window)
+        return PeriodogramDataset(sound_filenames, labels, convert_db, slice_freq=slice_freq)
 
     @staticmethod
     def _get_spectrogram_dataset(sound_filenames: List[Path], labels: List[int],

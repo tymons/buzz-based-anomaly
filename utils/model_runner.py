@@ -44,6 +44,9 @@ class EpochLoss:
     discriminator_loss: Optional[float] = None
 
 
+log = logging.getLogger("smartula")
+
+
 def clear_memory(model: Union[BM, VBM, CBM, SmDataParallel],
                  optimizer: torch.optim.Optimizer,
                  discriminator: nn.Module = None,
@@ -82,7 +85,7 @@ def _parse_optimizer(optimizer_name: str) -> Callable:
         'Adagrad': torch.optim.Adagrad,
         'Adadelta': torch.optim.Adadelta,
     }
-    return optimizer.get(optimizer_name, lambda x: logging.error(f'loss function for model {x} not implemented!'))
+    return optimizer.get(optimizer_name, lambda x: log.error(f'loss function for model {x} not implemented!'))
 
 
 def transfer_optimizer_to(optimizer: Optimizer, device_to: device) -> Optimizer:
@@ -198,7 +201,8 @@ class ModelRunner:
     device: device
 
     def __init__(self, output_folder: Path = None, comet_api_key: str = None, comet_config_file: Path = None,
-                 comet_project_name: str = "Default Project", torch_device: torch.device = None, gpu_ids: List[int] = None):
+                 comet_project_name: str = "Default Project", torch_device: torch.device = None,
+                 gpu_ids: List[int] = None):
         self.comet_api_key = comet_api_key if comet_api_key is not None else _read_comet_key(comet_config_file)
         self.comet_proj_name = comet_project_name
         self.output_folder = output_folder
@@ -249,21 +253,21 @@ class ModelRunner:
 
         best_architecture_file = Path(output_folder) / Path(f"{model_type.model_name.lower()}"
                                                             f"-{time.strftime('%Y%m%d-%H%M%S')}.config")
-        logging.info('Study statistics: ')
-        logging.info(f'  Number of finished trials: {len(study.trials)}')
-        logging.info(f'  Number of pruned trials: {len(pruned_trials)}')
-        logging.info(f'  Number of complete trials: {len(complete_trials)}')
+        log.info('Study statistics: ')
+        log.info(f'  Number of finished trials: {len(study.trials)}')
+        log.info(f'  Number of pruned trials: {len(pruned_trials)}')
+        log.info(f'  Number of complete trials: {len(complete_trials)}')
 
-        logging.info("Best trial:")
+        log.info("Best trial:")
         trial = study.best_trial
 
         with best_architecture_file.open('w+') as f:
             f.write(f'Best loss: {str(trial.value)} \r\n')
             f.write('Params: \r\n')
-            logging.info(f'  Value: {trial.value}')
-            logging.info('  Params: ')
+            log.info(f'  Value: {trial.value}')
+            log.info('  Params: ')
             for key, value in trial.params.items():
-                logging.info(f'    {key}:{value}')
+                log.info(f'    {key}:{value}')
                 f.write(f'    {key}:{value} \r\n')
 
     def _optuna_train_objective(self,
@@ -296,8 +300,8 @@ class ModelRunner:
                                                  **(feature_config if feature_config is not None else {})},
                                                 ['optuna'])
 
-            logging.debug(f'performing optuna train task on {self.device}(s) ({torch.cuda.device_count()})'
-                          f' for model {type(model).__name__.lower()} with following config: {optuna_learning_config}')
+            log.debug(f'performing optuna train task on {self.device}(s) ({torch.cuda.device_count()})'
+                      f' for model {type(model).__name__.lower()} with following config: {optuna_learning_config}')
 
             if torch.cuda.device_count() > 1:
                 model = SmDataParallel.SmDataParallel(model, device_ids=self.gpu_ids)
@@ -322,7 +326,7 @@ class ModelRunner:
 
                 epoch_loss_value = epoch_loss.model_loss
                 experiment.log_metric('train_epoch_loss', epoch_loss_value, step=epoch)
-                logging.info(f'--- train epoch {epoch} end with train loss: {epoch_loss_value} ---')
+                log.info(f'--- train epoch {epoch} end with train loss: {epoch_loss_value} ---')
 
                 trial.report(epoch_loss_value, epoch)
                 if trial.should_prune():
@@ -335,7 +339,7 @@ class ModelRunner:
 
             return self._curr_best_loss
         except RuntimeError as e:
-            logging.error(f'hive model build failed for config: {optuna_model_config} with exception: {e}')
+            log.error(f'hive model build failed for config: {optuna_model_config} with exception: {e}')
 
     def inference_latent(self, model: Union[BM, VBM, CBM, CVBM], dataloader: DataLoader):
         """
@@ -436,8 +440,8 @@ class ModelRunner:
                                              **(feature_config if feature_config is not None else {})}, [])
         checkpoint_path = self.output_folder / f'{experiment.get_name()}-checkpoint.pth'
 
-        logging.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
-                      f' for model {checkpoint_path.stem.upper()} with following config: {train_config}')
+        log.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
+                  f' for model {checkpoint_path.stem.upper()} with following config: {train_config}')
 
         model = SmDataParallel(model, self.gpu_ids) if torch.cuda.device_count() > 1 else model.to(self.device)
 
@@ -451,20 +455,20 @@ class ModelRunner:
             train_epoch_loss = train_step_func(model, train_dataloader, optimizer, experiment, epoch, log_interval)
             experiment.log_metric('train_epoch_loss', train_epoch_loss.model_loss, step=epoch)
 
-            logging.info(f'--- train epoch {epoch} end with train loss: {train_epoch_loss.model_loss}')
+            log.info(f'--- train epoch {epoch} end with train loss: {train_epoch_loss.model_loss}')
             early_stopping_loss = train_epoch_loss
             if val_dataloader is not None:
                 val_epoch_loss = val_step_func(model, val_dataloader, experiment, epoch, log_interval)
                 experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
                 early_stopping_loss = val_epoch_loss
-                logging.info(f'--- train epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
+                log.info(f'--- train epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
             patience = self.early_stopping_callback(early_stopping_loss.model_loss, patience_init_val)
             if patience == patience_init_val:
-                logging.debug(f'*** model checkpoint at epoch {epoch} ***')
+                log.debug(f'*** model checkpoint at epoch {epoch} ***')
                 model_save(model, checkpoint_path, optimizer, epoch, train_epoch_loss.model_loss)
             elif patience == 0:
-                logging.info(f' ___ early stopping at epoch {epoch} ___')
+                log.info(f' ___ early stopping at epoch {epoch} ___')
                 epoch, _ = model_load(checkpoint_path, model, optimizer, gpu_ids=self.gpu_ids)
                 break
 
@@ -497,8 +501,8 @@ class ModelRunner:
         model_checkpoint_path = self.output_folder / f'{experiment.get_name()}-contrastive-checkpoint.pth'
         discriminator_checkpoint_path = self.output_folder / f'{experiment.get_name()}-discriminator-checkpoint.pth'
 
-        logging.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
-                      f' for model {model_checkpoint_path.stem.upper()} with following config: {train_config}')
+        log.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
+                  f' for model {model_checkpoint_path.stem.upper()} with following config: {train_config}')
 
         model, discriminator = (SmDataParallel(model, self.gpu_ids), SmDataParallel(discriminator, self.gpu_ids)) \
             if torch.cuda.device_count() > 1 else (model.to(self.device), discriminator.to(self.device))
@@ -518,22 +522,22 @@ class ModelRunner:
             experiment.log_metric('train_epoch_loss', epoch_loss.model_loss, step=epoch)
             experiment.log_metric('train_discriminator_epoch_loss', epoch_loss.discriminator_loss, step=epoch)
 
-            logging.info(f'--- train epoch {epoch} end with train loss: {epoch_loss.model_loss}')
+            log.info(f'--- train epoch {epoch} end with train loss: {epoch_loss.model_loss}')
             early_stopping_loss = epoch_loss
             if val_dataloader is not None:
                 val_epoch_loss = self._val_contrastive_step(model, val_dataloader, experiment, epoch, log_interval)
                 experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
                 early_stopping_loss = val_epoch_loss
-                logging.info(f'--- train epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
+                log.info(f'--- train epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
             patience = self.early_stopping_callback(early_stopping_loss.model_loss, patience_init_val)
             if patience == patience_init_val:
-                logging.debug(f'*** model checkpoint at epoch {epoch} ***')
+                log.debug(f'*** model checkpoint at epoch {epoch} ***')
                 model_save(model, model_checkpoint_path, model_optimizer, epoch, epoch_loss.model_loss)
                 model_save(discriminator, discriminator_checkpoint_path, discriminator_optimizer, epoch,
                            epoch_loss.discriminator_loss)
             elif patience == 0:
-                logging.info(f' ___ early stopping at epoch {epoch} ___')
+                log.info(f' ___ early stopping at epoch {epoch} ___')
                 epoch, _ = model_load(model_checkpoint_path, model, model_optimizer, gpu_ids=self.gpu_ids)
                 break
 
@@ -577,9 +581,9 @@ class ModelRunner:
 
             experiment.log_metric("batch_train_loss", loss_float, step=epoch * batch_idx)
             if logging_interval != -1 and batch_idx % logging_interval == 0:
-                logging.info(f'=== train epoch {epoch},'
-                             f' [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
-                             f'-> batch loss: {loss_float}')
+                log.info(f'=== train epoch {epoch},'
+                         f' [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
+                         f'-> batch loss: {loss_float}')
 
             if all([discriminator, discriminator_optimizer]):
                 q = torch.cat((model_output.target_qs_latent.clone().detach(),
@@ -597,7 +601,7 @@ class ModelRunner:
                 discriminator_mean_loss.append(discriminator_loss_float)
                 experiment.log_metric("discriminator_batch_train_loss", dloss, step=epoch * batch_idx)
                 if logging_interval != -1 and batch_idx % logging_interval == 0:
-                    logging.info(f'-> discriminator loss: {discriminator_loss_float}')
+                    log.info(f'-> discriminator loss: {discriminator_loss_float}')
 
         epoch_loss = EpochLoss(sum(mean_loss) / len(mean_loss))
         if len(discriminator_mean_loss) > 0:
@@ -633,9 +637,9 @@ class ModelRunner:
                 experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
 
                 if logging_interval != -1 and batch_idx % logging_interval == 0:
-                    logging.info(f'=== validation epoch {epoch_no}, '
-                                 f'[{batch_idx * len(target)}/{len(val_dataloader.dataset)}]'
-                                 f'-> batch loss: {loss.item()} ===')
+                    log.info(f'=== validation epoch {epoch_no}, '
+                             f'[{batch_idx * len(target)}/{len(val_dataloader.dataset)}]'
+                             f'-> batch loss: {loss.item()} ===')
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
@@ -674,9 +678,9 @@ class ModelRunner:
             experiment.log_metric("batch_train_loss", loss_float, step=epoch_no * batch_idx)
 
             if logging_interval != -1 and batch_idx % logging_interval == 0:
-                logging.info(f'=== train epoch {epoch_no},'
-                             f' [{batch_idx * len(batch)}/{len(dataloader.dataset)}] '
-                             f'-> batch loss: {loss_float}')
+                log.info(f'=== train epoch {epoch_no},'
+                         f' [{batch_idx * len(batch)}/{len(dataloader.dataset)}] '
+                         f'-> batch loss: {loss_float}')
         return EpochLoss(sum(mean_loss) / len(mean_loss))
 
     T_val_step = Callable[[Union[BM, CBM, CVBM, SmDataParallel], DataLoader,
@@ -710,9 +714,9 @@ class ModelRunner:
                 experiment.log_metric("batch_val_loss", loss_float, step=epoch_no * batch_idx)
 
                 if logging_interval != -1 and batch_idx % logging_interval == 0:
-                    logging.info(f'=== validation epoch {epoch_no}, '
-                                 f'[{batch_idx * len(batch)}/{len(val_dataloader.dataset)}]'
-                                 f'-> batch loss: {loss.item()} ===')
+                    log.info(f'=== validation epoch {epoch_no}, '
+                             f'[{batch_idx * len(batch)}/{len(val_dataloader.dataset)}]'
+                             f'-> batch loss: {loss.item()} ===')
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 

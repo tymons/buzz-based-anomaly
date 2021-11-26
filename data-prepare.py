@@ -19,6 +19,8 @@ from utils.utils import create_valid_sounds_datalist
 from utils.data_prepare_type import DataPrepareType
 from features.sound_dataset import read_samples
 
+log = logging.getLogger("smartula")
+
 
 def generate_wav_from_mp3(mp3_filepath: Path, remove_mp3: bool = False):
     """
@@ -34,7 +36,7 @@ def generate_wav_from_mp3(mp3_filepath: Path, remove_mp3: bool = False):
         try:
             mp3_filepath.unlink()
         except OSError as e:
-            logging.error(f'Error at deleting mp3 file: {mp3_filepath} with {e.strerror}')
+            log.error(f'Error at deleting mp3 file: {mp3_filepath} with {e.strerror}')
 
     return new_wav_filename
 
@@ -67,7 +69,7 @@ def extract_bees_sounds_from_file(labfile_path: Path, output_folder: Path):
                     output_filenames.append(output_filename)
             return output_filenames
         except IndexError:
-            logging.error(f'file {sound_filenames[0]} not supported for wav conversion! only mp3 format supported!')
+            log.error(f'file {sound_filenames[0]} not supported for wav conversion! only mp3 format supported!')
             return []
 
 
@@ -77,13 +79,13 @@ def prepare_nuhive_data(path: Path):
     :param path:  where
     """
     files = list(path.glob('**/*.lab'))
-    logging.info(f'got  {len(files)} lab files to process')
+    log.info(f'got  {len(files)} lab files to process')
     for file_path in files:
         try:
             new_filenames = extract_bees_sounds_from_file(Path(file_path), path.parent / 'nu-hive-processed')
-            logging.info(f'generated {len(new_filenames)} from {file_path} file!')
+            log.info(f'generated {len(new_filenames)} from {file_path} file!')
         except FileNotFoundError:
-            logging.warning(f'missing sound file for {file_path}.')
+            log.warning(f'missing sound file for {file_path}.')
 
 
 def _download_data(download_folder: Path, start_utc_timestamp: int, end_utc_timestamp: int, hive_sn: str, api_url: str,
@@ -123,7 +125,7 @@ def prepare_smartula_data(dataset_path: Path, start_utc_imestamp: int, end_utc_t
     intervals = list(zip(timestamps[:-1], timestamps[1:]))
 
     for hive_sn in hive_list:
-        logging.debug(f'downloading data for {hive_sn} hive...', flush=True)
+        log.debug(f'downloading data for {hive_sn} hive...', flush=True)
         hive_path = dataset_path / hive_sn
         hive_path.mkdir(parents=True, exist_ok=True)
         for start, end in tqdm(intervals):
@@ -134,7 +136,7 @@ def prepare_smartula_data(dataset_path: Path, start_utc_imestamp: int, end_utc_t
             try:
                 file_path.unlink()
             except OSError as e:
-                logging.error(f'Error: {file_path} : {e.strerror}')
+                log.error(f'Error: {file_path} : {e.strerror}')
 
     create_valid_sounds_datalist(dataset_path)
 
@@ -146,7 +148,7 @@ def generate_fragmented_sound_files(files: List[Path], duration_ms: int) -> List
     :param duration_ms:
     """
     output_filenames = []
-    logging.info(f'got  {len(files)} sound files to process')
+    log.info(f'got  {len(files)} sound files to process')
     for file_path in tqdm(files):
         audio = AudioSegment.from_wav(file_path)
         if audio.duration_seconds * 1000 >= duration_ms:
@@ -173,7 +175,7 @@ def get_valid_sampling_rate_sound_files(files: List[Path], generate: bool, new_s
         sound_samples, sampling_rate = read_samples(filename, True)
         if sampling_rate != new_sampling_rate:
             if generate:
-                sound_samples = sig.resample(sound_samples, (len(sound_samples)//sampling_rate) * new_sampling_rate)
+                sound_samples = sig.resample(sound_samples, (len(sound_samples) // sampling_rate) * new_sampling_rate)
                 filename = f'{filename.with_suffix("")}-upsampled.wav'
                 wavfile.write(filename, new_sampling_rate, sound_samples.astype('int16'))
                 output_filenames.append(filename)
@@ -217,16 +219,16 @@ def main():
         if args.task == DataPrepareType.FRAGMENT_HIVE_AUDIO:
             assert args.duration, "duration argument should be specified!"
             fragmented_sound_filenames = generate_fragmented_sound_files(sound_files, args.duration * 1000)
-            logging.info(f'sound data processed with fragment resulting set of {len(fragmented_sound_filenames)} '
-                         f'audio files.')
+            log.info(f'sound data processed with fragment resulting set of {len(fragmented_sound_filenames)} '
+                     f'audio files.')
             sound_files_to_remove.update(sound_files)
 
         if args.task == DataPrepareType.UPSAMPLE_HIVE_AUDIO:
             assert args.sampling_rate, "sampling rate argument should be specified!"
             valid_sampling_filenames = get_valid_sampling_rate_sound_files(sound_files, generate=True,
                                                                            new_sampling_rate=args.sampling_rate)
-            logging.info(f'sound data processed with upsample resulting set of {len(valid_sampling_filenames)} '
-                         f'audio files.')
+            log.info(f'sound data processed with upsample resulting set of {len(valid_sampling_filenames)} '
+                     f'audio files.')
             sound_files_to_remove = set(sound_files) - set(list(map(Path, valid_sampling_filenames)))
 
         for file in sound_files_to_remove:
