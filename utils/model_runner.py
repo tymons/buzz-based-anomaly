@@ -461,7 +461,7 @@ class ModelRunner:
                 val_epoch_loss = val_step_func(model, val_dataloader, experiment, epoch, log_interval)
                 experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
                 early_stopping_loss = val_epoch_loss
-                log.info(f'--- train epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
+                log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
             patience = self.early_stopping_callback(early_stopping_loss.model_loss, patience_init_val)
             if patience == patience_init_val:
@@ -528,7 +528,7 @@ class ModelRunner:
                 val_epoch_loss = self._val_contrastive_step(model, val_dataloader, experiment, epoch, log_interval)
                 experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
                 early_stopping_loss = val_epoch_loss
-                log.info(f'--- train epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
+                log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
             patience = self.early_stopping_callback(early_stopping_loss.model_loss, patience_init_val)
             if patience == patience_init_val:
