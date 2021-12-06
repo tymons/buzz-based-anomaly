@@ -134,27 +134,23 @@ def model_save(model: Union[BM, VBM, CBM, CVBM, SmDataParallel],
          'loss': loss}, output_path)
 
 
-def model_load(checkpoint_filepath: Path, model: Union[BM, VBM, CVBM, CBM, SmDataParallel],
-               optimizer: Optimizer = None, gpu_ids=None):
+def model_load(checkpoint_filepath: Path, model: Union[BM, VBM, CVBM, CBM],
+               optimizer: Optimizer = None):
     """
     Function for loading model from disc
-    :param gpu_ids: ids of gpus to be used
     :param checkpoint_filepath: checkpoint path
     :param model: empty object of BaseClass
     :param optimizer: optimizer
     :return: epoch, loss
     """
-    checkpoint = torch.load(checkpoint_filepath)
-    if any([key.startswith('module') for key in checkpoint['model_state_dict'].keys()]):
-        model = SmDataParallel(model, gpu_ids)
-
+    checkpoint = torch.load(checkpoint_filepath, map_location=torch.device('cpu'))
     model.load_state_dict(checkpoint['model_state_dict'])
     if optimizer:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch']
     loss = checkpoint['loss']
 
-    return epoch, loss
+    return model, epoch, loss
 
 
 def modify_optuna_learning_config(learning_config: dict, trial: optuna.Trial) -> Dict[str, Any]:
@@ -353,9 +349,10 @@ class ModelRunner:
         output = torch.Tensor()
         with torch.no_grad():
             for (batch, _) in dataloader:
+                batch = batch.to(self.device)
                 output = torch.cat((output, model.get_latent(batch).cpu()))
 
-        return output
+        return output.squeeze()
 
     def train(self,
               model: Union[BM, VBM],
@@ -469,7 +466,7 @@ class ModelRunner:
                 model_save(model, checkpoint_path, optimizer, epoch, train_epoch_loss.model_loss)
             elif patience == 0:
                 log.info(f' ___ early stopping at epoch {epoch} ___')
-                epoch, _ = model_load(checkpoint_path, model, optimizer, gpu_ids=self.gpu_ids)
+                model, _, _ = model_load(checkpoint_path, model, optimizer)
                 break
 
         return model
@@ -538,7 +535,7 @@ class ModelRunner:
                            epoch_loss.discriminator_loss)
             elif patience == 0:
                 log.info(f' ___ early stopping at epoch {epoch} ___')
-                epoch, _ = model_load(model_checkpoint_path, model, model_optimizer, gpu_ids=self.gpu_ids)
+                model, _, _ = model_load(model_checkpoint_path, model, model_optimizer)
                 break
 
         return model

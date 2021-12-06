@@ -27,6 +27,7 @@ CBM = ContrastiveBaseModel
 VBM = VaeBaseModel
 
 log = logging.getLogger("smartula")
+print = log
 
 
 def count_parameters(model):

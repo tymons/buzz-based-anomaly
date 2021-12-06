@@ -9,6 +9,7 @@ from typing import Union, List
 
 class Autoencoder(BaseModel):
     """ Vanilla autoencoder """
+
     def __init__(self, layers: List[int], latent_size: int, input_size: int,
                  dropout: Union[List[float], float] = 0.2):
         super().__init__()
@@ -57,12 +58,14 @@ class Encoder(nn.Module):
 
         # input layer
         self.MLP.add_module(name=f"L{0}", module=nn.Linear(input_size, layer_sizes[0]))
+        self.MLP.add_module(name=f"D{0}", module=nn.Dropout(p=dropout[0]))
         self.MLP.add_module(name=f"A{0}", module=nn.ReLU())
         # following layers
         for i, (in_size, out_size) in enumerate(zip(layer_sizes[:-1], layer_sizes[1:]), 1):
             self.MLP.add_module(name=f"L{i}", module=nn.Linear(in_size, out_size))
+            if i < len(dropout):
+                self.MLP.add_module(name=f"D{i}", module=nn.Dropout(p=dropout[i]))
             self.MLP.add_module(name=f"A{i}", module=nn.ReLU())
-            self.MLP.add_module(name=f"D{i}", module=nn.Dropout(p=dropout[i]))
 
     def forward(self, x):
         x = self.MLP(x)
@@ -79,13 +82,18 @@ class Decoder(nn.Module):
         self.MLP = nn.Sequential()
 
         input_size = latent_size
-        for i, (in_size, out_size) in enumerate(zip([input_size] + layer_sizes[:-1], layer_sizes)):
+        layers = list(zip([input_size] + layer_sizes[:-1], layer_sizes))
+        for i, (in_size, out_size) in enumerate(layers):
             self.MLP.add_module(name=f"L{i}", module=nn.Linear(in_size, out_size))
+            if 0 < i < len(dropout):
+                self.MLP.add_module(name=f"D{i}", module=nn.Dropout(p=dropout[i]))
             self.MLP.add_module(name=f"A{i}", module=nn.ReLU())
-            self.MLP.add_module(name=f"D{i}", module=nn.Dropout(p=dropout[i]))
+
         # output layer
-        self.MLP.add_module(name=f"L{len(layer_sizes) + 1}", module=nn.Linear(layer_sizes[-1], output_size))
-        self.MLP.add_module(name="activation", module=nn.Sigmoid())
+        self.MLP.add_module(name=f"L{len(layers)}", module=nn.Linear(layer_sizes[-1], output_size))
+        if len(dropout) >= len(layers):
+            self.MLP.add_module(name=f"D{len(layers)}", module=nn.Dropout(p=dropout[len(layers) - 1]))
+        self.MLP.add_module(name=f"A{len(layers)}", module=nn.Sigmoid())
 
     def forward(self, z):
         x = self.MLP(z)
@@ -96,12 +104,11 @@ class EncoderWithLatent(Encoder):
     def __init__(self, layer_sizes: List[int], latent_size: int, dropout: List[float],
                  input_size: Union[int, tuple]):
         super().__init__(layer_sizes, dropout, input_size)
+
         # add last fc layer to get latent vector
-        self.latent_layer = nn.Linear(layer_sizes[-1], latent_size)
-        self.relu = nn.ReLU()
+        self.MLP.add_module(name=f'latent_layer_{len(layer_sizes)}', module=nn.Linear(layer_sizes[-1], latent_size))
+        self.MLP.add_module(name=f'latent_relu_{len(layer_sizes)}', module=nn.ReLU())
 
     def forward(self, x):
         x = self.MLP(x)
-        x = self.latent_layer(x)
-        x = self.relu(x)
         return x
