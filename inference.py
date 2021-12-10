@@ -88,9 +88,11 @@ def main():
             output_data_folder = Path('output/data/')
             output_data_folder.mkdir(parents=True, exist_ok=True)
             target_data_file = output_data_folder / Path(f'{model_type.model_name}') / Path(
-                f'{args.target_data_folder.stem}-{"-".join(args.model_path.stem.split("-")[:3])}-{args.feature.value}-target_data.npy')
+                f'{args.target_data_folder.stem}-{"-".join(args.model_path.stem.split("-")[:3])}-{args.feature.value}'
+                f'-target_data.npy')
             anomaly_data_file = output_data_folder / Path(f'{model_type.model_name}') / Path(
-                f'{args.anomaly_data_folder.stem}-{"-".join(args.model_path.stem.split("-")[:3])}-{args.feature.value}-anomaly_data.npy')
+                f'{args.anomaly_data_folder.stem}-{"-".join(args.model_path.stem.split("-")[:3])}-{args.feature.value}'
+                f'-anomaly_data.npy')
             np.save(str(target_data_file), hive_latent.detach().numpy())
             np.save(str(anomaly_data_file), anomaly_latent.detach().numpy())
 
