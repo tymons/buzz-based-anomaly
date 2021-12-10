@@ -72,4 +72,4 @@ class TestMelSpectrogramDataset(unittest.TestCase):
         (melspectrogram, frequencies, times), _ = dataset.get_item(0)
 
         self.assertGreaterEqual(0.0, melspectrogram.min(), "melspectrogram should be scaled")
-        self.assertLessEqual(melspectrogram.max(), 1.0, "melspectrogram should be scaled")
+        self.assertLessEqual(round(melspectrogram.max().item(), 2), 1.0, "melspectrogram should be scaled")
