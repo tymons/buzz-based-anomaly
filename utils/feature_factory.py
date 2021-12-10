@@ -1,4 +1,5 @@
 import logging
+import torchaudio
 
 from torch.utils.data import DataLoader, Dataset, random_split
 
@@ -76,7 +77,10 @@ class SoundFeatureFactory:
         data_round: bool = features_params_dict.get('round_power_2')
         n_mels: int = features_params_dict.get('nmels')
 
-        return MelSpectrogramDataset(sound_filenames, labels, n_fft, hop_len, convert_db, slice_freq,
+        # we assume that all sound recordings has the same sampling frequency as first file
+        _, sampling_rate = torchaudio.load(sound_filenames[0])
+
+        return MelSpectrogramDataset(sound_filenames, labels, sampling_rate, n_fft, hop_len, convert_db, slice_freq,
                                      round_data_shape=data_round, window=window, n_mels=n_mels)
 
     @staticmethod
