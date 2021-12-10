@@ -1,4 +1,3 @@
-import torch
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -62,3 +61,4 @@ class GMMAnomalyScorer:
 
         labels_predicted = self.model.predict(self._data)
         return f1_score(self._labels, labels_predicted)
+    
