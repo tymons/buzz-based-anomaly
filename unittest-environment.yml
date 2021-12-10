@@ -8,6 +8,7 @@ dependencies:
   - python==3.8.5
   - numpy
   - pytorch
+  - torchaudio
   - scikit-learn
   - pyyaml
   - pydub
