@@ -60,5 +60,5 @@ class GMMAnomalyScorer:
             raise ValueError("Model not fit, please run fit() method first")
 
         labels_predicted = self.model.predict(self._data)
+
         return f1_score(self._labels, labels_predicted)
-    
