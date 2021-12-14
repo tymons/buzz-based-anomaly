@@ -107,7 +107,10 @@ def get_valid_sounds_from_folders(folder_list: List[Path], valid_file_filename: 
             with summary_file.open('r') as f:
                 sound_filenames += list(map(lambda x: folder / x, f.read().splitlines()))
         else:
-            log.warning(f'{valid_file_filename} for folder {folder} does not exists! skipping')
+            log.warning(f'{valid_file_filename} for folder {folder} does not exists!')
+            if folder.is_dir():
+                log.debug('trying to go one level deeper...')
+                sound_filenames = get_valid_sounds_from_folders(list(folder.glob('*')))
 
     return sound_filenames
 
