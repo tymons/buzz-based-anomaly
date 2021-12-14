@@ -38,6 +38,8 @@ def main():
     parser.add_argument('--filter_dates', nargs=2, type=datetime.fromisoformat,
                         help="Start and end date for sound data with format YYYY-MM-DD", metavar='START_DATE END_DATE')
     parser.add_argument('--no_save_inference_data', dest='save_data', action='store_false')
+    parser.add_argument('--output_folder', metavar='output folder', type=Path, help='output data folder for latent '
+                                                                                    'hive data')
     parser.set_defaults(feature=True)
 
     args = parser.parse_args()
@@ -72,8 +74,8 @@ def main():
         assert hive_data_shape == anomaly_data_shape, "anomaly and hive data are not consistent!"
 
         logging.debug(f'got dataset of shape: {hive_data_shape}')
-        hive_dataloader = DataLoader(hive_dataset, batch_size=64, shuffle=True, drop_last=False, num_workers=0)
-        anomaly_dataloader = DataLoader(anomaly_dataset, batch_size=64, shuffle=True, drop_last=False, num_workers=0)
+        hive_dataloader = DataLoader(hive_dataset, batch_size=32, shuffle=True, drop_last=False, num_workers=0)
+        anomaly_dataloader = DataLoader(anomaly_dataset, batch_size=32, shuffle=True, drop_last=False, num_workers=0)
 
         model_type: HiveModelType = HiveModelType.from_name(args.model_path.stem.split('-')[0])
         model = HiveModelFactory.build_model(model_type, hive_data_shape, model_config['model'])
@@ -85,12 +87,12 @@ def main():
         anomaly_latent = model_runner.inference_latent(model, anomaly_dataloader)
 
         if args.save_data:
-            output_data_folder = Path('output/data/')
+            output_data_folder = Path(args.output_folder)
             output_data_folder.mkdir(parents=True, exist_ok=True)
-            target_data_file = output_data_folder / Path(f'{model_type.model_name}') / Path(
+            target_data_file = output_data_folder / Path(
                 f'{args.target_data_folder.stem}-{"-".join(args.model_path.stem.split("-")[:3])}-{args.feature.value}'
                 f'-target_data.npy')
-            anomaly_data_file = output_data_folder / Path(f'{model_type.model_name}') / Path(
+            anomaly_data_file = output_data_folder / Path(
                 f'{args.anomaly_data_folder.stem}-{"-".join(args.model_path.stem.split("-")[:3])}-{args.feature.value}'
                 f'-anomaly_data.npy')
             np.save(str(target_data_file), hive_latent.detach().numpy())
