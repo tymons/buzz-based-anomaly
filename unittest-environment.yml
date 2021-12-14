@@ -1,8 +1,8 @@
 name: pytorch-cuda-env
 channels:
   - defaults
-  - conda-forge
   - pytorch
+  - conda-forge
   - comet_ml
 dependencies:
   - python==3.8.10
