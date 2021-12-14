@@ -44,9 +44,12 @@ def main():
                         help="hive name for which fingerprint should be calculated")
     parser.add_argument('--fingerprint_feature_file', default=Path(__file__).absolute().parent / "feature.csv",
                         type=Path)
-    parser.add_argument('--contrastive_data_folder', type=Path)
+    parser.add_argument('--contrastive_data_folders', nargs='+', type=Path)
+    parser.add_argument('--use_contrastive_valid_file', dest='use_contrastive_valid_file', action='store_true',
+                        help='Flag for using valid_sound.txt file (applicable only for smartula folders)')
     parser.add_argument('--gpu_ids', type=int, nargs='+', help="ids for gpus which should be used")
 
+    parser.set_defaults(feature=False)
     args = parser.parse_args()
 
     utils.logger_setup(args.log_folder, f"{args.model.model_name}-{args.feature.value}")
@@ -87,24 +90,29 @@ def main():
             log.info(f'after fingerprint filtering got {len(sound_list)} recordings')
 
         # preparse background filenames if needed
-        if args.contrastive_data_folder is not None:
-            background_filenames = list(args.contrastive_data_folder.glob('**/*.wav'))
-            random.shuffle(background_filenames)
-            if len(sound_list) > len(background_filenames):
-                log.info(f'truncating taget dataset to the length of {len(background_filenames)}')
-                sound_list = sound_list[:len(background_filenames)]
-                sound_labels = sound_labels[:len(background_filenames)]
+        if args.contrastive_data_folders is not None:
+            if not args.use_contrastive_valid_file:
+                background_files = [file for folder in args.contrastive_data_folders
+                                    for file in list(folder.glob('**/*.wav'))]
+            else:
+                background_files = utils.get_valid_sounds_from_folders(args.contrastive_data_folders)
+
+            random.shuffle(background_files)
+            if len(sound_list) > len(background_files):
+                log.info(f'truncating taget dataset to the length of {len(background_files)}')
+                sound_list = sound_list[:len(background_files)]
+                sound_labels = sound_labels[:len(background_files)]
             else:
                 log.info(f'truncating background dataset to the length of: {len(sound_list)}')
-                background_filenames = background_filenames[:len(sound_list)]
+                background_files = background_files[:len(sound_list)]
 
         # build datasets and dataloader
         dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, sound_labels, feature_config)
         data_shape = dataset[0][0].squeeze().shape
         log.debug(f'got dataset of shape: {data_shape}')
-        if args.contrastive_data_folder is not None:
-            background_dataset = SoundFeatureFactory.build_dataset(args.feature, background_filenames,
-                                                                   [0] * len(background_filenames),
+        if args.contrastive_data_folders is not None:
+            background_dataset = SoundFeatureFactory.build_dataset(args.feature, background_files,
+                                                                   [0] * len(background_files),
                                                                    feature_config)
             log.debug(f'got background dataset for contrastive learning of shape:'
                       f' {background_dataset[0][0].squeeze().shape}')

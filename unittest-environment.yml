@@ -5,9 +5,9 @@ channels:
   - pytorch
   - comet_ml
 dependencies:
-  - python==3.8.5
+  - python==3.8.10
   - numpy
-  - pytorch
+  - pytorch==1.9.0
   - torchaudio
   - scikit-learn
   - pyyaml
