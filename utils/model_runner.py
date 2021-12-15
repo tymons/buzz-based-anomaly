@@ -627,7 +627,7 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
-        with torch.no_grad:
+        with torch.no_grad():
             for batch_idx, (target, background) in enumerate(val_dataloader):
                 target_batch = target.to(self.device)
                 background_batch = background.to(self.device)
