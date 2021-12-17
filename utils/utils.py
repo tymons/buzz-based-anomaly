@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import List, Union, Tuple, Callable, Dict
 from scipy.signal import resample
 from multiprocessing.pool import ThreadPool
-from tqdm import tqdm
 
 from utils.side_scripts.weather_feature_type import WeatherFeatureType
 
