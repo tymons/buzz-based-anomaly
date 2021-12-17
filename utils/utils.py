@@ -20,6 +20,8 @@ from tqdm import tqdm
 from pathlib import Path
 from typing import List, Union, Tuple, Callable, Dict
 from scipy.signal import resample
+from multiprocessing.pool import ThreadPool
+from tqdm import tqdm
 
 from utils.side_scripts.weather_feature_type import WeatherFeatureType
 
@@ -485,7 +487,7 @@ def hour_step_filter(xy_trend: List[Tuple], aux_trends: Dict[str, List[Tuple]],
         aux_y_trend = aux_y_trend - aux_y_trend.mean()
 
         start_time, end_time = most_varied_interval(y_trend, aux_y_trend, x_trend, step_sensitivity)
-        print(f'core vs aux hive ({hive_name}) start/end: {start_time}/{end_time}')
+        log.debug(f'fingerprint base vs aux hive ({hive_name}) start/end: {start_time}/{end_time}')
         start_daystamps.append(start_time.hour * 3600 + start_time.minute + 60 + start_time.second)
         end_daystamps.append(end_time.hour * 3600 + end_time.minute + 60 + end_time.second)
 
@@ -551,14 +553,12 @@ def hive_fingerprint(df: pd.DataFrame, fingerprint_hive_name: str, weather_type:
     """
     Method for extracting bee fingerprint
     :param df: pandas dataframe with all hives, features and outdoor feature (temperature, humidity etc.)
+               index should be a timestmap
     :param fingerprint_hive_name: hivename for main fingerprint calculation
     :param weather_type: weather type used in csv file (eg. temperature)
     :param hour_beeday_start: bee day start hour
     :param hour_beeday_end: bee day end hour
     """
-    df['datetime'] = pd.to_datetime(df['datetime'], utc=True)
-    df = df.set_index('datetime')
-
     hives_available = df['hive'].unique()
     hive_filtered_trends = {}
     hive_temperature_map = {}
@@ -584,9 +584,11 @@ def filter_hive_fingerprint(csv_feature_weather_path: Path,
                             weather_type: WeatherFeatureType = WeatherFeatureType.TEMPERATURE,
                             hour_beeday_start: int = 4,
                             hour_beeday_end: int = 23,
-                            quiet=False):
+                            quiet=False,
+                            num_workers=8):
     """
     Function for fingerprint filtering method from https://www.sciencedirect.com/science/article/pii/S0168169921005068
+    :param num_workers: number of workers used in fingerpint soundfile filtering
     :param fingerprint_sound_list: sound list to be filtered note that this should be sounds only for fingerprint hive!
     :param hour_beeday_end:
     :param hour_beeday_start:
@@ -600,6 +602,8 @@ def filter_hive_fingerprint(csv_feature_weather_path: Path,
     f_hive_sound_list = filter_path_list(fingerprint_sound_list.copy(), fingerprint_hive_name)
 
     df = pd.read_csv(csv_feature_weather_path, usecols=['datetime', 'hive', 'feature', weather_type.value])
+    df['datetime'] = pd.to_datetime(df['datetime'], utc=True)
+    df = df.set_index('datetime')
 
     # calculate main fingerprint
     (f_start, f_end), f_temperatures = hive_fingerprint(df, fingerprint_hive_name, weather_type, hour_beeday_start,
@@ -612,15 +616,24 @@ def filter_hive_fingerprint(csv_feature_weather_path: Path,
         hive_tfiltered_sound_timestamps.extend(hgroup[hgroup[weather_type.value] >= f_temperatures[hour]].index.values)
 
     # fingerprint filter by time
-    f_hive_sound_datetime = set(map(lambda x: parse_smartula_datetime(x).replace(tzinfo=pytz.UTC), f_hive_sound_list))
-    temperature_filtered_datetime = set(map(lambda x: x.to_pydatetime(), hive_tfiltered_sound_timestamps))
+    f_hive_sound_datetime = set(map(lambda x: pd.Timestamp(parse_smartula_datetime(x)).tz_localize(pytz.UTC),
+                                    f_hive_sound_list))
+    temperature_filtered_datetime = set(map(lambda x: pd.Timestamp(x).tz_localize(pytz.UTC),
+                                            hive_tfiltered_sound_timestamps))
     fingerprint_datetimes = f_hive_sound_datetime & temperature_filtered_datetime
     fingerprint_datetimes = list(filter(lambda x: f_start <= x.time() <= f_end, fingerprint_datetimes))
     fingerprint_datetimes = list(map(lambda y: y.strftime("%Y-%m-%dT%H-%M-%S"), fingerprint_datetimes))
-    f_hive_sound_list = filter_path_list(f_hive_sound_list, *fingerprint_datetimes)
+
+    def process(datetimes_list):
+        filter_path_list(f_hive_sound_list, *datetimes_list)
+
+    with ThreadPool(num_workers) as pool:
+        filenames = list(tqdm(pool.imap(process, fingerprint_datetimes), total=len(fingerprint_datetimes)))
 
     if not quiet:
         log.info(f'fingerprint time range: {f_start}/{f_end}')
         log.info(f'fingerprint temperatures: {f_temperatures}')
+        log.info(f'after fingerprint filtering got {len(filenames)} recordings '
+                 f'which is {len(filenames)/len(f_hive_sound_list) * 100}% of initial data')
 
-    return f_hive_sound_list
+    return filenames
