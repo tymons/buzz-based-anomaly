@@ -85,9 +85,8 @@ def main():
         # fingerprint filtering
         if args.fingerprint_main_hive is not None:
             sound_list = utils.filter_hive_fingerprint(args.fingerprint_feature_file,
-                                                       args.fingerptint_main_hive,
+                                                       args.fingerprint_main_hive,
                                                        sound_list)
-            log.info(f'after fingerprint filtering got {len(sound_list)} recordings')
 
         # preparse background filenames if needed
         if args.contrastive_data_folders is not None:
