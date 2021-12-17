@@ -580,7 +580,7 @@ def hive_fingerprint(df: pd.DataFrame, fingerprint_hive_name: str, weather_type:
 
 def filter_hive_fingerprint(csv_feature_weather_path: Path,
                             fingerprint_hive_name: str,
-                            fingerprint_sound_list: List[Path],
+                            sound_list: List[Path],
                             weather_type: WeatherFeatureType = WeatherFeatureType.TEMPERATURE,
                             hour_beeday_start: int = 4,
                             hour_beeday_end: int = 23,
@@ -589,7 +589,7 @@ def filter_hive_fingerprint(csv_feature_weather_path: Path,
     """
     Function for fingerprint filtering method from https://www.sciencedirect.com/science/article/pii/S0168169921005068
     :param num_workers: number of workers used in fingerpint soundfile filtering
-    :param fingerprint_sound_list: sound list to be filtered note that this should be sounds only for fingerprint hive!
+    :param sound_list: sound list to be filtered note that this should be sounds only for fingerprint hive!
     :param hour_beeday_end:
     :param hour_beeday_start:
     :param fingerprint_hive_name: hive name for which fingerprint should be calculated
@@ -599,7 +599,7 @@ def filter_hive_fingerprint(csv_feature_weather_path: Path,
     :return: utc most distinctive start time, utc most distinctive end time,
              temperatures threshold for every hour within day
     """
-    f_hive_sound_list = filter_path_list(fingerprint_sound_list.copy(), fingerprint_hive_name)
+    f_hive_sound_list = filter_path_list(sound_list.copy(), fingerprint_hive_name)
 
     df = pd.read_csv(csv_feature_weather_path, usecols=['datetime', 'hive', 'feature', weather_type.value])
     df['datetime'] = pd.to_datetime(df['datetime'], utc=True)
@@ -624,16 +624,17 @@ def filter_hive_fingerprint(csv_feature_weather_path: Path,
     fingerprint_datetimes = list(filter(lambda x: f_start <= x.time() <= f_end, fingerprint_datetimes))
     fingerprint_datetimes = list(map(lambda y: y.strftime("%Y-%m-%dT%H-%M-%S"), fingerprint_datetimes))
 
-    def process(datetimes_list):
-        filter_path_list(f_hive_sound_list, *datetimes_list)
+    def process(datetime_str):
+        return filter_path_list(f_hive_sound_list, datetime_str)
 
     with ThreadPool(num_workers) as pool:
-        filenames = list(tqdm(pool.imap(process, fingerprint_datetimes), total=len(fingerprint_datetimes)))
+        fingerprint_filenames = list(tqdm(pool.imap(process, fingerprint_datetimes), total=len(fingerprint_datetimes)))
+        fingerprint_filenames = [x for sublist in fingerprint_filenames for x in sublist]  # flatten
 
     if not quiet:
         log.info(f'fingerprint time range: {f_start}/{f_end}')
         log.info(f'fingerprint temperatures: {f_temperatures}')
-        log.info(f'after fingerprint filtering got {len(filenames)} recordings '
-                 f'which is {len(filenames)/len(f_hive_sound_list) * 100}% of initial data')
+        log.info(f'after fingerprint filtering got {len(fingerprint_filenames)} recordings '
+                 f'which is {len(fingerprint_filenames) / len(f_hive_sound_list) * 100:.2f}% of initial data')
 
-    return filenames
+    return fingerprint_filenames
