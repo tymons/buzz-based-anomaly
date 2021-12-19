@@ -1,20 +1,15 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from collections import namedtuple
 
 import torch
 from torch import nn
 
-
-@dataclass
-class VaeOutput:
-    output: torch.Tensor
-    log_var: torch.Tensor
-    mean: torch.Tensor
+VaeOutput = namedtuple('VaeOutput', ['output', 'log_var', 'mean'])
 
 
 def kld_loss(mean, log_var):
     """ KLD loss for normal distribution"""
-    return -0.5 * torch.sum(1 + log_var - mean ** 2 - log_var.exp())
+    return torch.mean(-0.5 * torch.sum(1 + log_var - mean ** 2 - log_var.exp(), dim=1), dim=0)
 
 
 def reparameterize(mu, log_var):

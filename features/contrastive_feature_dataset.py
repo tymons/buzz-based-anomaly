@@ -1,22 +1,17 @@
 from features.sound_dataset import SoundDataset
 from torch.utils.data import Dataset
-from dataclasses import dataclass
-from torch import Tensor
-from typing import Optional
+from collections import namedtuple
 
-
-@dataclass(frozen=True)
-class ContrastiveOutput:
-    target: Tensor
-    background: Tensor
-    target_qs_mean: Optional[float] = None
-    target_qs_log_var: Optional[float] = None
-    target_qz_mean: Optional[float] = None
-    target_qz_log_var: Optional[float] = None
-    background_qz_mean: Optional[float] = None
-    background_qz_log_var: Optional[float] = None
-    target_qs_latent: Optional[Tensor] = None
-    target_qz_latent: Optional[Tensor] = None
+ContrastiveOutput = namedtuple('ContrastiveOutput', ['target',
+                                                     'background',
+                                                     'target_qs_mean',
+                                                     'target_qs_log_var',
+                                                     'target_qz_mean',
+                                                     'target_qz_log_var',
+                                                     'background_qz_mean',
+                                                     'background_qz_log_var',
+                                                     'target_qs_latent',
+                                                     'target_qz_latent'])
 
 
 class ContrastiveFeatureDataset(Dataset):
