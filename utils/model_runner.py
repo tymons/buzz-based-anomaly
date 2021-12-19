@@ -583,7 +583,7 @@ class ModelRunner:
             loss_float = loss.item()
             mean_loss.append(loss_float)
 
-            experiment.log_metric("batch_train_loss", loss_float, step=epoch * batch_idx)
+            experiment.log_metric("batch_train_loss", loss_float, step=(epoch * len(dataloader)) + batch_idx)
             if logging_interval != -1 and batch_idx % logging_interval == 0:
                 log.info(f'=== train epoch {epoch},'
                          f' [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
