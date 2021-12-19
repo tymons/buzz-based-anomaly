@@ -133,7 +133,7 @@ class SoundFeatureFactory:
 
     @staticmethod
     def build_train_and_validation_dataloader(dataset: SoundDataset, batch_size: int,
-                                              ratio: float = 0.15, num_workers: int = 0, drop_last=False) -> \
+                                              ratio: float = 0.3, num_workers: int = 0, drop_last=False) -> \
             (DataLoader, DataLoader):
         """
         Building train and validation pytorch loader
