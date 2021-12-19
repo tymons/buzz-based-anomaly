@@ -16,6 +16,7 @@ from tqdm import tqdm
 from pathlib import Path
 from typing import Any, Dict
 
+from models.discriminator import Discriminator
 from models.model_type import HiveModelType
 from models.vanilla.base_model import BaseModel
 from models.variational.vae_base_model import VaeBaseModel
@@ -527,7 +528,8 @@ class ModelRunner:
             log.info(f'--- train epoch {epoch} end with train loss: {epoch_loss.model_loss}')
             early_stopping_loss = epoch_loss
             if val_dataloader is not None:
-                val_epoch_loss = self._val_contrastive_step(model, val_dataloader, experiment, epoch, log_interval)
+                val_epoch_loss = self._val_contrastive_step(model, val_dataloader, experiment, epoch, log_interval,
+                                                            discriminator=discriminator)
                 experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
                 early_stopping_loss = val_epoch_loss
                 log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
@@ -601,7 +603,8 @@ class ModelRunner:
 
                 discriminator_loss_float = dloss.item()
                 discriminator_mean_loss.append(discriminator_loss_float)
-                experiment.log_metric("discriminator_batch_train_loss", dloss, step=(epoch*len(dataloader))+batch_idx)
+                experiment.log_metric("discriminator_batch_train_loss", dloss,
+                                      step=(epoch * len(dataloader)) + batch_idx)
                 if logging_interval != -1 and batch_idx % logging_interval == 0:
                     log.info(f'-> discriminator loss: {discriminator_loss_float}')
 
@@ -615,7 +618,8 @@ class ModelRunner:
                               val_dataloader: DataLoader,
                               experiment: Experiment,
                               epoch_no: int,
-                              logging_interval: int) -> EpochLoss:
+                              logging_interval: int,
+                              discriminator: Discriminator = None) -> EpochLoss:
         """
         Function for performing validation step for model
         :param model: model to be evaluated
@@ -623,6 +627,7 @@ class ModelRunner:
         :param experiment: comet ml experiment
         :param epoch_no: epoch number for validation step - mostly for logging
         :param logging_interval: interval for logs within epoch
+        :param discriminator: discriminator to be used for vaes and density ratio trick
         :return:
         """
         val_loss = []
@@ -633,8 +638,12 @@ class ModelRunner:
                 background_batch = background.to(self.device)
                 model_output = model(target_batch, background_batch)
 
-                loss = model.loss_fn(target_batch, background_batch, model_output)
+                loss = model.loss_fn(target_batch, background_batch, model_output,
+                                     discriminator) if discriminator is not None else model.loss_fn(target_batch,
+                                                                                                    background_batch,
+                                                                                                    model_output)
                 loss_float = loss.item()
+
                 val_loss.append(loss_float)
                 experiment.log_metric("batch_val_loss", loss_float, step=(epoch_no * len(val_dataloader)) + batch_idx)
 
