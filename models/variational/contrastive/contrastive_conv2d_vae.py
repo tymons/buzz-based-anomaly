@@ -61,6 +61,9 @@ class ContrastiveConv2DVAE(cvbm.ContrastiveVariationalBaseModel):
         q = torch.cat((model_output.target_qs_latent, model_output.target_qz_latent), dim=-1).squeeze()
         q_bar = cvbm.latent_permutation(q)
         q_score, q_bar_score = discriminator(q, q_bar)
+        tc_loss = torch.mean(torch.logit(q_score))
+        loss += tc_loss
+
         disc_loss = discriminator.loss_fn(q_score, q_bar_score)
         loss += disc_loss
 
