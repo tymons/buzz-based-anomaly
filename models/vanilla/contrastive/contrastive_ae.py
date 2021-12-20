@@ -1,5 +1,4 @@
 import torch
-from torch import functional, Tensor
 
 from typing import List, Union
 
@@ -22,19 +21,6 @@ class ContrastiveAE(ContrastiveBaseModel):
         self.z_encoder = EncoderWithLatent(self._layers, self._latent_size, self._dropout, input_size)
         self.decoder = Decoder(self._layers[::-1], 2 * self._latent_size, self._dropout, input_size)
 
-    def loss_fn(self, target, background, model_output: ContrastiveOutput, discriminator=None) -> Tensor:
-        """
-        Function for contrastive model loss
-        :param target: target input data
-        :param background: background input data
-        :param model_output: contrastive model output
-        :param discriminator: not used
-        :return:
-        """
-        target_loss = functional.F.mse_loss(target, model_output.target, reduction='mean')
-        background_loss = functional.F.mse_loss(background, model_output.background, reduction='mean')
-        return target_loss + background_loss
-
     def forward(self, target, background) -> ContrastiveOutput:
         """
         Forward method for NN
@@ -50,7 +36,8 @@ class ContrastiveAE(ContrastiveBaseModel):
         target_output = self.decoder(temp)
         background_output = self.decoder(torch.cat(tensors=[torch.zeros_like(target_s), background_z], dim=-1))
 
-        return ContrastiveOutput(target=target_output, background=background_output)
+        return ContrastiveOutput(target=target_output, background=background_output, target_qs_latent=target_s,
+                                 target_qz_latent=target_z)
 
     def get_params(self) -> dict:
         """
