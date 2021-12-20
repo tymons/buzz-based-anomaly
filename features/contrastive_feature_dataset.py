@@ -2,16 +2,9 @@ from features.sound_dataset import SoundDataset
 from torch.utils.data import Dataset
 from collections import namedtuple
 
-ContrastiveOutput = namedtuple('ContrastiveOutput', ['target',
-                                                     'background',
-                                                     'target_qs_mean',
-                                                     'target_qs_log_var',
-                                                     'target_qz_mean',
-                                                     'target_qz_log_var',
-                                                     'background_qz_mean',
-                                                     'background_qz_log_var',
-                                                     'target_qs_latent',
-                                                     'target_qz_latent'])
+_fields = ['target', 'background', 'target_qs_mean', 'target_qs_log_var', 'target_qz_mean', 'target_qz_log_var',
+           'background_qz_mean', 'background_qz_log_var', 'target_qs_latent', 'target_qz_latent']
+ContrastiveOutput = namedtuple('ContrastiveOutput', _fields, defaults=(None,) * len(_fields))
 
 
 class ContrastiveFeatureDataset(Dataset):
