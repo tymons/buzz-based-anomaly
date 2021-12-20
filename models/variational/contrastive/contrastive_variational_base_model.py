@@ -4,7 +4,6 @@ import numpy as np
 import torch
 from torch import nn, Tensor
 from features.contrastive_feature_dataset import ContrastiveOutput
-from models.variational.vae_base_model import reparameterize
 
 
 def kl_closed_form(means_p, covs_p, means_q, covs_q):

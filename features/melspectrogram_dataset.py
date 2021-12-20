@@ -63,37 +63,40 @@ class MelSpectrogramDataset(SoundDataset):
         :param:idx: element idx
         :return: ((melspectrogram, frequencies, times), label) (tuple)
         """
-        sound_samples, sampling_rate, label = SoundDataset.read_sound(self, idx)
-        f_max = min(self.slice_freq.stop, sampling_rate // 2)
-        f_min = min(self.slice_freq.start, sampling_rate // 2)
+        sound_samples, sampling_rate = torchaudio.load(self.filenames[idx])
+        if sound_samples.shape[0] > 1:
+            if torch.count_nonzero(sound_samples[1]).item() > (len(sound_samples[0]) // 2):
+                sound_samples = torch.mean(sound_samples, dim=0, keepdim=True)
+            else:
+                sound_samples = sound_samples[0]  # get only first channel
 
-        mel_spectrogram = librosa.feature.melspectrogram(sound_samples, sampling_rate, n_fft=self.n_fft,
-                                                         hop_length=self.hop_len, n_mels=self.n_mels,
-                                                         fmax=f_max, fmin=f_min, window=self.window)
+        label = self.labels[idx]
 
-        frequencies = librosa.core.mel_frequencies(fmin=f_min, fmax=f_max, n_mels=self.n_mels)
-        times = np.linspace(0, len(sound_samples) / sampling_rate, mel_spectrogram.shape[1])
-
+        mel_sound_samples = self.transform(sound_samples)
         if self.convert_db:
-            mel_spectrogram = librosa.power_to_db(mel_spectrogram)
+            mel_sound_samples = torchaudio.transforms.AmplitudeToDB()(mel_sound_samples)
+        mel_sound_samples = mel_sound_samples.squeeze()
 
-        initial_shape = mel_spectrogram.shape
-        mel_spectrogram = MinMaxScaler().fit_transform(mel_spectrogram.reshape(-1, 1)).reshape(initial_shape)
+        initial_shape = mel_sound_samples.shape
+        mel_sound_samples = MinMaxScaler().fit_transform(mel_sound_samples.reshape(-1, 1)).reshape(initial_shape)
+
+        frequencies = librosa.core.mel_frequencies(fmin=self.f_min, fmax=self.f_max, n_mels=self.n_mels)
+        times = np.linspace(0, len(sound_samples) / sampling_rate, mel_sound_samples.shape[1])
 
         if self.round_data_shape:
             if self.convert_db:
                 # for now we only extend linearly spaced values
                 log.warning('ONLY LINEAR MELSPECTROGRAM COULD BE EXTENDED!')
             else:
-                mel_spectrogram = adjust_matrix(mel_spectrogram, 2 ** closest_power_2(mel_spectrogram.shape[0]),
-                                                2 ** closest_power_2(mel_spectrogram.shape[1]),
-                                                fill_with=mel_spectrogram.min())
+                mel_sound_samples = adjust_matrix(mel_sound_samples, 2 ** closest_power_2(mel_sound_samples.shape[0]),
+                                                  2 ** closest_power_2(mel_sound_samples.shape[1]),
+                                                  fill_with=mel_sound_samples.min())
 
                 frequencies = adjust_linear_ndarray(frequencies, 2 ** closest_power_2(frequencies.shape[0]),
                                                     policy='sequence')
                 times = adjust_linear_ndarray(times, 2 ** closest_power_2(times.shape[0]), policy='sequence')
 
-        return (mel_spectrogram, frequencies, times), label
+        return (mel_sound_samples, frequencies, times), label
 
     def __getitem__(self, idx):
         """ Wrapper for getting item from melpectrogram dataset """

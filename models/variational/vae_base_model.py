@@ -51,6 +51,5 @@ class VaeBaseModel(ABC, nn.Module):
 
     def get_latent(self, data) -> torch.Tensor:
         y = self.encoder(data)
-        latent_mean, latent_var = self.linear_means(y), self.linear_log_var(y)
-        latent = reparameterize(latent_mean, latent_var)
-        return latent
+        latent_mean, _ = self.linear_means(y), self.linear_log_var(y)
+        return latent_mean
