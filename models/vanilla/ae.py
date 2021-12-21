@@ -2,6 +2,7 @@ import torch
 
 from torch import nn
 from models.vanilla.base_model import BaseModel
+from models.model_type import HiveModelType
 import torch.nn.functional as F
 
 from typing import Union, List
@@ -10,9 +11,9 @@ from typing import Union, List
 class Autoencoder(BaseModel):
     """ Vanilla autoencoder """
 
-    def __init__(self, layers: List[int], latent_size: int, input_size: int,
+    def __init__(self, model_type: HiveModelType, layers: List[int], latent_size: int, input_size: int,
                  dropout: Union[List[float], float] = 0.2):
-        super().__init__()
+        super().__init__(model_type)
 
         self._layers = layers
         self._latent_size = latent_size

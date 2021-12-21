@@ -1,21 +1,20 @@
 import torch
-import torch.nn.functional as F
 from torch import nn, Tensor
 
 from typing import Union, List
 
-from models.discriminator import Discriminator
 import models.variational.contrastive.contrastive_variational_base_model as cvbm
+from models.model_type import HiveModelType
 from models.vanilla.ae import Encoder, Decoder
-from models.variational.vae_base_model import reparameterize, kld_loss
+from models.variational.vae_base_model import reparameterize
 
 from features.contrastive_feature_dataset import ContrastiveOutput
 
 
 class ContrastiveVAE(cvbm.ContrastiveVariationalBaseModel):
-    def __init__(self, layers: List[int], latent_size: int, input_size: int,
+    def __init__(self, model_type: HiveModelType, layers: List[int], latent_size: int, input_size: int,
                  dropout: Union[List[float], float] = 0.2):
-        super().__init__()
+        super().__init__(model_type)
 
         self._layers = layers
         self._latent_size = latent_size
@@ -30,36 +29,6 @@ class ContrastiveVAE(cvbm.ContrastiveVariationalBaseModel):
 
         self.z_linear_means = nn.Linear(layers[-1], latent_size)
         self.z_linear_log_var = nn.Linear(layers[-1], latent_size)
-
-    def loss_fn(self, target, background, model_output: ContrastiveOutput, discriminator: Discriminator) -> torch.Tensor:
-        """
-        Method for calculating loss function for pytorch model
-        :param model_output:
-        :param discriminator:
-        :param target: target input
-        :param background: background data
-        :return: loss
-        """
-        # reconstruction loss for target and background
-        loss = F.mse_loss(target, model_output.target, reduction='mean')
-        loss += F.mse_loss(background, model_output.background, reduction='mean')
-        # KLD losses
-        loss += kld_loss(model_output.target_qs_mean, model_output.target_qs_log_var)
-        loss += kld_loss(model_output.target_qz_mean, model_output.target_qz_log_var)
-        loss += kld_loss(model_output.background_qz_mean, model_output.background_qz_log_var)
-
-        # total correction loss
-        # with torch.no_grad():
-        q = torch.cat((model_output.target_qs_latent, model_output.target_qz_latent), dim=-1).squeeze()
-        q_bar = cvbm.latent_permutation(q)
-        q_score, q_bar_score = discriminator(q, q_bar)
-        tc_loss = torch.mean(torch.logit(q_score))
-        loss += tc_loss
-
-        disc_loss = discriminator.loss_fn(q_score, q_bar_score)
-        loss += disc_loss
-
-        return loss
 
     def forward(self, target, background) -> ContrastiveOutput:
         """

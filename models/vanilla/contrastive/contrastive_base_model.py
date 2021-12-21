@@ -5,14 +5,21 @@ from torch import nn
 from features.contrastive_feature_dataset import ContrastiveOutput
 from models.discriminator import Discriminator
 from torch import functional
-
+from sklearn.preprocessing import MinMaxScaler
 import models.variational.contrastive.contrastive_variational_base_model as cvbm
+from models.model_type import HiveModelType
 
 
 class ContrastiveBaseModel(ABC, nn.Module):
     s_encoder: nn.Module
     z_encoder: nn.Module
     decoder: nn.Module
+    model_type: HiveModelType
+    mm = MinMaxScaler()
+
+    def __init__(self, model_type):
+        super().__init__()
+        self.model_type = model_type
 
     def loss_fn(self, target, background, model_output: ContrastiveOutput, discriminator: Discriminator) -> nn.Module:
         """
@@ -28,6 +35,8 @@ class ContrastiveBaseModel(ABC, nn.Module):
         loss = target_loss + background_loss
 
         q = torch.cat((model_output.target_qs_latent, model_output.target_qz_latent), dim=-1).squeeze()
+        q = (q - q.min(axis=0).values) / (q.max(axis=0).values - q.min(axis=0).values)
+        q = torch.nan_to_num(q, nan=0.0)
         q_bar = cvbm.latent_permutation(q)
         q_score, q_bar_score = discriminator(q, q_bar)
         tc_loss = torch.mean(torch.logit(q_score))

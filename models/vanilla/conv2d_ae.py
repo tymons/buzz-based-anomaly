@@ -3,6 +3,7 @@ import torch
 from torch import nn, functional
 
 from models.conv_utils import convolutional_to_mlp
+from models.model_type import HiveModelType
 from models.vanilla.base_model import BaseModel
 from typing import List, Tuple
 
@@ -106,9 +107,9 @@ class Conv2DDecoder(nn.Module):
 
 
 class Conv2DAE(BaseModel):
-    def __init__(self, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int,
+    def __init__(self, model_type: HiveModelType, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int,
                  latent: int, input_size: tuple):
-        super().__init__()
+        super().__init__(model_type)
         self._feature_map = features
         self._dropout_probs = dropout_probs
         self._kernel_size = kernel_size

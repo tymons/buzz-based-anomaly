@@ -2,6 +2,7 @@ import torch
 
 from torch import nn, functional
 
+from models.model_type import HiveModelType
 from models.variational.vae_base_model import VaeBaseModel, VaeOutput, kld_loss, reparameterize
 from models.vanilla.ae import Encoder, Decoder
 
@@ -9,9 +10,9 @@ from typing import List, Union
 
 
 class VAE(VaeBaseModel):
-    def __init__(self, layers: List[int], latent_size: int, input_size: int,
+    def __init__(self, model_type: HiveModelType, layers: List[int], latent_size: int, input_size: int,
                  dropout: Union[List[float], float] = 0.2):
-        super().__init__()
+        super().__init__(model_type)
 
         self._layers = layers
         self._latent_size = latent_size

@@ -554,7 +554,7 @@ class ModelRunner:
                                 experiment: Experiment,
                                 epoch: int,
                                 logging_interval: int,
-                                discriminator: nn.Module = None,
+                                discriminator: Discriminator = None,
                                 discriminator_optimizer: Optimizer = None) -> EpochLoss:
         """
         Function for epoch run on contrastive model
@@ -592,6 +592,11 @@ class ModelRunner:
             if all([discriminator, discriminator_optimizer]):
                 q = torch.cat((model_output.target_qs_latent.clone().detach(),
                                model_output.target_qz_latent.clone().detach()), dim=-1).squeeze()
+                if HiveModelType.CONTRASTIVE_AE <= model.model_type <= HiveModelType.CONTRASTIVE_CONV2D_AE:
+                    # we should scale our latent data as it probably will not be BCE complaint
+                    q = (q - q.min(axis=0).values) / (q.max(axis=0).values - q.min(axis=0).values)
+                    q = torch.nan_to_num(q, nan=0.0)
+
                 q_bar = latent_permutation(q)
                 q = q.to(self.device)
                 q_bar = q_bar.to(self.device)

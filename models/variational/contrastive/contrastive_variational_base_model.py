@@ -2,8 +2,13 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
+import torch.nn.functional as F
+
 from torch import nn, Tensor
 from features.contrastive_feature_dataset import ContrastiveOutput
+from models.model_type import HiveModelType
+from models.discriminator import Discriminator
+from models.variational.vae_base_model import kld_loss
 
 
 def kl_closed_form(means_p, covs_p, means_q, covs_q):
@@ -48,10 +53,40 @@ class ContrastiveVariationalBaseModel(ABC, nn.Module):
     decoder: nn.Module
     s_linear_means: nn.Module
     s_linear_log_var: nn.Module
+    model_type: HiveModelType
 
-    @abstractmethod
-    def loss_fn(self, target, background, model_output: ContrastiveOutput, discriminator) -> nn.Module:
-        pass
+    def __init__(self, model_type):
+        super().__init__()
+        self.model_type = model_type
+
+    def loss_fn(self, target, background, model_output: ContrastiveOutput, discriminator: Discriminator):
+        """
+        Method for variational loss fn
+        :param target:
+        :param background:
+        :param model_output:
+        :param discriminator:
+        """
+        # reconstruction loss for target and background
+        loss = F.mse_loss(target, model_output.target, reduction='mean')
+        loss += F.mse_loss(background, model_output.background, reduction='mean')
+        # KLD losses
+        loss += kld_loss(model_output.target_qs_mean.squeeze(), model_output.target_qs_log_var.squeeze())
+        loss += kld_loss(model_output.target_qz_mean.squeeze(), model_output.target_qz_log_var.squeeze())
+        loss += kld_loss(model_output.background_qz_mean.squeeze(), model_output.background_qz_log_var.squeeze())
+
+        # total correction loss
+        # with torch.no_grad():
+        q = torch.cat((model_output.target_qs_latent.squeeze(), model_output.target_qz_latent.squeeze()), dim=-1)
+        q_bar = latent_permutation(q)
+        q_score, q_bar_score = discriminator(q, q_bar)
+        tc_loss = torch.mean(torch.logit(q_score))
+        loss += tc_loss
+
+        disc_loss = discriminator.loss_fn(q_score, q_bar_score)
+        loss += disc_loss
+
+        return loss
 
     @abstractmethod
     def get_params(self) -> dict:

@@ -4,6 +4,8 @@ from collections import namedtuple
 import torch
 from torch import nn
 
+from models.model_type import HiveModelType
+
 VaeOutput = namedtuple('VaeOutput', ['output', 'log_var', 'mean'])
 
 
@@ -36,6 +38,11 @@ class VaeBaseModel(ABC, nn.Module):
     decoder: nn.Module
     linear_means: nn.Module
     linear_log_var: nn.Module
+    model_type: HiveModelType
+
+    def __init__(self, model_type):
+        super().__init__()
+        self.model_type = model_type
 
     @abstractmethod
     def loss_fn(self, x, y) -> nn.Module:

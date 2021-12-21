@@ -2,6 +2,7 @@ import torch
 
 from typing import List, Union
 
+from models.model_type import HiveModelType
 from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel
 from models.vanilla.ae import EncoderWithLatent, Decoder
 
@@ -9,9 +10,9 @@ from features.contrastive_feature_dataset import ContrastiveOutput
 
 
 class ContrastiveAE(ContrastiveBaseModel):
-    def __init__(self, layers: List[int], latent_size: int, input_size: int,
+    def __init__(self, model_type: HiveModelType, layers: List[int], latent_size: int, input_size: int,
                  dropout: Union[List[float], float] = 0.2):
-        super().__init__()
+        super().__init__(model_type)
 
         self._layers = layers
         self._latent_size = latent_size

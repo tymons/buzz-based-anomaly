@@ -1,6 +1,8 @@
 from enum import Enum
+from functools import total_ordering
 
 
+@total_ordering
 class HiveModelType(Enum):
     AE = (1, 'autoencoder')
     VAE = (2, 'vae')
@@ -28,3 +30,8 @@ class HiveModelType(Enum):
     def __init__(self, num, model_name):
         self.num = num
         self.model_name = model_name
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.num < other.num
+        return NotImplemented
