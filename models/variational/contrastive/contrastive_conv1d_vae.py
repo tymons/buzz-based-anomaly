@@ -6,7 +6,7 @@ from typing import List
 from models.model_type import HiveModelType
 from models.vanilla.conv1d_ae import Conv1DEncoder, Conv1DDecoder
 from models.conv_utils import convolutional_to_mlp
-from models.variational.vae_base_model import reparameterize, kld_loss, Flattener
+from models.variational.vae_base_model import reparameterize, Flattener
 from features.contrastive_feature_dataset import ContrastiveOutput
 
 
