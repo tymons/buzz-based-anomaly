@@ -44,7 +44,9 @@ class ContrastiveConv1DAE(ContrastiveBaseModel):
         background_output = self.decoder(torch.cat(tensors=[torch.zeros_like(target_s), background_z], dim=-1))
 
         return ContrastiveOutput(target=target_output, background=background_output, target_qs_latent=target_s,
-                                 target_qz_latent=target_z)
+                                 target_qz_latent=target_z, target_qz_mean=None, target_qs_mean=None,
+                                 background_qz_mean=None, background_qz_log_var=None, target_qs_log_var=None,
+                                 target_qz_log_var=None)
 
     def get_params(self) -> dict:
         """
