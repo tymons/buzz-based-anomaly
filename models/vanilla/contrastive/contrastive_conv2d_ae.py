@@ -11,8 +11,8 @@ from features.contrastive_feature_dataset import ContrastiveOutput
 
 
 class ContrastiveConv2DAE(ContrastiveBaseModel):
-    def __init__(self, model_type: HiveModelType, features: List[int], dropout_probs: List[float], kernel_size: int, padding: int, max_pool: int,
-                 latent: int, input_size: tuple):
+    def __init__(self, model_type: HiveModelType, features: List[int], dropout_probs: List[float], kernel_size: int,
+                 padding: int, max_pool: int, latent: int, input_size: tuple):
         super().__init__(model_type)
         self._feature_map = features
         self._dropout_probs = dropout_probs
