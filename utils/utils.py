@@ -3,9 +3,13 @@ import glob
 import math
 import logging
 import collections
+
+import comet_ml
 import pytz
 
+import matplotlib
 import matplotlib.pyplot as plt
+
 import pandas as pd
 
 import torch
@@ -25,6 +29,7 @@ from multiprocessing.pool import ThreadPool
 from utils.side_scripts.weather_feature_type import WeatherFeatureType
 
 log = logging.getLogger("smartula")
+matplotlib.use('Agg')
 
 
 def logger_setup(log_folder: Path, filename_prefix: str) -> None:
@@ -637,3 +642,22 @@ def filter_hive_fingerprint(csv_feature_weather_path: Path,
                  f'which is {len(fingerprint_filenames) / len(f_hive_sound_list) * 100:.2f}% of initial data')
 
     return fingerprint_filenames
+
+
+def plot_latent(target: torch.Tensor, folder: Path, epoch=0, background: torch.Tensor = None,
+                experiment: comet_ml.Experiment = None):
+    plt.ioff()
+    fig = plt.figure(figsize=(10, 10))
+    filepath = folder / Path(f'latent-epoch-{epoch}.png')
+    target = target.squeeze()
+    plt.scatter(x=target.T[0], y=target.T[1], label='target', c='g')
+    if background is not None:
+        background = background.squeeze()
+        plt.scatter(x=background.T[0], y=background.T[1], label='background', c='r')
+    plt.savefig(filepath)
+    plt.close(fig)
+
+    if experiment is not None:
+        experiment.log_image(str(filepath))
+
+    return

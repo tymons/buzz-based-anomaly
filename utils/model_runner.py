@@ -11,6 +11,7 @@ import time
 import optuna
 import math
 import gc
+import utils.utils as util
 
 from tqdm import tqdm
 from pathlib import Path
@@ -441,6 +442,9 @@ class ModelRunner:
                                             {**model.get_params(),
                                              **train_config,
                                              **(feature_config if feature_config is not None else {})}, [])
+
+        model_debug_folder = Path(f'output/runs/{experiment.get_name()}')
+        model_debug_folder.mkdir(exist_ok=True, parents=True)
         checkpoint_path = self.output_folder / f'{experiment.get_name()}-checkpoint.pth'
 
         log.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
@@ -461,7 +465,8 @@ class ModelRunner:
             log.info(f'--- train epoch {epoch} end with train loss: {train_epoch_loss.model_loss}')
             early_stopping_loss = train_epoch_loss
             if val_dataloader is not None:
-                val_epoch_loss = val_step_func(model, val_dataloader, experiment, epoch, log_interval)
+                val_epoch_loss = val_step_func(model, val_dataloader, experiment, epoch, log_interval,
+                                               fig_folder=model_debug_folder)
                 experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
                 early_stopping_loss = val_epoch_loss
                 log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
@@ -500,7 +505,8 @@ class ModelRunner:
                                             {**model.get_params(),
                                              **train_config,
                                              **(feature_config if feature_config is not None else {})}, [])
-
+        model_debug_folder = Path(f'output/runs/{experiment.get_name()}')
+        model_debug_folder.mkdir(exist_ok=True, parents=True)
         model_checkpoint_path = self.output_folder / f'{experiment.get_name()}-contrastive-checkpoint.pth'
         discriminator_checkpoint_path = self.output_folder / f'{experiment.get_name()}-discriminator-checkpoint.pth'
 
@@ -529,7 +535,8 @@ class ModelRunner:
             early_stopping_loss = epoch_loss
             if val_dataloader is not None:
                 val_epoch_loss = self._val_contrastive_step(model, val_dataloader, experiment, epoch, log_interval,
-                                                            discriminator=discriminator)
+                                                            discriminator=discriminator,
+                                                            fig_folder=model_debug_folder)
                 experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
                 early_stopping_loss = val_epoch_loss
                 log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
@@ -624,7 +631,8 @@ class ModelRunner:
                               experiment: Experiment,
                               epoch_no: int,
                               logging_interval: int,
-                              discriminator: Discriminator = None) -> EpochLoss:
+                              discriminator: Discriminator = None,
+                              fig_folder: Path = None) -> EpochLoss:
         """
         Function for performing validation step for model
         :param model: model to be evaluated
@@ -637,16 +645,16 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
+        cat_target_output, cat_bg_output = (torch.Tensor(), torch.Tensor()) if fig_folder is not None else (None, None)
+
         with torch.no_grad():
             for batch_idx, (target, background) in enumerate(val_dataloader):
                 target_batch = target.to(self.device)
                 background_batch = background.to(self.device)
                 model_output = model(target_batch, background_batch)
 
-                loss = model.loss_fn(target_batch, background_batch, model_output,
-                                     discriminator) if discriminator is not None else model.loss_fn(target_batch,
-                                                                                                    background_batch,
-                                                                                                    model_output)
+                loss, _ = model.loss_fn(target_batch, background_batch, model_output, discriminator)\
+                    if discriminator is not None else model.loss_fn(target_batch, background_batch, model_output)
                 loss_float = loss.item()
 
                 val_loss.append(loss_float)
@@ -656,6 +664,14 @@ class ModelRunner:
                     log.info(f'=== validation epoch {epoch_no}, '
                              f'[{batch_idx * len(target)}/{len(val_dataloader.dataset)}]'
                              f'-> batch loss: {loss.item()} ===')
+
+                if cat_bg_output is not None:
+                    cat_bg_output = torch.cat((cat_bg_output, model.get_latent(background_batch).cpu()), dim=0)
+                if cat_target_output is not None:
+                    cat_target_output = torch.cat((cat_target_output, model.get_latent(target_batch).cpu()), dim=0)
+
+        if fig_folder is not None:
+            util.plot_latent(cat_target_output, fig_folder, epoch_no, background=cat_bg_output, experiment=experiment)
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
@@ -700,14 +716,15 @@ class ModelRunner:
         return EpochLoss(sum(mean_loss) / len(mean_loss))
 
     T_val_step = Callable[[Union[BM, CBM, CVBM, SmDataParallel], DataLoader,
-                           Experiment, int, int], EpochLoss]
+                           Experiment, int, int, Optional[Path]], EpochLoss]
 
     def _val_step(self,
                   model: Union[BM, VBM, CBM, SmDataParallel],
                   val_dataloader: DataLoader,
                   experiment: Experiment,
                   epoch_no: int,
-                  logging_interval: int) -> EpochLoss:
+                  logging_interval: int,
+                  fig_folder: Optional[Path] = None) -> EpochLoss:
         """
         Function for performing validation step for model
         :param model: model to be evaluated
@@ -719,6 +736,8 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
+        cat_latent = torch.Tensor() if fig_folder is not None else None
+
         with torch.no_grad():
             for batch_idx, (batch, _) in enumerate(val_dataloader):
                 batch = batch.to(self.device)
@@ -733,6 +752,12 @@ class ModelRunner:
                     log.info(f'=== validation epoch {epoch_no}, '
                              f'[{batch_idx * len(batch)}/{len(val_dataloader.dataset)}]'
                              f'-> batch loss: {loss.item()} ===')
+
+                if cat_latent is not None:
+                    cat_latent = torch.cat((cat_latent, model.get_latent(batch).cpu()), dim=0)
+
+        if fig_folder is not None:
+            util.plot_latent(cat_latent, fig_folder, epoch_no, experiment=experiment)
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
