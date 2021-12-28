@@ -108,7 +108,6 @@ class EncoderWithLatent(Encoder):
 
         # add last fc layer to get latent vector
         self.MLP.add_module(name=f'latent_layer_{len(layer_sizes)}', module=nn.Linear(layer_sizes[-1], latent_size))
-        self.MLP.add_module(name=f'latent_relu_{len(layer_sizes)}', module=nn.ReLU())
 
     def forward(self, x):
         x = self.MLP(x)
