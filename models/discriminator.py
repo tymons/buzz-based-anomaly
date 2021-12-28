@@ -1,42 +1,28 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
-from typing import List
 
 
 class Discriminator(nn.Module):
-    def __init__(self, layers_sizes: List, input_size: int):
+    def __init__(self, input_size: int):
         super(Discriminator, self).__init__()
+        self.linear = torch.nn.Linear(input_size, 1)
 
-        self.MLP = nn.Sequential()
-        self.MLP.add_module(name=f'FC{0}', module=nn.Linear(input_size, layers_sizes[0]))
-        self.MLP.add_module(name=f'A{0}', module=nn.ReLU())
-
-        for i, (input_size, output_size) in enumerate(zip(layers_sizes[:-1], layers_sizes[1:]), 1):
-            self.MLP.add_module(name=f'FC{i}', module=nn.Linear(input_size, output_size))
-            self.MLP.add_module(name=f'A{i}', module=nn.ReLU())
-
-        self.MLP.add_module(name=f'FC{len(layers_sizes) + 1}', module=nn.Linear(layers_sizes[-1], 1))
-        self.MLP.add_module(name=f'A{len(layers_sizes) + 1}', module=nn.Sigmoid())
-
-    def loss_fn(self, p_prob: torch.Tensor, q_prob: torch.Tensor):
+    def loss_fn(self, true_labels: torch.Tensor, probs: torch.Tensor):
         """
         Method for loss calculation in discriminator model
-        :param p_prob: tensor of probability for samples p(x)
-        :param q_prob: tensor or probability for samples q(x)
+        :param true_labels:
+        :param probs: tensor of probability for samples
         :return:
         """
-        p_loss = F.binary_cross_entropy(p_prob, torch.zeros_like(p_prob), reduction='mean')
-        q_loss = F.binary_cross_entropy(q_prob, torch.ones_like(q_prob), reduction='mean')
-        return p_loss + q_loss
+        loss = F.binary_cross_entropy(probs, true_labels, reduction='mean')
+        return loss
 
-    def forward(self, p, q):
+    def forward(self, x):
         """
         Method for forward pass
-        :param p - samples from p-distribution
-        :param q - samples from q-distribution
+        :param x - samples from distribution
         :return:
         """
-        p_class_probability = self.MLP(p)
-        q_class_probability = self.MLP(q)
-        return p_class_probability, q_class_probability
+        class_probability = torch.sigmoid(self.linear(x))
+        return class_probability

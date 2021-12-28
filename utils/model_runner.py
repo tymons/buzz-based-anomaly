@@ -23,7 +23,6 @@ from models.vanilla.base_model import BaseModel
 from models.variational.vae_base_model import VaeBaseModel
 from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel
 from models.variational.contrastive.contrastive_variational_base_model import ContrastiveVariationalBaseModel
-from models.variational.contrastive.contrastive_variational_base_model import latent_permutation
 
 from typing import List, Callable, Union, Optional
 from torch import nn, device
@@ -183,17 +182,16 @@ def modify_optuna_learning_config(learning_config: dict, trial: optuna.Trial) ->
     return optuna_learning_config
 
 
-def _prepare_discrimination_for_train(discriminator_model_config: dict, model_latent: int, torch_device: torch.device,
+def _prepare_discrimination_for_train(model_latent: int, torch_device: torch.device,
                                       discriminator_train_config: dict):
     """
     Method for preparing discriminator model and optimizer
-    :param discriminator_model_config:
     :param model_latent:
     :param torch_device:
     :param discriminator_train_config:
     :return:
     """
-    discriminator = HiveModelFactory.get_discriminator(discriminator_model_config, model_latent).to(torch_device)
+    discriminator = HiveModelFactory.get_discriminator(model_latent).to(torch_device)
     discriminator_optimizer_class = _parse_optimizer(discriminator_train_config['optimizer']['type'])
     discriminator_optimizer = discriminator_optimizer_class(discriminator.parameters(),
                                                             lr=discriminator_train_config['learning_rate'])
@@ -316,10 +314,8 @@ class ModelRunner:
 
             disc, disc_opt = None, None
             if model_type.num >= HiveModelType.CONTRASTIVE_VAE.num:
-                disc, disc_opt = _prepare_discrimination_for_train(optuna_model_config,
-                                                                   optuna_model_config['model']['latent'],
-                                                                   self.device,
-                                                                   optuna_learning_config['discriminator'])
+                disc, disc_opt = _prepare_discrimination_for_train(optuna_model_config['model']['latent'],
+                                                                   self.device, optuna_learning_config['discriminator'])
 
             for epoch in range(optuna_learning_config.get('epochs', 10)):
                 epoch_loss = self._train_step(model, train_dataloader, optim, experiment, epoch, log_interval) \
@@ -583,33 +579,32 @@ class ModelRunner:
             background_batch = background.to(self.device)
             model_optimizer.zero_grad()
             model_output: ContrastiveOutput = model(target_batch, background_batch)
-            loss = model.loss_fn(target_batch, background_batch, model_output, discriminator)
+            loss, partial_loss = model.loss_fn(target_batch, background_batch, model_output, discriminator)
+            recon_loss, tc_loss, disc_loss = partial_loss
+
             loss.backward()
             model_optimizer.step()
-
+            
             loss_float = loss.item()
             mean_loss.append(loss_float)
 
             experiment.log_metric("batch_train_loss", loss_float, step=(epoch * len(dataloader)) + batch_idx)
+            experiment.log_metric("tc_loss", tc_loss, step=(epoch * len(dataloader)) + batch_idx)
+            experiment.log_metric("recon_loss", recon_loss, step=(epoch * len(dataloader)) + batch_idx)
+            experiment.log_metric("disc_loss", disc_loss, step=(epoch * len(dataloader)) + batch_idx)
+
             if logging_interval != -1 and batch_idx % logging_interval == 0:
-                log.info(f'=== train epoch {epoch},'
-                         f' [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
+                log.info(f'=== train epoch {epoch}, [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
                          f'-> batch loss: {loss_float}')
 
             if all([discriminator, discriminator_optimizer]):
-                q = torch.cat((model_output.target_qs_latent.clone().detach(),
-                               model_output.target_qz_latent.clone().detach()), dim=-1).squeeze()
-                if HiveModelType.CONTRASTIVE_AE <= model.model_type <= HiveModelType.CONTRASTIVE_CONV2D_AE:
-                    # we should scale our latent data as it probably will not be BCE complaint
-                    q = (q - q.min(axis=0).values) / (q.max(axis=0).values - q.min(axis=0).values)
-                    q = torch.nan_to_num(q, nan=0.0)
-
-                q_bar = latent_permutation(q)
-                q = q.to(self.device)
-                q_bar = q_bar.to(self.device)
-                discriminator_optimizer.zero_grad()
-                q_score, q_bar_score = discriminator(q, q_bar)
-                dloss = discriminator.loss_fn(q_score, q_bar_score)
+                qs_target_latent = model_output.target_qs_latent.clone().detach().squeeze()
+                qz_target_latent = model_output.target_qz_latent.clone().detach().squeeze()
+                latent_data = torch.vstack((qs_target_latent, qz_target_latent)).to(self.device)
+                latent_labels = torch.hstack((torch.ones(qs_target_latent.shape[0]),
+                                              torch.zeros(qz_target_latent.shape[0]))).reshape(-1, 1).to(self.device)
+                probs = discriminator(latent_data)
+                dloss = discriminator.loss_fn(latent_labels, probs)
                 dloss.backward()
                 discriminator_optimizer.step()
 

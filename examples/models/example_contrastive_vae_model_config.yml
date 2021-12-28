@@ -2,5 +2,3 @@ model:
   layers: [256, 32, 8]
   dropout: [0.3, 0.3, 0.3]
   latent: 14
-discriminator:
-  layers: [32, 64]
