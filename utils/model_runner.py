@@ -584,7 +584,6 @@ class ModelRunner:
 
             loss.backward()
             model_optimizer.step()
-            
             loss_float = loss.item()
             mean_loss.append(loss_float)
 
