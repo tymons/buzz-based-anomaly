@@ -5,8 +5,6 @@ from torch import nn
 from features.contrastive_feature_dataset import ContrastiveOutput
 from models.discriminator import Discriminator
 from torch import functional
-from sklearn.preprocessing import MinMaxScaler
-import models.variational.contrastive.contrastive_variational_base_model as cvbm
 from models.model_type import HiveModelType
 
 
@@ -15,13 +13,12 @@ class ContrastiveBaseModel(ABC, nn.Module):
     z_encoder: nn.Module
     decoder: nn.Module
     model_type: HiveModelType
-    mm = MinMaxScaler()
 
     def __init__(self, model_type):
         super().__init__()
         self.model_type = model_type
 
-    def loss_fn(self, target, background, model_output: ContrastiveOutput, discriminator: Discriminator) -> nn.Module:
+    def loss_fn(self, target, background, model_output: ContrastiveOutput, discriminator: Discriminator):
         """
         Method for contrastive model's loss function
         :param target:
@@ -32,20 +29,23 @@ class ContrastiveBaseModel(ABC, nn.Module):
         """
         target_loss = functional.F.mse_loss(target, model_output.target, reduction='mean')
         background_loss = functional.F.mse_loss(background, model_output.background, reduction='mean')
-        loss = target_loss + background_loss
+        recon_loss = target_loss + background_loss
+        loss = recon_loss
 
-        q = torch.cat((model_output.target_qs_latent, model_output.target_qz_latent), dim=-1).squeeze()
-        q = (q - q.min(axis=0).values) / (q.max(axis=0).values - q.min(axis=0).values)
-        q = torch.nan_to_num(q, nan=0.0)
-        q_bar = cvbm.latent_permutation(q)
-        q_score, q_bar_score = discriminator(q, q_bar)
-        tc_loss = torch.mean(torch.logit(q_score))
-        loss += tc_loss
+        with torch.no_grad():
+            qs_target_latent = model_output.target_qs_latent.squeeze()
+            qz_target_latent = model_output.target_qz_latent.squeeze()
+            latent_data = torch.vstack((qs_target_latent, qz_target_latent))
+            latent_labels = torch.hstack((torch.ones(qs_target_latent.shape[0]),
+                                          torch.zeros(qz_target_latent.shape[0]))).reshape(-1, 1)
 
-        disc_loss = discriminator.loss_fn(q_score, q_bar_score)
-        loss += disc_loss
+            tc_loss = -torch.mean(torch.log(torch.exp(torch.logit(discriminator(qs_target_latent)))))
 
-        return loss
+            probs = discriminator(latent_data)
+            disc_loss = discriminator.loss_fn(latent_labels, probs.cpu())
+
+            loss += (0.1 * (tc_loss + disc_loss))
+            return loss, (recon_loss, tc_loss, disc_loss)
 
     @abstractmethod
     def get_params(self) -> dict:
