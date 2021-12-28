@@ -5,5 +5,3 @@ model:
   kernel: 3
   padding: 1
   max_pool: 2
-discriminator:
-  layers: [32, 64 ]

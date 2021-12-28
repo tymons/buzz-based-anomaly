@@ -32,18 +32,14 @@ class TestContrastiveVAEModelMethods(unittest.TestCase):
         self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
 
     def test_discriminator_is_built_basic_setup(self):
-        config = {
-            'layers': [2, 4, 8]
-        }
-
-        discriminator_model: torch.nn.Module = HiveModelFactory.get_discriminator(config, 2)
-        self.assertGreaterEqual(discriminator_model(torch.empty((1, 4)), torch.empty((1, 4)))[0].squeeze().item(), 0.0,
+        discriminator_model: torch.nn.Module = HiveModelFactory.get_discriminator(4)
+        self.assertGreaterEqual(discriminator_model(torch.empty((1, 4))).squeeze().item(), 0.0,
                                 "discriminator output should be scaled")
-        self.assertGreaterEqual(discriminator_model(torch.empty((1, 4)), torch.empty((1, 4)))[1].squeeze().item(), 0.0,
+        self.assertGreaterEqual(discriminator_model(torch.empty((1, 4))).squeeze().item(), 0.0,
                                 "discriminator output should be scaled")
-        self.assertLessEqual(discriminator_model(torch.empty((1, 4)), torch.empty((1, 4)))[0].squeeze().item(), 1.0,
+        self.assertLessEqual(discriminator_model(torch.empty((1, 4))).squeeze().item(), 1.0,
                              "discriminator output should be scaled")
-        self.assertLessEqual(discriminator_model(torch.empty((1, 4)), torch.empty((1, 4)))[1].squeeze().item(), 1.0,
+        self.assertLessEqual(discriminator_model(torch.empty((1, 4))).squeeze().item(), 1.0,
                              "discriminator output should be scaled")
 
     def test_contrastive_vae_model_inference(self):

@@ -353,15 +353,13 @@ class HiveModelFactory:
                                     padding=padding, latent_size=latent_size, input_size=input_size, max_pool=max_pool)
 
     @staticmethod
-    def get_discriminator(discriminator_config: dict, autoencoder_latent: int) -> Discriminator:
+    def get_discriminator(autoencoder_latent: int) -> Discriminator:
         """
         Method for building discriminator for contrastive autoencoder
-        :param discriminator_config: dictionary with config for discriminator. Only 'layers' key is supported
         :param autoencoder_latent:
         :return:
         """
-        layers = discriminator_config.get('layers', [8, 16])
-        return Discriminator(layers, 2 * autoencoder_latent)
+        return Discriminator(autoencoder_latent)
 
     @staticmethod
     def build_model(model_type: HiveModelType, input_shape: Tuple, config: dict) \
