@@ -58,6 +58,9 @@ def main():
 
         hive_dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, labels,
                                                          feature_config)
+        if len(hive_dataset) <= 0:
+            raise ValueError('Sound dataset is empty')
+
         hive_data_shape = hive_dataset[0][0].squeeze().shape
 
         logging.debug(f'got dataset of shape: {hive_data_shape}')
