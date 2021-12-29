@@ -433,6 +433,7 @@ class ModelRunner:
         self._curr_best_loss = sys.maxsize
         self._curr_patience = train_config.get('epoch_patience', 10)
         patience_init_val = train_config.get('epoch_patience', 10)
+        save_last_flag = train_config.get('save_last', False)
 
         experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
                                             {**model.get_params(),
@@ -476,6 +477,10 @@ class ModelRunner:
                 model, _, _ = model_load(checkpoint_path, model, optimizer, gpu_ids=self.gpu_ids)
                 break
 
+            if save_last_flag is True:
+                model_save(model, self.output_folder / f'{experiment.get_name()}-last-epoch.pth',
+                           optimizer, epoch, train_epoch_loss.model_loss)
+
         return model
 
     def _train_contrastive_with_discriminator(self,
@@ -496,6 +501,7 @@ class ModelRunner:
         self._curr_best_loss = sys.maxsize
         self._curr_patience = train_config.get('epoch_patience', 10)
         patience_init_val = train_config.get('epoch_patience', 10)
+        save_last_flag = train_config.get('save_last', False)
 
         experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
                                             {**model.get_params(),
@@ -547,6 +553,10 @@ class ModelRunner:
                 log.info(f' ___ early stopping at epoch {epoch} ___')
                 model, _, _ = model_load(model_checkpoint_path, model, model_optimizer, gpu_ids=self.gpu_ids)
                 break
+
+            if save_last_flag is True:
+                model_save(model, self.output_folder / f'{experiment.get_name()}-last-epoch.pth',
+                           model_optimizer, epoch, epoch_loss.model_loss)
 
         return model
 
@@ -609,8 +619,6 @@ class ModelRunner:
 
                 discriminator_loss_float = dloss.item()
                 discriminator_mean_loss.append(discriminator_loss_float)
-                experiment.log_metric("discriminator_batch_train_loss", dloss,
-                                      step=(epoch * len(dataloader)) + batch_idx)
                 if logging_interval != -1 and batch_idx % logging_interval == 0:
                     log.info(f'-> discriminator loss: {discriminator_loss_float}')
 
