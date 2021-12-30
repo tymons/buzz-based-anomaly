@@ -647,7 +647,8 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
-        cat_target_output, cat_bg_output = (torch.Tensor(), torch.Tensor()) if fig_folder is not None else (None, None)
+        cat_target_qs_output, cat_target_qz_output, cat_background_qs_output = \
+            (torch.Tensor(), torch.Tensor(), torch.Tensor()) if fig_folder is not None else (None, None, None)
 
         with torch.no_grad():
             for batch_idx, (target, background) in enumerate(val_dataloader):
@@ -667,13 +668,21 @@ class ModelRunner:
                              f'[{batch_idx * len(target)}/{len(val_dataloader.dataset)}]'
                              f'-> batch loss: {loss.item()} ===')
 
-                if cat_bg_output is not None:
-                    cat_bg_output = torch.cat((cat_bg_output, model.get_latent(background_batch).cpu()), dim=0)
-                if cat_target_output is not None:
-                    cat_target_output = torch.cat((cat_target_output, model.get_latent(target_batch).cpu()), dim=0)
+                if cat_target_qz_output is not None:
+                    cat_target_qz_output = torch.cat((cat_target_qz_output, model_output.target_qz_latent.cpu()), dim=0)
+                if cat_target_qs_output is not None:
+                    cat_target_qs_output = torch.cat((cat_target_qs_output, model_output.target_qs_latent.cpu()), dim=0)
+                if cat_background_qs_output is not None:
+                    cat_background_qs_output = torch.cat((cat_background_qs_output, model_output.background_qs_latent.cpu()), dim=0)
 
         if fig_folder is not None:
-            util.plot_latent(cat_target_output, fig_folder, epoch_no, background=cat_bg_output, experiment=experiment)
+            f1 = fig_folder / Path('target_qs-target_qz')
+            f2 = fig_folder / Path('target_qs-background_qs')
+            f1.mkdir(exist_ok=True, parents=True)
+            f2.mkdir(exist_ok=True, parents=True)
+            util.plot_latent(cat_target_qs_output, f1, epoch_no, background=cat_target_qz_output, experiment=experiment)
+            util.plot_latent(cat_target_qs_output, f2, epoch_no, background=cat_background_qs_output,
+                             experiment=experiment)
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 

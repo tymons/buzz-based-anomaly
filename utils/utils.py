@@ -648,12 +648,12 @@ def plot_latent(target: torch.Tensor, folder: Path, epoch=0, background: torch.T
                 experiment: comet_ml.Experiment = None):
     plt.ioff()
     fig = plt.figure(figsize=(10, 10))
-    filepath = folder / Path(f'latent-epoch-{epoch}.png')
+    filepath = folder / Path(f'{folder.stem}-latent-epoch-{epoch}.png')
     target = target.squeeze()
     plt.scatter(x=target.T[0], y=target.T[1], label='target', c='g')
     if background is not None:
         background = background.squeeze()
-        plt.scatter(x=background.T[0], y=background.T[1], label='background', c='r')
+        plt.scatter(x=background.T[0], y=background.T[1], label='auxiliary', c='r')
     plt.savefig(filepath)
     plt.close(fig)
 

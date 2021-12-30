@@ -32,6 +32,7 @@ class ContrastiveAE(ContrastiveBaseModel):
         target_s = self.s_encoder(target)
         target_z = self.z_encoder(target)
         background_z = self.z_encoder(background)
+        background_s = self.s_encoder(background)
 
         temp = torch.cat(tensors=[target_s, target_z], dim=-1)
         target_output = self.decoder(temp)
@@ -40,7 +41,7 @@ class ContrastiveAE(ContrastiveBaseModel):
         return ContrastiveOutput(target=target_output, background=background_output, target_qs_latent=target_s,
                                  target_qz_latent=target_z, target_qz_mean=None, target_qs_mean=None,
                                  background_qz_mean=None, background_qz_log_var=None, target_qs_log_var=None,
-                                 target_qz_log_var=None)
+                                 target_qz_log_var=None, background_qs_latent=background_s)
 
     def get_params(self) -> dict:
         """
