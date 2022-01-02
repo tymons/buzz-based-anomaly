@@ -646,6 +646,15 @@ def filter_hive_fingerprint(csv_feature_weather_path: Path,
 
 def plot_latent(target: torch.Tensor, folder: Path, epoch=0, background: torch.Tensor = None,
                 experiment: comet_ml.Experiment = None):
+    """
+    Method for plotting latent data
+    :param target:
+    :param folder:
+    :param epoch:
+    :param background:
+    :param experiment:
+    :return:
+    """
     plt.ioff()
     fig = plt.figure(figsize=(10, 10))
     filepath = folder / Path(f'{folder.stem}-latent-epoch-{epoch}.png')
@@ -654,6 +663,9 @@ def plot_latent(target: torch.Tensor, folder: Path, epoch=0, background: torch.T
     if background is not None:
         background = background.squeeze()
         plt.scatter(x=background.T[0], y=background.T[1], label='auxiliary', c='r')
+    plt.xlabel('Latent 1')
+    plt.ylabel('Latent 2')
+    plt.legend()
     plt.savefig(filepath)
     plt.close(fig)
 
