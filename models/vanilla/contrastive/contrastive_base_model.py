@@ -2,15 +2,14 @@ from abc import ABC, abstractmethod
 
 import torch
 from torch import nn
-from features.contrastive_feature_dataset import ContrastiveOutput
+from features.contrastive_feature_dataset import VanillaContrastiveOutput
 from models.discriminator import Discriminator
 from torch import functional
 from models.model_type import HiveModelType
 
 
 class ContrastiveBaseModel(ABC, nn.Module):
-    s_encoder: nn.Module
-    z_encoder: nn.Module
+    encoder: nn.Module
     decoder: nn.Module
     model_type: HiveModelType
 
@@ -18,7 +17,7 @@ class ContrastiveBaseModel(ABC, nn.Module):
         super().__init__()
         self.model_type = model_type
 
-    def loss_fn(self, target, background, model_output: ContrastiveOutput, discriminator: Discriminator):
+    def loss_fn(self, target, background, model_output: VanillaContrastiveOutput, discriminator: Discriminator):
         """
         Method for contrastive model's loss function
         :param target:
@@ -30,31 +29,30 @@ class ContrastiveBaseModel(ABC, nn.Module):
         target_loss = functional.F.mse_loss(target, model_output.target, reduction='mean')
         background_loss = functional.F.mse_loss(background, model_output.background, reduction='mean')
         recon_loss = target_loss + background_loss
-        loss = recon_loss
+        loss = recon_loss.clone()
 
-        with torch.no_grad():
-            qs_target_latent = model_output.target_qs_latent.squeeze()
-            qz_target_latent = model_output.target_qz_latent.squeeze()
-            latent_data = torch.vstack((qs_target_latent, qz_target_latent))
-            latent_labels = torch.hstack((torch.ones(qs_target_latent.shape[0]),
-                                          torch.zeros(qz_target_latent.shape[0]))).reshape(-1, 1)
+        target_latent = model_output.target_latent.squeeze()
+        background_latent = model_output.background_latent.squeeze()
 
-            tc_loss = -torch.mean(torch.log(torch.exp(torch.logit(discriminator(qs_target_latent)))))
+        latent_data = torch.vstack((target_latent, background_latent))
+        latent_labels = torch.hstack((torch.ones(target_latent.shape[0]),
+                                      torch.zeros(background_latent.shape[0]))).reshape(-1, 1)
 
-            probs = discriminator(latent_data)
-            disc_loss = discriminator.loss_fn(latent_labels, probs.cpu())
+        probs = discriminator(latent_data)
+        disc_loss = 0.1 * discriminator.loss_fn(latent_labels, probs.cpu())
 
-            loss += (0.1 * (tc_loss + disc_loss))
-            return loss, (recon_loss, tc_loss, disc_loss)
+        loss += disc_loss
+
+        return loss, (recon_loss, 0, disc_loss)
 
     @abstractmethod
     def get_params(self) -> dict:
         pass
 
     @abstractmethod
-    def forward(self, target, background) -> ContrastiveOutput:
+    def forward(self, target, background) -> VanillaContrastiveOutput:
         pass
 
     def get_latent(self, data) -> torch.Tensor:
-        latent = self.s_encoder(data)
+        latent = self.encoder(data)
         return latent

@@ -3,8 +3,13 @@ from torch.utils.data import Dataset
 from collections import namedtuple
 
 _fields = ['target', 'background', 'target_qs_mean', 'target_qs_log_var', 'target_qz_mean', 'target_qz_log_var',
-           'background_qz_mean', 'background_qz_log_var', 'target_qs_latent', 'target_qz_latent', 'background_qs_latent']
+           'background_qz_mean', 'background_qz_log_var', 'target_qs_latent', 'target_qz_latent',
+           'background_qs_latent']
 ContrastiveOutput = namedtuple('ContrastiveOutput', _fields, defaults=(None,) * len(_fields))
+
+_vanilla_fields = ['target', 'background', 'target_latent', 'background_latent']
+VanillaContrastiveOutput = namedtuple('VanillaContrastiveOutput', _vanilla_fields,
+                                      defaults=(None,) * len(_vanilla_fields))
 
 
 class ContrastiveFeatureDataset(Dataset):

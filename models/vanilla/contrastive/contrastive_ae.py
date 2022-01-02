@@ -1,12 +1,10 @@
-import torch
-
 from typing import List, Union
 
 from models.model_type import HiveModelType
 from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel
 from models.vanilla.ae import EncoderWithLatent, Decoder
 
-from features.contrastive_feature_dataset import ContrastiveOutput
+from features.contrastive_feature_dataset import VanillaContrastiveOutput
 
 
 class ContrastiveAE(ContrastiveBaseModel):
@@ -18,30 +16,23 @@ class ContrastiveAE(ContrastiveBaseModel):
         self._latent_size = latent_size
         self._dropout = dropout
 
-        self.s_encoder = EncoderWithLatent(self._layers, self._latent_size, self._dropout, input_size)
-        self.z_encoder = EncoderWithLatent(self._layers, self._latent_size, self._dropout, input_size)
-        self.decoder = Decoder(self._layers[::-1], 2 * self._latent_size, self._dropout, input_size)
+        self.encoder = EncoderWithLatent(self._layers, self._latent_size, self._dropout, input_size)
+        self.decoder = Decoder(self._layers[::-1], self._latent_size, self._dropout, input_size)
 
-    def forward(self, target, background) -> ContrastiveOutput:
+    def forward(self, target, background) -> VanillaContrastiveOutput:
         """
         Forward method for NN
         :param target: target sample
         :param background: background smaple
         :return: ContrastiveOutput
         """
-        target_s = self.s_encoder(target)
-        target_z = self.z_encoder(target)
-        background_z = self.z_encoder(background)
-        background_s = self.s_encoder(background)
+        target_latent = self.encoder(target)
+        background_latent = self.encoder(background)
+        target_output = self.decoder(target_latent)
+        background_output = self.decoder(background_latent)
 
-        temp = torch.cat(tensors=[target_s, target_z], dim=-1)
-        target_output = self.decoder(temp)
-        background_output = self.decoder(torch.cat(tensors=[torch.zeros_like(target_s), background_z], dim=-1))
-
-        return ContrastiveOutput(target=target_output, background=background_output, target_qs_latent=target_s,
-                                 target_qz_latent=target_z, target_qz_mean=None, target_qs_mean=None,
-                                 background_qz_mean=None, background_qz_log_var=None, target_qs_log_var=None,
-                                 target_qz_log_var=None, background_qs_latent=background_s)
+        return VanillaContrastiveOutput(target=target_output, background=background_output,
+                                        target_latent=target_latent, background_latent=background_latent)
 
     def get_params(self) -> dict:
         """
