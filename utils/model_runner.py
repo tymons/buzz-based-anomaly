@@ -30,7 +30,7 @@ from torch import nn, device
 from dataclasses import dataclass
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
-from features.contrastive_feature_dataset import ContrastiveOutput, VanillaContrastiveOutput
+from features.contrastive_feature_dataset import VanillaContrastiveOutput
 from utils.model_factory import HiveModelFactory, build_optuna_model_config
 from utils.sm_data_parallel import SmDataParallel
 
@@ -423,7 +423,7 @@ class ModelRunner:
         model = SmDataParallel(model, self.gpu_ids) if torch.cuda.device_count() > 1 else model.to(self.device)
 
         optimizer: Optimizer = _parse_optimizer(train_config['model']['optimizer'].get('type', 'Adam'))(
-            model.parameters(), lr=train_config.get( 'learning_rate', 0.0001))
+            model.parameters(), lr=train_config.get('learning_rate', 0.0001))
 
         _ = val_step_func(model, val_dataloader, -1, None, run_folder)
 
