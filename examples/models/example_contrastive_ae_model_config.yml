@@ -2,3 +2,4 @@ model:
   layers: [256, 32, 8]
   dropout: [0.3, 0.3, 0.3]
   latent: 1
+  alpha: 0.2

@@ -543,7 +543,7 @@ class ModelRunner:
             model_optimizer.zero_grad()
             model_output: VanillaContrastiveOutput = model(target_batch, background_batch)
             loss, partial_loss = model.loss_fn(target_batch, background_batch, model_output, discriminator)
-            recon_loss, tc_loss, disc_loss = partial_loss
+            recon_loss, disc_loss = partial_loss
 
             loss.backward()
             model_optimizer.step()
@@ -551,7 +551,6 @@ class ModelRunner:
             mean_loss.append(loss_float)
 
             experiment.log_metric("batch_train_loss", loss_float, step=(epoch * len(dataloader)) + batch_idx)
-            experiment.log_metric("batch_tc_loss", tc_loss, step=(epoch * len(dataloader)) + batch_idx)
             experiment.log_metric("batch_recon_loss", recon_loss, step=(epoch * len(dataloader)) + batch_idx)
 
             if self._log_interval != -1 and batch_idx % self._log_interval == 0:

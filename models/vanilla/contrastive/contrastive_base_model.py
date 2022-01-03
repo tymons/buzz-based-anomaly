@@ -12,6 +12,7 @@ class ContrastiveBaseModel(ABC, nn.Module):
     encoder: nn.Module
     decoder: nn.Module
     model_type: HiveModelType
+    alpha: float
 
     def __init__(self, model_type):
         super().__init__()
@@ -39,18 +40,29 @@ class ContrastiveBaseModel(ABC, nn.Module):
                                       torch.zeros(background_latent.shape[0]))).reshape(-1, 1)
 
         probs = discriminator(latent_data)
-        disc_loss = 0.1 * discriminator.loss_fn(latent_labels, probs.cpu())
+        disc_loss = self.alpha * discriminator.loss_fn(latent_labels, probs.cpu())
 
         loss += disc_loss
 
-        return loss, (recon_loss, 0, disc_loss)
+        return loss, (recon_loss, disc_loss)
+
+    def forward(self, target, background) -> VanillaContrastiveOutput:
+        """
+        Forward method for NN
+        :param target: target sample
+        :param background: background smaple
+        :return: ContrastiveOutput
+        """
+        target_latent = self.encoder(target)
+        background_latent = self.encoder(background)
+        target_output = self.decoder(target_latent)
+        background_output = self.decoder(background_latent)
+
+        return VanillaContrastiveOutput(target=target_output, background=background_output,
+                                        target_latent=target_latent, background_latent=background_latent)
 
     @abstractmethod
     def get_params(self) -> dict:
-        pass
-
-    @abstractmethod
-    def forward(self, target, background) -> VanillaContrastiveOutput:
         pass
 
     def get_latent(self, data) -> torch.Tensor:

@@ -12,3 +12,6 @@ README.md
 .gitignore
 .git-credentials
 docker-run-example-command.sh
+feature_config.yml
+learning_config.yml
+model_config.yml
