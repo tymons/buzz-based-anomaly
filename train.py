@@ -36,7 +36,7 @@ def main():
     parser.add_argument('--feature_config', default=Path(__file__).absolute().parent / "feature_config.yml", type=Path)
     parser.add_argument('--learning_config', default=Path(__file__).absolute().parent / "learning_config.yml",
                         type=Path)
-    parser.add_argument('--model_output', default=Path(__file__).absolute().parent / "output/model", type=Path)
+    parser.add_argument('--model_output', default=Path(__file__).absolute().parent / "output/", type=Path)
     parser.add_argument('--comet_config', default=Path(__file__).absolute().parent / ".comet.config", type=Path)
     parser.add_argument('--find_best', type=int, metavar='N', help="how many trials for finding best architecture")
     parser.add_argument('--log_folder', default=Path(__file__).absolute().parent / "output/", type=Path)
@@ -96,10 +96,13 @@ def main():
                                     for file in list(folder.glob('**/*.wav'))]
             else:
                 background_files = utils.get_valid_sounds_from_folders(args.contrastive_data_folders)
+                if args.filter_dates:
+                    background_files = utils.filter_by_datetime(background_files,
+                                                                args.filter_dates[0], args.filter_dates[1])
 
             random.shuffle(background_files)
             if len(sound_list) > len(background_files):
-                log.info(f'truncating taget dataset to the length of {len(background_files)}')
+                log.info(f'truncating target dataset to the length of {len(background_files)}')
                 sound_list = sound_list[:len(background_files)]
                 sound_labels = sound_labels[:len(background_files)]
             else:

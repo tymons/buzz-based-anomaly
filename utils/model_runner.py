@@ -30,7 +30,7 @@ from torch import nn, device
 from dataclasses import dataclass
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
-from features.contrastive_feature_dataset import ContrastiveOutput
+from features.contrastive_feature_dataset import VanillaContrastiveOutput
 from utils.model_factory import HiveModelFactory, build_optuna_model_config
 from utils.sm_data_parallel import SmDataParallel
 
@@ -206,7 +206,11 @@ class ModelRunner:
                  gpu_ids: List[int] = None):
         self.comet_api_key = comet_api_key if comet_api_key is not None else _read_comet_key(comet_config_file)
         self.comet_proj_name = comet_project_name
+
         self.output_folder = output_folder
+        if output_folder is not None:
+            self.output_folder.mkdir(parents=True, exist_ok=True)
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if torch_device is not None:
             self.device = torch_device
@@ -214,6 +218,8 @@ class ModelRunner:
         self.gpu_ids = gpu_ids if self.device == torch.device("cuda") else None
         self._curr_patience = -1
         self._curr_best_loss = sys.maxsize
+        self._patience_init_val = 10
+        self._save_last_model_flag = False
 
     def _setup_experiment(self, experiment_name: str, log_parameters: dict, tags: List[str]) -> Experiment:
         """
@@ -375,23 +381,6 @@ class ModelRunner:
         return self._train(model, train_dataloader, train_config, self._train_step, self._val_step,
                            val_dataloader, feature_config)
 
-    def train_contrastive(self,
-                          model: CBM,
-                          train_dataloader: DataLoader,
-                          train_config: dict,
-                          val_dataloader: DataLoader = None,
-                          feature_config: dict = None) -> CBM:
-        """
-        Wrapper for training vanilla contrastive autoencoders (both convolutional and fully connected)
-        :param feature_config: feature config to be logged
-        :param val_dataloader: validation dataloader
-        :param train_dataloader: train dataloader
-        :param model: model to be trained
-        :param train_config: train config
-        """
-        return self._train(model, train_dataloader, train_config, self._train_contrastive_step,
-                           self._val_contrastive_step, val_dataloader, feature_config)
-
     def train_contrastive_with_discriminator(self,
                                              model: CVBM,
                                              train_dataloader: DataLoader,
@@ -428,58 +417,38 @@ class ModelRunner:
         :param val_step_func: function to be invoked for single epoch validating
         :rtype: BM: trained model, last loss
         """
-        if feature_config is None:
-            feature_config = {}
-        self._curr_best_loss = sys.maxsize
-        self._curr_patience = train_config.get('epoch_patience', 10)
-        patience_init_val = train_config.get('epoch_patience', 10)
-        save_last_flag = train_config.get('save_last', False)
-
-        experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
-                                            {**model.get_params(),
-                                             **train_config,
-                                             **(feature_config if feature_config is not None else {})}, [])
-
-        model_debug_folder = Path(f'output/runs/{experiment.get_name()}')
-        model_debug_folder.mkdir(exist_ok=True, parents=True)
-        checkpoint_path = self.output_folder / f'{experiment.get_name()}-checkpoint.pth'
-
-        log.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
-                  f' for model {checkpoint_path.stem.upper()} with following config: {train_config}')
+        experiment, checkpoint_folder, run_folder = self._initialize_training(train_config, feature_config, model)
+        checkpoint_path = checkpoint_folder / f'{experiment.get_name()}-checkpoint.pth'
 
         model = SmDataParallel(model, self.gpu_ids) if torch.cuda.device_count() > 1 else model.to(self.device)
 
         optimizer: Optimizer = _parse_optimizer(train_config['model']['optimizer'].get('type', 'Adam'))(
-            model.parameters(),
-            lr=train_config.get(
-                'learning_rate',
-                0.0001))
-        log_interval = train_config.get('logging_batch_interval', 10)
+            model.parameters(), lr=train_config.get('learning_rate', 0.0001))
+
+        _ = val_step_func(model, val_dataloader, -1, None, run_folder)
+
+        log.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
+                  f' for model {checkpoint_path.stem.upper()} with following config: {train_config}')
         for epoch in range(train_config.get('epochs', 10)):
-            train_epoch_loss = train_step_func(model, train_dataloader, optimizer, experiment, epoch, log_interval)
+            # ------------ train step ------------
+            train_epoch_loss = train_step_func(model, train_dataloader, optimizer, experiment, epoch)
             experiment.log_metric('train_epoch_loss', train_epoch_loss.model_loss, step=epoch)
-
             log.info(f'--- train epoch {epoch} end with train loss: {train_epoch_loss.model_loss}')
-            early_stopping_loss = train_epoch_loss
-            if val_dataloader is not None:
-                val_epoch_loss = val_step_func(model, val_dataloader, experiment, epoch, log_interval,
-                                               fig_folder=model_debug_folder)
-                experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
-                early_stopping_loss = val_epoch_loss
-                log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
-            patience = self.early_stopping_callback(early_stopping_loss.model_loss, patience_init_val)
-            if patience == patience_init_val:
-                log.debug(f'*** model checkpoint at epoch {epoch} ***')
-                model_save(model, checkpoint_path, optimizer, epoch, train_epoch_loss.model_loss)
-            elif patience == 0:
+            # ------------ validation step ------------
+            val_epoch_loss = val_step_func(model, val_dataloader, epoch, experiment, run_folder)
+            experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
+            log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
+
+            # ------------ early stopping handler ------------
+            should_stop = self._early_stopping_handler(val_epoch_loss, epoch, model, optimizer, checkpoint_path)
+            if should_stop:
                 log.info(f' ___ early stopping at epoch {epoch} ___')
-                model, _, _ = model_load(checkpoint_path, model, optimizer, gpu_ids=self.gpu_ids)
                 break
 
-            if save_last_flag is True:
-                model_save(model, self.output_folder / f'{experiment.get_name()}-last-epoch.pth',
-                           optimizer, epoch, train_epoch_loss.model_loss)
+            if self._save_last_model_flag is True:
+                model_save(model, self.output_folder / f'{experiment.get_name()}-last-epoch.pth', optimizer,
+                           epoch, val_epoch_loss.model_loss)
 
         return model
 
@@ -498,22 +467,9 @@ class ModelRunner:
         :param discriminator:
         :return trained model, last loss
         """
-        self._curr_best_loss = sys.maxsize
-        self._curr_patience = train_config.get('epoch_patience', 10)
-        patience_init_val = train_config.get('epoch_patience', 10)
-        save_last_flag = train_config.get('save_last', False)
-
-        experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
-                                            {**model.get_params(),
-                                             **train_config,
-                                             **(feature_config if feature_config is not None else {})}, [])
-        model_debug_folder = Path(f'output/runs/{experiment.get_name()}')
-        model_debug_folder.mkdir(exist_ok=True, parents=True)
-        model_checkpoint_path = self.output_folder / f'{experiment.get_name()}-contrastive-checkpoint.pth'
-        discriminator_checkpoint_path = self.output_folder / f'{experiment.get_name()}-discriminator-checkpoint.pth'
-
-        log.debug(f'performing train task on {self.device}(s) ({torch.cuda.device_count()})'
-                  f' for model {model_checkpoint_path.stem.upper()} with following config: {train_config}')
+        experiment, checkpoint_folder, run_folder = self._initialize_training(train_config, feature_config, model)
+        model_checkpoint_path = checkpoint_folder / f'{experiment.get_name()}-contrastive-checkpoint.pth'
+        disc_checkpoint_path = checkpoint_folder / f'{experiment.get_name()}-discriminator-checkpoint.pth'
 
         model, discriminator = (SmDataParallel(model, self.gpu_ids), SmDataParallel(discriminator, self.gpu_ids)) \
             if torch.cuda.device_count() > 1 else (model.to(self.device), discriminator.to(self.device))
@@ -525,38 +481,37 @@ class ModelRunner:
                                                                             lr=train_config['discriminator'].get(
                                                                                 'learning_rate', 0.0001))
 
-        log_interval = train_config.get('logging_batch_interval', 10)
+        _ = self._val_contrastive_step(model, val_dataloader, -1, experiment=None, discriminator=discriminator,
+                                       fig_folder=run_folder)
+
+        log.debug(f'running train task on {self.device}(s) ({torch.cuda.device_count()}) for model '
+                  f'{model_checkpoint_path.stem.upper()} with following config: {train_config}')
         for epoch in range(train_config.get('epochs', 10)):
+            # ------------ train step ------------
             epoch_loss = self._train_contrastive_step(model, train_dataloader,
-                                                      model_optimizer, experiment, epoch, log_interval,
-                                                      discriminator, discriminator_optimizer)
+                                                      model_optimizer, experiment, epoch, discriminator,
+                                                      discriminator_optimizer)
             experiment.log_metric('train_epoch_loss', epoch_loss.model_loss, step=epoch)
             experiment.log_metric('train_discriminator_epoch_loss', epoch_loss.discriminator_loss, step=epoch)
-
             log.info(f'--- train epoch {epoch} end with train loss: {epoch_loss.model_loss}')
-            early_stopping_loss = epoch_loss
-            if val_dataloader is not None:
-                val_epoch_loss = self._val_contrastive_step(model, val_dataloader, experiment, epoch, log_interval,
-                                                            discriminator=discriminator,
-                                                            fig_folder=model_debug_folder)
-                experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
-                early_stopping_loss = val_epoch_loss
-                log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
-            patience = self.early_stopping_callback(early_stopping_loss.model_loss, patience_init_val)
-            if patience == patience_init_val:
-                log.debug(f'*** model checkpoint at epoch {epoch} ***')
-                model_save(model, model_checkpoint_path, model_optimizer, epoch, epoch_loss.model_loss)
-                model_save(discriminator, discriminator_checkpoint_path, discriminator_optimizer, epoch,
-                           epoch_loss.discriminator_loss)
-            elif patience == 0:
+            # ------------ validation step ------------
+            val_epoch_loss = self._val_contrastive_step(model, val_dataloader, epoch, experiment=experiment,
+                                                        discriminator=discriminator, fig_folder=run_folder)
+            experiment.log_metric('val_epoch_loss', val_epoch_loss.model_loss, step=epoch)
+            log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
+
+            # ------------ early stopping handler ------------
+            should_stop = self._early_stopping_handler(val_epoch_loss, epoch, model, model_optimizer,
+                                                       model_checkpoint_path, discriminator, discriminator_optimizer,
+                                                       disc_checkpoint_path)
+            if should_stop:
                 log.info(f' ___ early stopping at epoch {epoch} ___')
-                model, _, _ = model_load(model_checkpoint_path, model, model_optimizer, gpu_ids=self.gpu_ids)
                 break
 
-            if save_last_flag is True:
-                model_save(model, self.output_folder / f'{experiment.get_name()}-last-epoch.pth',
-                           model_optimizer, epoch, epoch_loss.model_loss)
+            if self._save_last_model_flag is True:
+                model_save(model, self.output_folder / f'{experiment.get_name()}-last-epoch.pth', model_optimizer,
+                           epoch, epoch_loss.model_loss)
 
         return model
 
@@ -566,7 +521,6 @@ class ModelRunner:
                                 model_optimizer: Optimizer,
                                 experiment: Experiment,
                                 epoch: int,
-                                logging_interval: int,
                                 discriminator: Discriminator = None,
                                 discriminator_optimizer: Optimizer = None) -> EpochLoss:
         """
@@ -578,7 +532,6 @@ class ModelRunner:
         :param discriminator_optimizer: optimizer for latent discriminator model
         :param experiment: comet ml experiment
         :param epoch: current epoch
-        :param logging_interval: logging interval
         :return: epoch loss object
         """
         mean_loss = []
@@ -588,9 +541,9 @@ class ModelRunner:
             target_batch = target.to(self.device)
             background_batch = background.to(self.device)
             model_optimizer.zero_grad()
-            model_output: ContrastiveOutput = model(target_batch, background_batch)
+            model_output: VanillaContrastiveOutput = model(target_batch, background_batch)
             loss, partial_loss = model.loss_fn(target_batch, background_batch, model_output, discriminator)
-            recon_loss, tc_loss, disc_loss = partial_loss
+            recon_loss, disc_loss = partial_loss
 
             loss.backward()
             model_optimizer.step()
@@ -598,20 +551,19 @@ class ModelRunner:
             mean_loss.append(loss_float)
 
             experiment.log_metric("batch_train_loss", loss_float, step=(epoch * len(dataloader)) + batch_idx)
-            experiment.log_metric("tc_loss", tc_loss, step=(epoch * len(dataloader)) + batch_idx)
-            experiment.log_metric("recon_loss", recon_loss, step=(epoch * len(dataloader)) + batch_idx)
-            experiment.log_metric("disc_loss", disc_loss, step=(epoch * len(dataloader)) + batch_idx)
+            experiment.log_metric("batch_recon_loss", recon_loss, step=(epoch * len(dataloader)) + batch_idx)
 
-            if logging_interval != -1 and batch_idx % logging_interval == 0:
+            if self._log_interval != -1 and batch_idx % self._log_interval == 0:
                 log.info(f'=== train epoch {epoch}, [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
                          f'-> batch loss: {loss_float}')
 
             if all([discriminator, discriminator_optimizer]):
-                qs_target_latent = model_output.target_qs_latent.clone().detach().squeeze()
-                qz_target_latent = model_output.target_qz_latent.clone().detach().squeeze()
-                latent_data = torch.vstack((qs_target_latent, qz_target_latent)).to(self.device)
-                latent_labels = torch.hstack((torch.ones(qs_target_latent.shape[0]),
-                                              torch.zeros(qz_target_latent.shape[0]))).reshape(-1, 1).to(self.device)
+                target_latent = model_output.target_latent.clone().detach().squeeze()
+                background_latent = model_output.background_latent.clone().detach().squeeze()
+
+                latent_data = torch.vstack((target_latent, background_latent)).to(self.device)
+                latent_labels = torch.hstack((torch.ones(target_latent.shape[0]),
+                                              torch.zeros(background_latent.shape[0]))).reshape(-1, 1).to(self.device)
                 probs = discriminator(latent_data)
                 dloss = discriminator.loss_fn(latent_labels, probs)
                 dloss.backward()
@@ -619,8 +571,11 @@ class ModelRunner:
 
                 discriminator_loss_float = dloss.item()
                 discriminator_mean_loss.append(discriminator_loss_float)
-                if logging_interval != -1 and batch_idx % logging_interval == 0:
+
+                if self._log_interval != -1 and batch_idx % self._log_interval == 0:
                     log.info(f'-> discriminator loss: {discriminator_loss_float}')
+                experiment.log_metric("batch_disc_loss", discriminator_loss_float,
+                                      step=(epoch * len(dataloader)) + batch_idx)
 
         epoch_loss = EpochLoss(sum(mean_loss) / len(mean_loss))
         if len(discriminator_mean_loss) > 0:
@@ -630,9 +585,8 @@ class ModelRunner:
     def _val_contrastive_step(self,
                               model: Union[CBM, CVBM, SmDataParallel],
                               val_dataloader: DataLoader,
-                              experiment: Experiment,
                               epoch_no: int,
-                              logging_interval: int,
+                              experiment: Experiment = None,
                               discriminator: Discriminator = None,
                               fig_folder: Path = None) -> EpochLoss:
         """
@@ -641,14 +595,13 @@ class ModelRunner:
         :param val_dataloader: validation dataloader
         :param experiment: comet ml experiment
         :param epoch_no: epoch number for validation step - mostly for logging
-        :param logging_interval: interval for logs within epoch
         :param discriminator: discriminator to be used for vaes and density ratio trick
         :return:
         """
         val_loss = []
         model.eval()
-        cat_target_qs_output, cat_target_qz_output, cat_background_qs_output = \
-            (torch.Tensor(), torch.Tensor(), torch.Tensor()) if fig_folder is not None else (None, None, None)
+        cat_target_latent, cat_background_latent = \
+            (torch.Tensor(), torch.Tensor()) if fig_folder is not None else (None, None)
 
         with torch.no_grad():
             for batch_idx, (target, background) in enumerate(val_dataloader):
@@ -656,46 +609,41 @@ class ModelRunner:
                 background_batch = background.to(self.device)
                 model_output = model(target_batch, background_batch)
 
-                loss, _ = model.loss_fn(target_batch, background_batch, model_output, discriminator)\
-                    if discriminator is not None else model.loss_fn(target_batch, background_batch, model_output)
+                loss, _ = model.loss_fn(target_batch, background_batch, model_output, discriminator)
                 loss_float = loss.item()
 
                 val_loss.append(loss_float)
-                experiment.log_metric("batch_val_loss", loss_float, step=(epoch_no * len(val_dataloader)) + batch_idx)
+                if experiment is not None:
+                    experiment.log_metric("batch_val_loss", loss_float,
+                                          step=(epoch_no * len(val_dataloader)) + batch_idx)
 
-                if logging_interval != -1 and batch_idx % logging_interval == 0:
+                if self._log_interval != -1 and batch_idx % self._log_interval == 0:
                     log.info(f'=== validation epoch {epoch_no}, '
                              f'[{batch_idx * len(target)}/{len(val_dataloader.dataset)}]'
                              f'-> batch loss: {loss.item()} ===')
 
-                if cat_target_qz_output is not None:
-                    cat_target_qz_output = torch.cat((cat_target_qz_output, model_output.target_qz_latent.cpu()), dim=0)
-                if cat_target_qs_output is not None:
-                    cat_target_qs_output = torch.cat((cat_target_qs_output, model_output.target_qs_latent.cpu()), dim=0)
-                if cat_background_qs_output is not None:
-                    cat_background_qs_output = torch.cat((cat_background_qs_output, model_output.background_qs_latent.cpu()), dim=0)
+                if cat_target_latent is not None:
+                    cat_target_latent = torch.cat((cat_target_latent, model_output.target_latent.cpu()), dim=0)
+                if cat_background_latent is not None:
+                    cat_background_latent = torch.cat((cat_background_latent, model_output.background_latent.cpu()),
+                                                      dim=0)
 
         if fig_folder is not None:
-            f1 = fig_folder / Path('target_qs-target_qz')
-            f2 = fig_folder / Path('target_qs-background_qs')
+            f1 = fig_folder / Path('target-background')
             f1.mkdir(exist_ok=True, parents=True)
-            f2.mkdir(exist_ok=True, parents=True)
-            util.plot_latent(cat_target_qs_output, f1, epoch_no, background=cat_target_qz_output, experiment=experiment)
-            util.plot_latent(cat_target_qs_output, f2, epoch_no, background=cat_background_qs_output,
-                             experiment=experiment)
+            util.plot_latent(cat_target_latent, f1, epoch_no, background=cat_background_latent, experiment=experiment)
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
     T_train_step = Callable[[Union[BM, CBM, SmDataParallel], DataLoader, Optimizer,
-                             Experiment, int, int], EpochLoss]
+                             Experiment, int], EpochLoss]
 
     def _train_step(self,
                     model: Union[BM, VBM, CBM, SmDataParallel],
                     dataloader: DataLoader,
                     optimizer: torch.optim.Optimizer,
                     experiment: Experiment,
-                    epoch_no: int,
-                    logging_interval: int = 10) -> EpochLoss:
+                    epoch_no: int,) -> EpochLoss:
         """
         Function for performing epoch step on data
         :param model: model to be trained
@@ -703,7 +651,6 @@ class ModelRunner:
         :param optimizer: used optimizer
         :param experiment: comet ml experiment where data will be reported
         :param epoch_no: epoch number
-        :param logging_interval: after how many batches data will be logged
         :return: mean loss for all batches
         """
         mean_loss = []
@@ -720,21 +667,20 @@ class ModelRunner:
             mean_loss.append(loss_float)
             experiment.log_metric("batch_train_loss", loss_float, step=(epoch_no * len(dataloader)) + batch_idx)
 
-            if logging_interval != -1 and batch_idx % logging_interval == 0:
+            if self._log_interval != -1 and batch_idx % self._log_interval == 0:
                 log.info(f'=== train epoch {epoch_no},'
                          f' [{batch_idx * len(batch)}/{len(dataloader.dataset)}] '
                          f'-> batch loss: {loss_float}')
         return EpochLoss(sum(mean_loss) / len(mean_loss))
 
     T_val_step = Callable[[Union[BM, CBM, CVBM, SmDataParallel], DataLoader,
-                           Experiment, int, int, Optional[Path]], EpochLoss]
+                           int, Optional[Experiment], Optional[Path]], EpochLoss]
 
     def _val_step(self,
                   model: Union[BM, VBM, CBM, SmDataParallel],
                   val_dataloader: DataLoader,
-                  experiment: Experiment,
                   epoch_no: int,
-                  logging_interval: int,
+                  experiment: Experiment = None,
                   fig_folder: Optional[Path] = None) -> EpochLoss:
         """
         Function for performing validation step for model
@@ -742,7 +688,6 @@ class ModelRunner:
         :param val_dataloader: validation dataloader
         :param experiment: comet ml experiment
         :param epoch_no: epoch number for validation step - mostly for logging
-        :param logging_interval: interval for logs within epoch
         :return:
         """
         val_loss = []
@@ -757,9 +702,11 @@ class ModelRunner:
 
                 loss_float = loss.item()
                 val_loss.append(loss_float)
-                experiment.log_metric("batch_val_loss", loss_float, step=(epoch_no * len(val_dataloader)) + batch_idx)
+                if experiment is not None:
+                    experiment.log_metric("batch_val_loss", loss_float,
+                                          step=(epoch_no * len(val_dataloader)) + batch_idx)
 
-                if logging_interval != -1 and batch_idx % logging_interval == 0:
+                if self._log_interval != -1 and batch_idx % self._log_interval == 0:
                     log.info(f'=== validation epoch {epoch_no}, '
                              f'[{batch_idx * len(batch)}/{len(val_dataloader.dataset)}]'
                              f'-> batch loss: {loss.item()} ===')
@@ -772,19 +719,58 @@ class ModelRunner:
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
-    def early_stopping_callback(self, curr_loss: float, patience_reset_value: int) -> int:
+    def early_stopping_callback(self, curr_loss: float) -> int:
         """
         Method for performing callback for early stopping
         :param curr_loss:
-        :param patience_reset_value:
         :return:
         """
         if self._curr_patience == 0 or math.isnan(curr_loss):
             return 0
         elif curr_loss < self._curr_best_loss:
             self._curr_best_loss = curr_loss
-            self._curr_patience = patience_reset_value
+            self._curr_patience = self._patience_init_val
         else:
             self._curr_patience -= 1
 
         return self._curr_patience
+
+    def _early_stopping_handler(self, current_loss, current_epoch, model, model_optimizer, model_checkpoint_path,
+                                discriminator=None, discriminator_optimizer=None, discriminator_checkpoint_path=None):
+        patience = self.early_stopping_callback(current_loss.model_loss)
+        if patience == self._patience_init_val:
+            log.debug(f'*** model checkpoint at epoch {current_epoch} ***')
+            model_save(model, model_checkpoint_path, model_optimizer, current_epoch, current_loss.model_loss)
+            if all([discriminator, discriminator_checkpoint_path, discriminator_optimizer]):
+                model_save(discriminator, discriminator_checkpoint_path, discriminator_optimizer, current_epoch,
+                           current_loss.discriminator_loss)
+        elif patience == 0:
+            model, _, _ = model_load(model_checkpoint_path, model, model_optimizer, gpu_ids=self.gpu_ids)
+            return True
+
+        return False
+
+    def _initialize_training(self, train_config, feature_config, model):
+        """
+        Method for initializing train run
+        :param train_config: train config
+        :param feature_config: feature config
+        :param model: model to be trained
+        :return: comet_ml experiment, folder for model checkpoints, folder for debug plotting
+        """
+        self._curr_best_loss = sys.maxsize
+        self._curr_patience = train_config.get('epoch_patience', 10)
+        self._patience_init_val = train_config.get('epoch_patience', 10)
+        self._save_last_model_flag = train_config.get('save_last', False)
+        self._log_interval = train_config.get('logging_batch_interval', 10)
+
+        experiment = self._setup_experiment(f"{type(model).__name__.lower()}-{time.strftime('%Y%m%d-%H%M%S')}",
+                                            {**model.get_params(), **train_config,
+                                             **(feature_config if feature_config is not None else {})}, [])
+
+        model_debug_folder = self.output_folder / f'runs/{experiment.get_name()}'
+        model_checkpoint_folder = self.output_folder / f'models/{experiment.get_name()}'
+        model_debug_folder.mkdir(exist_ok=True, parents=True)
+        model_checkpoint_folder.mkdir(exist_ok=True, parents=True)
+
+        return experiment, model_checkpoint_folder, model_debug_folder

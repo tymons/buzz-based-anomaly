@@ -261,10 +261,11 @@ class HiveModelFactory:
         layers = config.get('layers', [256, 32, 16])
         dropouts = config.get('dropout', [0.2, 0.2, 0.2])
         latent_size = config.get('latent', 2)
+        alpha = config.get('alpha', 0.1)
 
         log.debug(f'building contrastive ae model with config: layers({layers}), latent({latent_size}),'
-                  f' dropout({dropouts})')
-        return ContrastiveAE(HiveModelType.CONTRASTIVE_AE, layers, latent_size, input_size[0], dropouts)
+                  f' dropout({dropouts}), alpha({alpha})')
+        return ContrastiveAE(HiveModelType.CONTRASTIVE_AE, layers, latent_size, input_size[0], dropouts, alpha)
 
     @staticmethod
     def _get_contrastive_conv1d_autoencoder_model(config: dict, input_size: Tuple) -> ContrastiveConv1DAE:
@@ -280,12 +281,14 @@ class HiveModelFactory:
         kernel = config.get('kernel', 2)
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
+        alpha = config.get('alpha', 0.1)
 
         log.debug(f'building contrastive conv1d ae model with config: encoder_layers({layers}),'
                   f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
-                  f' max_pool({max_pool})')
+                  f' max_pool({max_pool}), alpha({alpha})')
         return ContrastiveConv1DAE(HiveModelType.CONTRASTIVE_CONV1D_AE, layers, dropout, kernel_size=kernel,
-                                   padding=padding, latent=latent_size, input_size=input_size[0], max_pool=max_pool)
+                                   padding=padding, latent=latent_size, input_size=input_size[0], max_pool=max_pool,
+                                   alpha=alpha)
 
     @staticmethod
     def _get_contrastive_conv2d_autoencoder_model(config: dict, input_size: Tuple) -> ContrastiveConv2DAE:
@@ -301,13 +304,15 @@ class HiveModelFactory:
         kernel = config.get('kernel', 2)
         padding = config.get('padding', 0)
         max_pool = config.get('max_pool', 2)
+        alpha = config.get('alpha', 0.1)
 
         log.debug(f'building contrastive conv2d ae model with config: encoder_layers({layers}),'
                   f' dropout({dropout}), latent({latent_size}), kernel({kernel}), padding({padding}),'
-                  f' max_pool({max_pool})')
+                  f' max_pool({max_pool}), alpha({alpha})')
 
         return ContrastiveConv2DAE(HiveModelType.CONTRASTIVE_CONV2D_AE, layers, dropout, kernel_size=kernel,
-                                   padding=padding, latent=latent_size, input_size=input_size, max_pool=max_pool)
+                                   padding=padding, latent=latent_size, input_size=input_size, max_pool=max_pool,
+                                   alpha=alpha)
 
     @staticmethod
     def _get_contrastive_conv1d_vae_model(config: dict, input_size: Tuple) -> ContrastiveConv1DVAE:
