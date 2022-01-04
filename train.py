@@ -36,7 +36,7 @@ def main():
     parser.add_argument('--feature_config', default=Path(__file__).absolute().parent / "feature_config.yml", type=Path)
     parser.add_argument('--learning_config', default=Path(__file__).absolute().parent / "learning_config.yml",
                         type=Path)
-    parser.add_argument('--model_output', default=Path(__file__).absolute().parent / "output/", type=Path)
+    parser.add_argument('--output_folder', default=Path(__file__).absolute().parent / "output/", type=Path)
     parser.add_argument('--comet_config', default=Path(__file__).absolute().parent / ".comet.config", type=Path)
     parser.add_argument('--find_best', type=int, metavar='N', help="how many trials for finding best architecture")
     parser.add_argument('--log_folder', default=Path(__file__).absolute().parent / "output/", type=Path)
@@ -56,7 +56,7 @@ def main():
 
     log.info(f'running {args.model.model_name} model with {args.feature.value}...')
     log.info(f'data folder located at: {args.smartula_data_folder}')
-    log.info(f'output folder for ML models located at: {args.model_output}')
+    log.info(f'output folder for ML models located at: {args.output_folder}')
     log.info(f'output folder for logs located at: {args.log_folder}')
 
     # TODO: Check features and model type compatibility
@@ -124,7 +124,7 @@ def main():
                                                                                              learning_config.get(
                                                                                                  'batch_size', 32))
 
-        model_runner = ModelRunner(args.model_output, comet_config_file=args.comet_config,
+        model_runner = ModelRunner(args.output_folder, comet_config_file=args.comet_config,
                                    comet_project_name="bee-sound-anomaly", gpu_ids=args.gpu_ids)
         if args.find_best is not None:
             model_runner.find_best(args.model, train_loader, learning_config, n_trials=args.find_best,
