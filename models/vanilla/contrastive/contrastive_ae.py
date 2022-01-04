@@ -26,5 +26,6 @@ class ContrastiveAE(ContrastiveBaseModel):
         return {
             'model_layers': self._layers,
             'model_latent': self._latent_size,
-            'model_dropouts': self._dropout
+            'model_dropouts': self._dropout,
+            'model_alpha': self.alpha
         }

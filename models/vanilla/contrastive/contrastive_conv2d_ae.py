@@ -35,5 +35,6 @@ class ContrastiveConv2DAE(ContrastiveBaseModel):
             'model_kernel_size': self._kernel_size,
             'model_padding': self._padding,
             'model_latent': self._latent,
-            'model_max_pool': self._max_pool
+            'model_max_pool': self._max_pool,
+            'model_alpha': self.alpha
         }
