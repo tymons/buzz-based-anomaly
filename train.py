@@ -56,7 +56,7 @@ def main():
 
     log.info(f'running {args.model.model_name} model with {args.feature.value}...')
     log.info(f'data folder located at: {args.smartula_data_folder}')
-    log.info(f'output folder for ML models located at: {args.output_folder}')
+    log.info(f'output folder located at: {args.output_folder}')
     log.info(f'output folder for logs located at: {args.log_folder}')
 
     # TODO: Check features and model type compatibility
