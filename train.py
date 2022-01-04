@@ -128,7 +128,7 @@ def main():
                                    comet_project_name="bee-sound-anomaly", gpu_ids=args.gpu_ids)
         if args.find_best is not None:
             model_runner.find_best(args.model, train_loader, learning_config, n_trials=args.find_best,
-                                   output_folder=Path('output/model'), feature_config=feature_config)
+                                   output_folder=args.output_folder, feature_config=feature_config)
         else:
             if args.model.num >= HiveModelType.CONTRASTIVE_AE.num:
                 model = HiveModelFactory.build_model(args.model, data_shape, model_config['model'])
