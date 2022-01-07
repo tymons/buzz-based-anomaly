@@ -1,4 +1,3 @@
-import librosa.feature
 import numpy as np
 import torchaudio
 import logging
