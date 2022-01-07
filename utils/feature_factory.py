@@ -99,9 +99,14 @@ class SoundFeatureFactory:
         round_data_shape: bool = features_params_dict.get('round_power_2')
         n_mfccs: int = features_params_dict.get('nmfccs')
         n_mels: int = features_params_dict.get('nmels')
+        log_mel: bool = features_params_dict.get('log_mel')
 
-        return MfccDataset(sound_filenames, labels, n_fft, hop_len, slice_freq, round_data_shape=round_data_shape,
-                           window=window, n_mfccs=n_mfccs, n_mels=n_mels)
+        # we assume that all sound recordings has the same sampling frequency as first file
+        _, sampling_rate = torchaudio.load(sound_filenames[0])
+
+        return MfccDataset(sound_filenames, labels, sampling_rate, n_fft, hop_len, slice_freq,
+                           round_data_shape=round_data_shape, window=window, n_mfccs=n_mfccs, n_mels=n_mels,
+                           log_mel=log_mel)
 
     @staticmethod
     def build_dataset(input_type: SoundFeatureType, sound_filenames: List[Path], labels: List[int],
