@@ -56,6 +56,10 @@ class SoundFeatureFactory:
         window: str = features_params_dict.get('window')
         data_round: bool = features_params_dict.get('round_power_2')
 
+        log.debug(f'building spectrogram dataset of length {len(sound_filenames)}'
+                  f' with params: n_fft({n_fft}),  slice_freq({slice_freq}), hop_len({hop_len}),'
+                  f' convert_db({convert_db}), window({window}), data_round({data_round})')
+
         return SpectrogramDataset(sound_filenames, labels, n_fft, hop_len, convert_db, slice_freq,
                                   round_data_shape=data_round, window=window)
 
@@ -80,6 +84,10 @@ class SoundFeatureFactory:
         # we assume that all sound recordings has the same sampling frequency as first file
         _, sampling_rate = torchaudio.load(sound_filenames[0])
 
+        log.debug(f'building spectrogram dataset of length {len(sound_filenames)}'
+                  f' with params: n_fft({n_fft}),  slice_freq({slice_freq}), hop_len({hop_len}),'
+                  f' convert_db({convert_db}), window({window}), data_round({data_round}), n_mels({n_mels})')
+
         return MelSpectrogramDataset(sound_filenames, labels, sampling_rate, n_fft, hop_len, convert_db, slice_freq,
                                      round_data_shape=data_round, window=window, n_mels=n_mels)
 
@@ -103,6 +111,11 @@ class SoundFeatureFactory:
 
         # we assume that all sound recordings has the same sampling frequency as first file
         _, sampling_rate = torchaudio.load(sound_filenames[0])
+
+        log.debug(f'building spectrogram dataset of length {len(sound_filenames)}'
+                  f' with params: n_fft({n_fft}),  slice_freq({slice_freq}), hop_len({hop_len}),'
+                  f' window({window}), data_round({round_data_shape}), n_mels({n_mels}), n_mfccs({n_mfccs}),'
+                  f' log_mel({log_mel})')
 
         return MfccDataset(sound_filenames, labels, sampling_rate, n_fft, hop_len, slice_freq,
                            round_data_shape=round_data_shape, window=window, n_mfccs=n_mfccs, n_mels=n_mels,
