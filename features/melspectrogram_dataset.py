@@ -9,18 +9,11 @@ from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
 
 from features.sound_dataset import SoundDataset
+from features.spectrogram_dataset import torch_windows
 from features.slice_frequency_dataclass import SliceFrequency
 from utils.utils import adjust_matrix, adjust_linear_ndarray, closest_power_2
 
 log = logging.getLogger("smartula")
-
-torch_windows = {
-    'hann': torch.hann_window,
-    'hamming': torch.hamming_window,
-    'blackman': torch.blackman_window,
-    'bartlett': torch.bartlett_window,
-    'none': None,
-}
 
 
 class MelSpectrogramDataset(SoundDataset):

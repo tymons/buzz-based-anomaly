@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 import logging
 
@@ -11,6 +12,15 @@ from features.slice_frequency_dataclass import SliceFrequency
 from utils.utils import adjust_matrix, closest_power_2, adjust_linear_ndarray
 
 log = logging.getLogger("smartula")
+
+
+torch_windows = {
+    'hann': torch.hann_window,
+    'hamming': torch.hamming_window,
+    'blackman': torch.blackman_window,
+    'bartlett': torch.bartlett_window,
+    'none': None,
+}
 
 
 def calculate_spectrogram(samples, sampling_rate: int, n_fft: int, hop_len: int, slice_freq: SliceFrequency = None,

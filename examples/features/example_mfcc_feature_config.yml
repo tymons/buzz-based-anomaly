@@ -7,3 +7,4 @@ window: hann
 round_power_2: False
 nmels: 32
 nmfccs: 32
+log_mel: False

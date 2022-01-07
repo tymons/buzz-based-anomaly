@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+
 from utils.feature_factory import SoundFeatureFactory
 from features.feature_type import SoundFeatureType
 
@@ -19,7 +20,8 @@ def _get_default_config() -> dict:
         'window': 'hann',
         'round_power_2': True,
         'nmfccs': 32,
-        'nmels': 128
+        'nmels': 128,
+        'log_mel': False
     }
 
 
@@ -34,7 +36,7 @@ class TestPeriodogramMethods(unittest.TestCase):
         dataset = SoundFeatureFactory.build_dataset(SoundFeatureType.from_name('mfcc'),
                                                     [self.filename_10kHz], [1], config)
 
-        (mfccs, frequencies, times), _ = dataset.get_item(0)
+        (mfccs, mels_numbers, times), _ = dataset.get_item(0)
 
-        self.assertGreaterEqual(0.0, mfccs.min(), "mfccs should be scaled")
+        self.assertGreaterEqual(mfccs.min(), 0.0, "mfccs should be scaled")
         self.assertLessEqual(mfccs.max(), 1.0, "mfccs should be scaled")
