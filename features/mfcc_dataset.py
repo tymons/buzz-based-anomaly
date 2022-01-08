@@ -31,7 +31,6 @@ class MfccDataset(SoundDataset):
 
         self.f_max = min(self.slice_freq.stop, sampling_rate // 2)
         self.f_min = min(self.slice_freq.start, sampling_rate // 2)
-        print(log_mel)
         self.transform = torchaudio.transforms.MFCC(
             sample_rate=sampling_rate,
             n_mfcc=n_mfccs,
