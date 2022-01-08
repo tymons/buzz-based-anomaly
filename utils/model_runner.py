@@ -447,7 +447,7 @@ class ModelRunner:
                 break
 
             if self._save_last_model_flag is True:
-                model_save(model, self.output_folder / f'{experiment.get_name()}-last-epoch.pth', optimizer,
+                model_save(model, checkpoint_folder / f'{experiment.get_name()}-last-epoch.pth', optimizer,
                            epoch, val_epoch_loss.model_loss)
 
         return model
@@ -510,7 +510,7 @@ class ModelRunner:
                 break
 
             if self._save_last_model_flag is True:
-                model_save(model, self.output_folder / f'{experiment.get_name()}-last-epoch.pth', model_optimizer,
+                model_save(model, model_checkpoint_path / f'{experiment.get_name()}-last-epoch.pth', model_optimizer,
                            epoch, epoch_loss.model_loss)
 
         return model
