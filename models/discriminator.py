@@ -5,6 +5,8 @@ from torch import nn
 from features.contrastive_feature_dataset import VaeContrastiveOutput, VanillaContrastiveOutput
 from typing import Union
 
+from models.variational.contrastive.contrastive_variational_base_model import latent_permutation
+
 
 class Discriminator(nn.Module):
     def __init__(self, input_size: int):
@@ -37,6 +39,17 @@ class Discriminator(nn.Module):
 
         return latent_data, latent_labels
 
+    def _variational_get_latent(self, model_output: VaeContrastiveOutput):
+        q = torch.cat((model_output.target_qs_latent.clone().detach().squeeze(),
+                       model_output.target_qz_latent.clone().detach().squeeze()), dim=-1)
+        q_bar = latent_permutation(q)
+
+        latent_data = torch.vstack((q, q_bar)).to(self.device)
+        latent_labels = torch.hstack((torch.ones(q.shape[0]),
+                                      torch.zeros(q_bar.shape[0]))).reshape(-1, 1).to(self.device)
+
+        return latent_data, latent_labels
+
     def forward(self, x):
         """
         Method for forward pass
@@ -55,10 +68,11 @@ class Discriminator(nn.Module):
         if isinstance(model_output, VanillaContrastiveOutput):
             x, labels = self._vanilla_get_latent(model_output)
         elif isinstance(model_output, VaeContrastiveOutput):
-            x, labels = 0, []
+            x, labels = self._variational_get_latent(model_output)
         else:
             raise ValueError('Contrastive output not supported!')
 
         probs = self(x)
         loss = self.loss_fn(labels, probs)
         return loss
+

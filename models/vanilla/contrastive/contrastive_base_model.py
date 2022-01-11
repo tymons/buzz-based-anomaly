@@ -2,10 +2,14 @@ from abc import ABC, abstractmethod
 
 import torch
 from torch import nn
-from features.contrastive_feature_dataset import VanillaContrastiveOutput
-from models.discriminator import Discriminator
 from torch import functional
+
 from models.model_type import HiveModelType
+from collections import namedtuple
+
+_vanilla_fields = ['target', 'background', 'target_latent', 'background_latent']
+VanillaContrastiveOutput = namedtuple('VanillaContrastiveOutput', _vanilla_fields,
+                                      defaults=(None,) * len(_vanilla_fields))
 
 
 class ContrastiveBaseModel(ABC, nn.Module):
@@ -18,7 +22,7 @@ class ContrastiveBaseModel(ABC, nn.Module):
         super().__init__()
         self.model_type = model_type
 
-    def loss_fn(self, target, background, model_output: VanillaContrastiveOutput, discriminator: Discriminator):
+    def loss_fn(self, target, background, model_output: VanillaContrastiveOutput, discriminator):
         """
         Method for contrastive model's loss function
         :param target:
@@ -44,7 +48,7 @@ class ContrastiveBaseModel(ABC, nn.Module):
 
         loss += disc_loss
 
-        return loss, (recon_loss, disc_loss)
+        return loss, (recon_loss, disc_loss, 0)
 
     def forward(self, target, background) -> VanillaContrastiveOutput:
         """

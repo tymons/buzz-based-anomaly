@@ -1,14 +1,17 @@
 from abc import ABC, abstractmethod
+from collections import namedtuple
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 
 from torch import nn, Tensor
-from features.contrastive_feature_dataset import VaeContrastiveOutput
 from models.model_type import HiveModelType
-from models.discriminator import Discriminator
 from models.variational.vae_base_model import kld_loss
+
+_fields = ['target', 'background', 'target_qs_mean', 'target_qs_log_var', 'target_qz_mean', 'target_qz_log_var',
+           'background_qz_mean', 'background_qz_log_var', 'target_qs_latent', 'target_qz_latent']
+VaeContrastiveOutput = namedtuple('VaeContrastiveOutput', _fields, defaults=(None,) * len(_fields))
 
 
 def kl_closed_form(means_p, covs_p, means_q, covs_q):
@@ -59,7 +62,7 @@ class ContrastiveVariationalBaseModel(ABC, nn.Module):
         super().__init__()
         self.model_type = model_type
 
-    def loss_fn(self, target, background, model_output: VaeContrastiveOutput, discriminator: Discriminator):
+    def loss_fn(self, target, background, model_output, discriminator):
         """
         Method for variational loss fn
         :param target:
@@ -70,32 +73,33 @@ class ContrastiveVariationalBaseModel(ABC, nn.Module):
         # reconstruction loss for target and background
         loss = F.mse_loss(target, model_output.target, reduction='mean')
         loss += F.mse_loss(background, model_output.background, reduction='mean')
+        recon_loss = loss.item()
+
         # KLD losses
         loss += kld_loss(model_output.target_qs_mean.squeeze(), model_output.target_qs_log_var.squeeze())
         loss += kld_loss(model_output.target_qz_mean.squeeze(), model_output.target_qz_log_var.squeeze())
         loss += kld_loss(model_output.background_qz_mean.squeeze(), model_output.background_qz_log_var.squeeze())
 
         # total correction loss
-        # with torch.no_grad():
         q = torch.cat((model_output.target_qs_latent.squeeze(), model_output.target_qz_latent.squeeze()), dim=-1)
         q_bar = latent_permutation(q)
         q_score = discriminator(q)
         q_bar_score = discriminator(q_bar)
-        tc_loss = torch.mean(torch.logit(q_score))
+        tc_loss = torch.mean(torch.logit(q_score, eps=1e-4))
         loss += tc_loss
 
         disc_loss = discriminator.loss_fn(torch.ones_like(q_score), q_score)
         disc_loss += discriminator.loss_fn(torch.zeros_like(q_bar_score), q_bar_score)
         loss += disc_loss
 
-        return loss
+        return loss, (recon_loss, disc_loss.item(), tc_loss.item())
 
     @abstractmethod
     def get_params(self) -> dict:
         pass
 
     @abstractmethod
-    def forward(self, target, background) -> VaeContrastiveOutput:
+    def forward(self, target, background):
         pass
 
     def get_latent(self, data) -> torch.Tensor:

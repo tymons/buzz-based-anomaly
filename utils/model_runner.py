@@ -21,8 +21,9 @@ from models.discriminator import Discriminator
 from models.model_type import HiveModelType
 from models.vanilla.base_model import BaseModel
 from models.variational.vae_base_model import VaeBaseModel
-from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel
+from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel, VanillaContrastiveOutput
 from models.variational.contrastive.contrastive_variational_base_model import ContrastiveVariationalBaseModel
+from models.variational.contrastive.contrastive_variational_base_model import VaeContrastiveOutput
 
 from typing import List, Callable, Union, Optional
 from torch import nn, device
@@ -30,7 +31,7 @@ from torch import nn, device
 from dataclasses import dataclass
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
-from features.contrastive_feature_dataset import VaeContrastiveOutput, VanillaContrastiveOutput
+from features.contrastive_feature_dataset import ContrastiveFeatureLogger
 from utils.model_factory import HiveModelFactory, build_optuna_model_config
 from utils.sm_data_parallel import SmDataParallel
 
@@ -543,7 +544,7 @@ class ModelRunner:
             model_optimizer.zero_grad()
             model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput] = model(target_batch, background_batch)
             loss, partial_loss = model.loss_fn(target_batch, background_batch, model_output, discriminator)
-            recon_loss, disc_loss = partial_loss
+            recon_loss, disc_loss, tc_loss = partial_loss
 
             loss.backward()
             model_optimizer.step()
@@ -552,7 +553,7 @@ class ModelRunner:
 
             experiment.log_metric("batch_train_loss", loss_float, step=(epoch * len(dataloader)) + batch_idx)
             experiment.log_metric("batch_recon_loss", recon_loss, step=(epoch * len(dataloader)) + batch_idx)
-
+            experiment.log_metric("tc_loss", tc_loss, step=(epoch * len(dataloader)) + batch_idx)
             if self._log_interval != -1 and batch_idx % self._log_interval == 0:
                 log.info(f'=== train epoch {epoch}, [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
                          f'-> batch loss: {loss_float}')
@@ -592,8 +593,7 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
-        cat_target_latent, cat_background_latent = \
-            (torch.Tensor(), torch.Tensor()) if fig_folder is not None else (None, None)
+        contrastive_logger = ContrastiveFeatureLogger(type(model), fig_folder) if fig_folder is not None else None
 
         with torch.no_grad():
             for batch_idx, (target, background) in enumerate(val_dataloader):
@@ -615,15 +615,11 @@ class ModelRunner:
                              f'[{batch_idx * len(target)}/{len(val_dataloader.dataset)}]'
                              f'-> batch loss: {loss.item()} ===')
 
-                if cat_target_latent is not None:
-                    cat_target_latent = torch.cat((cat_target_latent, model_output.target_latent.cpu()), dim=0)
-                if cat_background_latent is not None:
-                    cat_background_latent = torch.cat((cat_background_latent, model_output.background_latent.cpu()), dim=0)
+                if contrastive_logger is not None:
+                    contrastive_logger.batch_collect(model_output)
 
-        if fig_folder is not None:
-            f1 = fig_folder / Path('target-background')
-            f1.mkdir(exist_ok=True, parents=True)
-            util.plot_latent(cat_target_latent, f1, epoch_no, background=cat_background_latent, experiment=experiment)
+        if contrastive_logger is not None:
+            contrastive_logger.data_flush(epoch_no)
 
         return EpochLoss(sum(val_loss) / len(val_loss))
 
