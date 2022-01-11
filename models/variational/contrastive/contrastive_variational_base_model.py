@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 
 from torch import nn, Tensor
-from features.contrastive_feature_dataset import ContrastiveOutput
+from features.contrastive_feature_dataset import VaeContrastiveOutput
 from models.model_type import HiveModelType
 from models.discriminator import Discriminator
 from models.variational.vae_base_model import kld_loss
@@ -59,7 +59,7 @@ class ContrastiveVariationalBaseModel(ABC, nn.Module):
         super().__init__()
         self.model_type = model_type
 
-    def loss_fn(self, target, background, model_output: ContrastiveOutput, discriminator: Discriminator):
+    def loss_fn(self, target, background, model_output: VaeContrastiveOutput, discriminator: Discriminator):
         """
         Method for variational loss fn
         :param target:
@@ -79,11 +79,13 @@ class ContrastiveVariationalBaseModel(ABC, nn.Module):
         # with torch.no_grad():
         q = torch.cat((model_output.target_qs_latent.squeeze(), model_output.target_qz_latent.squeeze()), dim=-1)
         q_bar = latent_permutation(q)
-        q_score, q_bar_score = discriminator(q, q_bar)
+        q_score = discriminator(q)
+        q_bar_score = discriminator(q_bar)
         tc_loss = torch.mean(torch.logit(q_score))
         loss += tc_loss
 
-        disc_loss = discriminator.loss_fn(q_score, q_bar_score)
+        disc_loss = discriminator.loss_fn(torch.ones_like(q_score), q_score)
+        disc_loss += discriminator.loss_fn(torch.zeros_like(q_bar_score), q_bar_score)
         loss += disc_loss
 
         return loss
@@ -93,7 +95,7 @@ class ContrastiveVariationalBaseModel(ABC, nn.Module):
         pass
 
     @abstractmethod
-    def forward(self, target, background) -> ContrastiveOutput:
+    def forward(self, target, background) -> VaeContrastiveOutput:
         pass
 
     def get_latent(self, data) -> torch.Tensor:

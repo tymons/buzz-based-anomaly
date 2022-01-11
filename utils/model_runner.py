@@ -30,7 +30,7 @@ from torch import nn, device
 from dataclasses import dataclass
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
-from features.contrastive_feature_dataset import VanillaContrastiveOutput
+from features.contrastive_feature_dataset import VaeContrastiveOutput, VanillaContrastiveOutput
 from utils.model_factory import HiveModelFactory, build_optuna_model_config
 from utils.sm_data_parallel import SmDataParallel
 
@@ -456,7 +456,7 @@ class ModelRunner:
                                               model: CVBM,
                                               train_dataloader: DataLoader,
                                               train_config: dict,
-                                              discriminator: nn.Module,
+                                              discriminator: Discriminator,
                                               val_dataloader: DataLoader = None,
                                               feature_config: dict = None) -> (CVBM, float):
         """
@@ -541,7 +541,7 @@ class ModelRunner:
             target_batch = target.to(self.device)
             background_batch = background.to(self.device)
             model_optimizer.zero_grad()
-            model_output: VanillaContrastiveOutput = model(target_batch, background_batch)
+            model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput] = model(target_batch, background_batch)
             loss, partial_loss = model.loss_fn(target_batch, background_batch, model_output, discriminator)
             recon_loss, disc_loss = partial_loss
 
@@ -558,17 +558,9 @@ class ModelRunner:
                          f'-> batch loss: {loss_float}')
 
             if all([discriminator, discriminator_optimizer]):
-                target_latent = model_output.target_latent.clone().detach().squeeze()
-                background_latent = model_output.background_latent.clone().detach().squeeze()
-
-                latent_data = torch.vstack((target_latent, background_latent)).to(self.device)
-                latent_labels = torch.hstack((torch.ones(target_latent.shape[0]),
-                                              torch.zeros(background_latent.shape[0]))).reshape(-1, 1).to(self.device)
-                probs = discriminator(latent_data)
-                dloss = discriminator.loss_fn(latent_labels, probs)
+                dloss = discriminator.forward_with_loss(model_output)
                 dloss.backward()
                 discriminator_optimizer.step()
-
                 discriminator_loss_float = dloss.item()
                 discriminator_mean_loss.append(discriminator_loss_float)
 
@@ -607,7 +599,8 @@ class ModelRunner:
             for batch_idx, (target, background) in enumerate(val_dataloader):
                 target_batch = target.to(self.device)
                 background_batch = background.to(self.device)
-                model_output = model(target_batch, background_batch)
+                model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput] = model(target_batch,
+                                                                                            background_batch)
 
                 loss, _ = model.loss_fn(target_batch, background_batch, model_output, discriminator)
                 loss_float = loss.item()
@@ -625,8 +618,7 @@ class ModelRunner:
                 if cat_target_latent is not None:
                     cat_target_latent = torch.cat((cat_target_latent, model_output.target_latent.cpu()), dim=0)
                 if cat_background_latent is not None:
-                    cat_background_latent = torch.cat((cat_background_latent, model_output.background_latent.cpu()),
-                                                      dim=0)
+                    cat_background_latent = torch.cat((cat_background_latent, model_output.background.cpu()), dim=0)
 
         if fig_folder is not None:
             f1 = fig_folder / Path('target-background')

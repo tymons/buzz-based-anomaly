@@ -9,7 +9,7 @@ from models.vanilla.conv2d_ae import Conv2DEncoder, Conv2DDecoder
 from models.conv_utils import convolutional_to_mlp
 from models.variational.vae_base_model import reparameterize, Flattener
 
-from features.contrastive_feature_dataset import ContrastiveOutput
+from features.contrastive_feature_dataset import VaeContrastiveOutput
 
 
 class ContrastiveConv2DVAE(cvbm.ContrastiveVariationalBaseModel):
@@ -37,7 +37,7 @@ class ContrastiveConv2DVAE(cvbm.ContrastiveVariationalBaseModel):
         self.z_linear_means = nn.Linear(features[-1] * connector_size, latent_size)
         self.z_linear_log_var = nn.Linear(features[-1] * connector_size, latent_size)
 
-    def forward(self, target, background) -> ContrastiveOutput:
+    def forward(self, target, background) -> VaeContrastiveOutput:
         """
         Method for performing forward pass
         :param target: target data for contrastive autoencoder
@@ -63,11 +63,11 @@ class ContrastiveConv2DVAE(cvbm.ContrastiveVariationalBaseModel):
         tg_output = self.decoder(torch.cat(tensors=[tg_s, tg_z], dim=-1))
         bg_output = self.decoder(torch.cat(tensors=[torch.zeros_like(tg_s), bg_z], dim=-1))
 
-        return ContrastiveOutput(target=tg_output, background=bg_output,
-                                 target_qs_mean=tg_s_mean, target_qs_log_var=tg_s_log_var,
-                                 target_qz_mean=tg_z_mean, target_qz_log_var=tg_z_log_var,
-                                 background_qz_mean=bg_z_mean, background_qz_log_var=bg_z_log_var,
-                                 target_qs_latent=tg_s, target_qz_latent=tg_z)
+        return VaeContrastiveOutput(target=tg_output, background=bg_output,
+                                    target_qs_mean=tg_s_mean, target_qs_log_var=tg_s_log_var,
+                                    target_qz_mean=tg_z_mean, target_qz_log_var=tg_z_log_var,
+                                    background_qz_mean=bg_z_mean, background_qz_log_var=bg_z_log_var,
+                                    target_qs_latent=tg_s, target_qz_latent=tg_z)
 
     def get_params(self) -> dict:
         """
