@@ -75,4 +75,3 @@ class Discriminator(nn.Module):
         probs = self(x)
         loss = self.loss_fn(labels, probs)
         return loss
-
