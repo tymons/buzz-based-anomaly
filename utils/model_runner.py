@@ -618,7 +618,7 @@ class ModelRunner:
                 if cat_target_latent is not None:
                     cat_target_latent = torch.cat((cat_target_latent, model_output.target_latent.cpu()), dim=0)
                 if cat_background_latent is not None:
-                    cat_background_latent = torch.cat((cat_background_latent, model_output.background.cpu()), dim=0)
+                    cat_background_latent = torch.cat((cat_background_latent, model_output.background_latent.cpu()), dim=0)
 
         if fig_folder is not None:
             f1 = fig_folder / Path('target-background')

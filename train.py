@@ -73,13 +73,10 @@ def main():
             log.error('sound list empty!')
             raise Exception('sound list empty!')
 
+        sound_list = utils.filter_path_list(sound_list, *args.hives)
         if args.filter_dates:
             sound_list = utils.filter_by_datetime(sound_list, args.filter_dates[0], args.filter_dates[1])
 
-        # prepare sound filenames
-        sound_list = utils.filter_path_list(sound_list, *args.hives)
-
-        # fingerprint filtering
         if args.fingerprint_main_hive is not None:
             sound_list = utils.filter_hive_fingerprint(args.fingerprint_feature_file,
                                                        args.fingerprint_main_hive,
