@@ -543,7 +543,7 @@ class ModelRunner:
             background_batch = background.to(self.device)
             model_optimizer.zero_grad()
             model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput] = model(target_batch, background_batch)
-            loss, partial_loss = model.loss_fn(target_batch, background_batch, model_output, discriminator)
+            loss, partial_loss, indices = model.loss_fn(target_batch, background_batch, model_output, discriminator)
             recon_loss, disc_loss, tc_loss = partial_loss
 
             loss.backward()
@@ -559,7 +559,7 @@ class ModelRunner:
                          f'-> batch loss: {loss_float}')
 
             if all([discriminator, discriminator_optimizer]):
-                dloss = discriminator.forward_with_loss(model_output)
+                dloss = discriminator.forward_with_loss(model_output, indices)
                 dloss.backward()
                 discriminator_optimizer.step()
                 discriminator_loss_float = dloss.item()
@@ -602,7 +602,7 @@ class ModelRunner:
                 model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput] = model(target_batch,
                                                                                             background_batch)
 
-                loss, _ = model.loss_fn(target_batch, background_batch, model_output, discriminator)
+                loss, _, _ = model.loss_fn(target_batch, background_batch, model_output, discriminator)
                 loss_float = loss.item()
 
                 val_loss.append(loss_float)

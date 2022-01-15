@@ -54,8 +54,10 @@ class ContrastiveFeatureLogger:
             self.vanilla_background_data = torch.cat((self.vanilla_background_data,
                                                       model_output.background_latent.cpu()), dim=0)
         elif isinstance(model_output, VaeContrastiveOutput):
-            self.vae_target_qs_data = torch.cat((self.vae_target_qs_data, model_output.target_qs_mean.cpu()), dim=0)
-            self.vae_target_qz_data = torch.cat((self.vae_target_qz_data, model_output.target_qz_mean.cpu()), dim=0)
+            self.vae_target_qs_data = torch.cat((self.vae_target_qs_data,
+                                                 model_output.target_qs_mean.cpu().squeeze(dim=1)), dim=0)
+            self.vae_target_qz_data = torch.cat((self.vae_target_qz_data,
+                                                 model_output.target_qz_mean.cpu().squeeze(dim=1)), dim=0)
             self.vae_background_qz_data = torch.cat((self.vae_background_qz_data,
                                                      model_output.background_qz_mean.cpu()), dim=0)
 

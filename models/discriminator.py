@@ -39,10 +39,10 @@ class Discriminator(nn.Module):
 
         return latent_data, latent_labels
 
-    def _variational_get_latent(self, model_output: VaeContrastiveOutput):
-        q = torch.cat((model_output.target_qs_latent.clone().detach().squeeze(),
-                       model_output.target_qz_latent.clone().detach().squeeze()), dim=-1)
-        q_bar = latent_permutation(q)
+    def _variational_get_latent(self, model_output: VaeContrastiveOutput, indices=None):
+        q = torch.cat((model_output.target_qs_latent.clone().detach().squeeze(dim=1),
+                       model_output.target_qz_latent.clone().detach().squeeze(dim=1)), dim=-1)
+        q_bar, _ = latent_permutation(q, indices=indices)
 
         latent_data = torch.vstack((q, q_bar)).to(self.device)
         latent_labels = torch.hstack((torch.ones(q.shape[0]),
@@ -59,7 +59,7 @@ class Discriminator(nn.Module):
         class_probability = torch.sigmoid(self.linear(x))
         return class_probability
 
-    def forward_with_loss(self, model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput]):
+    def forward_with_loss(self, model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput], indices=None):
         """
         Method for forward pass with loss calculation for discriminator
         :param model_output:
@@ -68,7 +68,7 @@ class Discriminator(nn.Module):
         if isinstance(model_output, VanillaContrastiveOutput):
             x, labels = self._vanilla_get_latent(model_output)
         elif isinstance(model_output, VaeContrastiveOutput):
-            x, labels = self._variational_get_latent(model_output)
+            x, labels = self._variational_get_latent(model_output, indices)
         else:
             raise ValueError('Contrastive output not supported!')
 

@@ -119,7 +119,8 @@ def main():
             dataset = SoundFeatureFactory.build_contrastive_feature_dataset(dataset, background_dataset)
         train_loader, val_loader = SoundFeatureFactory.build_train_and_validation_dataloader(dataset,
                                                                                              learning_config.get(
-                                                                                                 'batch_size', 32))
+                                                                                                 'batch_size', 32),
+                                                                                             drop_last=True)
 
         model_runner = ModelRunner(args.output_folder, comet_config_file=args.comet_config,
                                    comet_project_name="bee-sound-anomaly", gpu_ids=args.gpu_ids)
