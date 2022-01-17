@@ -33,7 +33,7 @@ class VAE(VaeBaseModel):
         :return: loss
         """
         mse = functional.F.mse_loss(y.output, x, reduction='mean')
-        kld = kld_loss(y.mean, y.log_var)
+        kld = kld_loss(y.mean.squeeze(dim=1), y.log_var.squeeze(dim=1))
         return mse + kld
 
     def get_params(self) -> dict:

@@ -42,7 +42,7 @@ def latent_permutation(latent_batch: Tensor, inplace: bool = False, indices=None
     """
     latent_batch = latent_batch.squeeze()
 
-    data = latent_batch.clone() if inplace is False else latent_batch
+    data = latent_batch.clone().detach() if inplace is False else latent_batch
     rand_indices = torch.randperm(latent_batch.shape[0]) if indices is None else indices
     data[:, (latent_batch.shape[1] // 2):] = latent_batch[:, (latent_batch.shape[1] // 2):][rand_indices]
 
@@ -84,16 +84,17 @@ class ContrastiveVariationalBaseModel(ABC, nn.Module):
         q = torch.cat((model_output.target_qs_latent.squeeze(dim=1),
                        model_output.target_qz_latent.squeeze(dim=1)), dim=-1)
         q_bar, indices = latent_permutation(q)
-        q_score = discriminator(q)
-        q_bar_score = discriminator(q_bar)
-        tc_loss = torch.mean(torch.logit(q_bar_score, eps=1e-4))
-        loss += tc_loss
 
-        disc_loss = discriminator.loss_fn(torch.ones_like(q_score), q_score)
-        disc_loss += discriminator.loss_fn(torch.zeros_like(q_bar_score), q_bar_score)
+        q_score, q_bar_score = discriminator(q, q_bar)
+        tc_loss_p = -torch.mean(torch.logit(q_score, eps=1e-34))
+        tc_loss_q = torch.mean(torch.logit(q_bar_score, eps=1e-34))
+        sum_tc_loss = tc_loss_p + tc_loss_q
+        loss += sum_tc_loss
+
+        disc_loss = discriminator.loss_fn(q_score, q_bar_score)
         loss += disc_loss
 
-        return loss, (recon_loss, disc_loss.item(), tc_loss.item()), indices
+        return loss, (recon_loss, disc_loss.item(), sum_tc_loss.item()), indices
 
     @abstractmethod
     def get_params(self) -> dict:

@@ -45,6 +45,7 @@ BM = BaseModel
 class EpochLoss:
     model_loss: float
     discriminator_loss: Optional[float] = None
+    tc_loss: Optional[float] = None
 
 
 log = logging.getLogger("smartula")
@@ -491,9 +492,10 @@ class ModelRunner:
             # ------------ train step ------------
             epoch_loss = self._train_contrastive_step(model, train_dataloader,
                                                       model_optimizer, experiment, epoch, discriminator,
-                                                      discriminator_optimizer)
+                                                      discriminator_optimizer, fig_folder=run_folder)
             experiment.log_metric('train_epoch_loss', epoch_loss.model_loss, step=epoch)
             experiment.log_metric('train_discriminator_epoch_loss', epoch_loss.discriminator_loss, step=epoch)
+            experiment.log_metric('train_tc_epoch_loss', epoch_loss.tc_loss, step=epoch)
             log.info(f'--- train epoch {epoch} end with train loss: {epoch_loss.model_loss}')
 
             # ------------ validation step ------------
@@ -523,7 +525,8 @@ class ModelRunner:
                                 experiment: Experiment,
                                 epoch: int,
                                 discriminator: Discriminator = None,
-                                discriminator_optimizer: Optimizer = None) -> EpochLoss:
+                                discriminator_optimizer: Optimizer = None,
+                                fig_folder: Path = None) -> EpochLoss:
         """
         Function for epoch run on contrastive model
         :param model: model to be train on contrastive manner
@@ -537,6 +540,9 @@ class ModelRunner:
         """
         mean_loss = []
         discriminator_mean_loss = []
+        tc_mean_loss = []
+        aux_logger = ContrastiveFeatureLogger(fig_folder) if fig_folder is not None else None
+
         model.train()
         for batch_idx, (target, background) in enumerate(dataloader):
             target_batch = target.to(self.device)
@@ -544,7 +550,11 @@ class ModelRunner:
             model_optimizer.zero_grad()
             model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput] = model(target_batch, background_batch)
             loss, partial_loss, indices = model.loss_fn(target_batch, background_batch, model_output, discriminator)
-            recon_loss, disc_loss, tc_loss = partial_loss
+            recon_loss, _, tc_loss = partial_loss
+
+            q_log, q_bar_log = discriminator.variational_get_latent(model_output, indices=indices)
+            if aux_logger is not None:
+                aux_logger.batch_collect_aux(q_log.cpu(), q_bar_log.cpu())
 
             loss.backward()
             model_optimizer.step()
@@ -553,7 +563,8 @@ class ModelRunner:
 
             experiment.log_metric("batch_train_loss", loss_float, step=(epoch * len(dataloader)) + batch_idx)
             experiment.log_metric("batch_recon_loss", recon_loss, step=(epoch * len(dataloader)) + batch_idx)
-            experiment.log_metric("tc_loss", tc_loss, step=(epoch * len(dataloader)) + batch_idx)
+            experiment.log_metric("batch_tc_loss", tc_loss, step=(epoch * len(dataloader)) + batch_idx)
+            tc_mean_loss.append(tc_loss)
             if self._log_interval != -1 and batch_idx % self._log_interval == 0:
                 log.info(f'=== train epoch {epoch}, [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
                          f'-> batch loss: {loss_float}')
@@ -571,8 +582,13 @@ class ModelRunner:
                                       step=(epoch * len(dataloader)) + batch_idx)
 
         epoch_loss = EpochLoss(sum(mean_loss) / len(mean_loss))
+
+        if aux_logger is not None:
+            aux_logger.aux_data_flush(epoch)
+
         if len(discriminator_mean_loss) > 0:
             epoch_loss.discriminator_loss = sum(discriminator_mean_loss) / len(discriminator_mean_loss)
+            epoch_loss.tc_loss = sum(tc_mean_loss) / len(tc_mean_loss)
         return epoch_loss
 
     def _val_contrastive_step(self,
@@ -593,7 +609,7 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
-        contrastive_logger = ContrastiveFeatureLogger(type(model), fig_folder) if fig_folder is not None else None
+        contrastive_logger = ContrastiveFeatureLogger(fig_folder, type(model)) if fig_folder is not None else None
 
         with torch.no_grad():
             for batch_idx, (target, background) in enumerate(val_dataloader):

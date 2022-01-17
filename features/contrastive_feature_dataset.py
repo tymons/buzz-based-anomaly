@@ -35,7 +35,8 @@ class ContrastiveFeatureDataset(Dataset):
 
 
 class ContrastiveFeatureLogger:
-    def __init__(self, model_type: Type[Union[ContrastiveBaseModel, ContrastiveVariationalBaseModel]], folder: Path,
+    def __init__(self, folder: Path,
+                 model_type: Type[Union[ContrastiveBaseModel, ContrastiveVariationalBaseModel]] = None,
                  experiment: comet_ml.Experiment = None):
         self.model_type = model_type
         self.folder = folder
@@ -47,6 +48,20 @@ class ContrastiveFeatureLogger:
         self.vae_target_qs_data = torch.Tensor()
         self.vae_target_qz_data = torch.Tensor()
         self.vae_background_qz_data = torch.Tensor()
+        # aux data
+        self.aux_data_p = torch.Tensor()
+        self.aux_data_q = torch.Tensor()
+
+    def batch_collect_aux(self, aux_data_p_batch, aux_data_q_batch):
+        self.aux_data_p = torch.cat((self.aux_data_p, aux_data_p_batch), dim=0)
+        self.aux_data_q = torch.cat((self.aux_data_q, aux_data_q_batch), dim=0)
+
+    def aux_data_flush(self, epoch: int):
+        folder = self.folder / Path('p-q')
+        folder.mkdir(exist_ok=True, parents=True)
+        util.plot_latent(self.aux_data_p, folder, epoch, background=self.aux_data_q, experiment=self.experiment)
+        self.aux_data_p = torch.Tensor()
+        self.aux_data_q = torch.Tensor()
 
     def batch_collect(self, model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput]):
         if isinstance(model_output, VanillaContrastiveOutput):
@@ -59,7 +74,7 @@ class ContrastiveFeatureLogger:
             self.vae_target_qz_data = torch.cat((self.vae_target_qz_data,
                                                  model_output.target_qz_mean.cpu().squeeze(dim=1)), dim=0)
             self.vae_background_qz_data = torch.cat((self.vae_background_qz_data,
-                                                     model_output.background_qz_mean.cpu()), dim=0)
+                                                     model_output.background_qz_mean.cpu().squeeze(dim=1)), dim=0)
 
     def clear_buffers(self):
         self.vae_target_qz_data = torch.Tensor()
@@ -84,6 +99,6 @@ class ContrastiveFeatureLogger:
             util.plot_latent(self.vae_target_qs_data, folder_qs_qz_bg, epoch, background=self.vae_background_qz_data,
                              experiment=self.experiment)
         else:
-            log.warning(f'Model {self.model_type} not supported, latent data will not be saved!')
+            log.warning(f'Model {self.model_type} empty or not supported, latent data will not be saved!')
 
         self.clear_buffers()

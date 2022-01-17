@@ -14,14 +14,19 @@ class Discriminator(nn.Module):
         self.linear = torch.nn.Linear(input_size, 1)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def loss_fn(self, true_labels: torch.Tensor, probs: torch.Tensor):
+    def loss_fn(self, q_score, q_bar_score):
         """
         Method for loss calculation in discriminator model
-        :param true_labels:
-        :param probs: tensor of probability for samples
+        :param q_bar_score:
+        :param q_score:
         :return:
         """
-        loss = F.binary_cross_entropy(probs, true_labels, reduction='mean')
+        # loss = F.binary_cross_entropy(probs, true_labels, reduction='mean')
+
+        q_score_max = torch.clip(q_score, min=1e-36, max=1e36)
+        q_bar_score_max = torch.clip(q_bar_score, min=1e-36, max=1e36)
+        loss = - torch.log(q_score_max) - torch.log(1 - q_bar_score_max)
+        loss = torch.mean(loss)
         return loss
 
     def _vanilla_get_latent(self, model_output: VanillaContrastiveOutput):
@@ -39,25 +44,27 @@ class Discriminator(nn.Module):
 
         return latent_data, latent_labels
 
-    def _variational_get_latent(self, model_output: VaeContrastiveOutput, indices=None):
+    def variational_get_latent(self, model_output: VaeContrastiveOutput, indices=None):
         q = torch.cat((model_output.target_qs_latent.clone().detach().squeeze(dim=1),
                        model_output.target_qz_latent.clone().detach().squeeze(dim=1)), dim=-1)
         q_bar, _ = latent_permutation(q, indices=indices)
 
-        latent_data = torch.vstack((q, q_bar)).to(self.device)
-        latent_labels = torch.hstack((torch.ones(q.shape[0]),
-                                      torch.zeros(q_bar.shape[0]))).reshape(-1, 1).to(self.device)
+        # latent_data = torch.vstack((q, q_bar)).to(self.device)
+        # latent_labels = torch.hstack((torch.ones(q.shape[0]),
+        #                               torch.zeros(q_bar.shape[0]))).reshape(-1, 1).to(self.device)
 
-        return latent_data, latent_labels
+        return q, q_bar
 
-    def forward(self, x):
+    def forward(self, p, q):
         """
         Method for forward pass
-        :param x:
+        :param q:
+        :param p:
         :return:
         """
-        class_probability = torch.sigmoid(self.linear(x))
-        return class_probability
+        p_class_probability = torch.sigmoid(self.linear(p))
+        q_class_probability = torch.sigmoid(self.linear(q))
+        return p_class_probability, q_class_probability
 
     def forward_with_loss(self, model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput], indices=None):
         """
@@ -67,11 +74,14 @@ class Discriminator(nn.Module):
         """
         if isinstance(model_output, VanillaContrastiveOutput):
             x, labels = self._vanilla_get_latent(model_output)
+
+            probs = self(x)
+            loss = self.loss_fn(labels, probs)
         elif isinstance(model_output, VaeContrastiveOutput):
-            x, labels = self._variational_get_latent(model_output, indices)
+            q, q_bar = self.variational_get_latent(model_output, indices)
+            q_score, q_bar_score = self(q, q_bar)
+            loss = self.loss_fn(q_score, q_bar_score)
         else:
             raise ValueError('Contrastive output not supported!')
 
-        probs = self(x)
-        loss = self.loss_fn(labels, probs)
         return loss
