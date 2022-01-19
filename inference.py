@@ -68,8 +68,8 @@ def main():
 
         model_type: HiveModelType = HiveModelType.from_name(args.model_path.stem.split('-')[0])
         model = HiveModelFactory.build_model(model_type, hive_data_shape, model_config['model'])
-        model, last_epoch, last_loss = model_load(args.model_path, model)
-        logging.info(f'model {model_type.model_name} has been loaded from epoch {last_epoch} with loss: {last_loss}')
+        model, last_epoch = model_load(args.model_path, model)
+        logging.info(f'model {model_type.model_name} has been loaded from epoch {last_epoch}')
 
         model_runner = ModelRunner(comet_api_key='DEADBEEF')
         latent = model_runner.inference_latent(model, dataloader)
