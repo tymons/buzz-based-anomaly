@@ -12,8 +12,8 @@ from features.contrastive_feature_dataset import VaeContrastiveOutput
 
 class ContrastiveConv1DVAE(cvbm.ContrastiveVariationalBaseModel):
     def __init__(self, model_type: HiveModelType, features: List[int], dropout_probs: List[float], kernel_size: int,
-                 padding: int, max_pool: int, latent_size: int, input_size: int):
-        super().__init__(model_type)
+                 padding: int, max_pool: int, latent_size: int, input_size: int, alpha: float = 0.1):
+        super().__init__(model_type, float)
 
         self._feature_map = features
         self._dropout_probs = dropout_probs
@@ -78,5 +78,6 @@ class ContrastiveConv1DVAE(cvbm.ContrastiveVariationalBaseModel):
             'model_kernel_size': self._kernel_size,
             'model_padding': self._padding,
             'model_latent': self._latent,
-            'model_max_pool': self._max_pool
+            'model_max_pool': self._max_pool,
+            'model_alpha': self.alpha
         }

@@ -8,12 +8,11 @@ from models.vanilla.ae import EncoderWithLatent, Decoder
 class ContrastiveAE(ContrastiveBaseModel):
     def __init__(self, model_type: HiveModelType, layers: List[int], latent_size: int, input_size: int,
                  dropout: Union[List[float], float] = 0.2, alpha: float = 0.1):
-        super().__init__(model_type)
+        super().__init__(model_type, alpha)
 
         self._layers = layers
         self._latent_size = latent_size
         self._dropout = dropout
-        self.alpha = alpha
 
         self.encoder = EncoderWithLatent(self._layers, self._latent_size, self._dropout, input_size)
         self.decoder = Decoder(self._layers[::-1], self._latent_size, self._dropout, input_size)

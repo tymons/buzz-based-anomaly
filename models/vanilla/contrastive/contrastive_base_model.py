@@ -18,9 +18,10 @@ class ContrastiveBaseModel(ABC, nn.Module):
     model_type: HiveModelType
     alpha: float
 
-    def __init__(self, model_type):
+    def __init__(self, model_type, alpha):
         super().__init__()
         self.model_type = model_type
+        self.alpha = alpha
 
     def loss_fn(self, target, background, model_output: VanillaContrastiveOutput, discriminator):
         """

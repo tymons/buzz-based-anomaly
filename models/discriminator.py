@@ -45,8 +45,8 @@ class Discriminator(nn.Module):
         return latent_data, latent_labels
 
     def variational_get_latent(self, model_output: VaeContrastiveOutput, indices=None):
-        q = torch.cat((model_output.target_qs_latent.clone().detach().squeeze(dim=1),
-                       model_output.target_qz_latent.clone().detach().squeeze(dim=1)), dim=-1)
+        q = torch.cat((model_output.target_latent.clone().detach().squeeze(dim=1),
+                       model_output.background_latent.clone().detach().squeeze(dim=1)), dim=-1)
         q_bar, _ = latent_permutation(q, indices=indices)
 
         # latent_data = torch.vstack((q, q_bar)).to(self.device)
@@ -69,6 +69,7 @@ class Discriminator(nn.Module):
     def forward_with_loss(self, model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput], indices=None):
         """
         Method for forward pass with loss calculation for discriminator
+        :param indices:
         :param model_output:
         :return:
         """
