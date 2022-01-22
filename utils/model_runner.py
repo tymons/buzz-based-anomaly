@@ -568,9 +568,15 @@ class ModelRunner:
                          f'-> batch loss: {loss_float}')
 
             if all([discriminator, discriminator_optimizer]):
-                q_score, q_bar_score = discriminator(model_output.target_latent.squeeze(dim=1).clone().detach(),
-                                                     model_output.background_latent.squeeze(dim=1).clone().detach())
-                dloss = discriminator.loss_fn(q_score, q_bar_score)
+                target_latent = model_output.target_latent.squeeze(dim=1).clone().detach()
+                background_latent = model_output.background_latent.squeeze(dim=1).clone().detach()
+
+                latent_data = torch.vstack((target_latent, background_latent)).to(self.device)
+                latent_labels = torch.hstack((torch.ones(target_latent.shape[0]),
+                                              torch.zeros(background_latent.shape[0]))).reshape(-1, 1).to(self.device)
+
+                scores = discriminator(latent_data)
+                dloss = discriminator.loss_fn(scores, latent_labels)
                 dloss.backward()
                 discriminator_optimizer.step()
                 discriminator_loss_float = dloss.item()

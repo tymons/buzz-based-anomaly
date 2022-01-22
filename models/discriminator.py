@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 
@@ -6,26 +7,22 @@ class Discriminator(nn.Module):
     def __init__(self, input_size: int):
         super(Discriminator, self).__init__()
         self.linear = torch.nn.Linear(input_size, 1)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def loss_fn(self, q_score, q_bar_score):
+    def loss_fn(self, probs, true_labels):
         """
         Method for loss calculation in discriminator model
-        :param q_bar_score:
-        :param q_score:
+        :param true_labels:
+        :param probs: tensor of probability for samples
         :return:
         """
-        loss = -torch.mean(torch.log(q_score))
-        loss -= torch.mean(torch.log(1 - q_bar_score))
+        loss = F.binary_cross_entropy(probs, true_labels, reduction='mean')
         return loss
 
-    def forward(self, q, q_bar):
+    def forward(self, x):
         """
         Method for forward pass
-        :param q_bar:
-        :param q:
+        :param x:
         :return:
         """
-        q_class_probability = torch.sigmoid(self.linear(q))
-        q_bar_class_probability = torch.sigmoid(self.linear(q_bar))
-        return q_class_probability, q_bar_class_probability
+        class_probability = torch.sigmoid(self.linear(x))
+        return class_probability

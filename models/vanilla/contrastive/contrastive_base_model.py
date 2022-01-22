@@ -41,14 +41,19 @@ class ContrastiveBaseModel(ABC, nn.Module):
 
         target_latent = model_output.target_latent.squeeze(dim=1)
         background_latent = model_output.background_latent.squeeze(dim=1)
+        latent_data = torch.vstack((target_latent, background_latent))
+        latent_labels = torch.hstack((torch.ones(target_latent.shape[0]),
+                                      torch.zeros(background_latent.shape[0]))).reshape(-1, 1)
+        latent_labels = latent_labels.to(latent_data.get_device())
 
-        q_score, q_bar_score = discriminator(target_latent, background_latent)
-        disc_loss = discriminator.loss_fn(q_score, q_bar_score)
+        probs = discriminator(latent_data)
+        disc_loss = discriminator.loss_fn(probs, latent_labels)
         loss += disc_loss
 
-        tc_loss = -torch.mean(torch.logit(q_score, eps=1e-7))
+        tc_loss = -torch.mean(torch.logit(target_latent, eps=1e-7))
         if self.tc_component is True:
-            loss += self.tc_alpha * tc_loss
+            tc_loss = self.tc_alpha * tc_loss
+            loss += tc_loss
 
         return loss, (recon_loss.item(), disc_loss.item(), tc_loss.item())
 
