@@ -492,7 +492,7 @@ class ModelRunner:
             # ------------ train step ------------
             epoch_loss = self._train_contrastive_step(model, train_dataloader,
                                                       model_optimizer, experiment, epoch, discriminator,
-                                                      discriminator_optimizer, fig_folder=run_folder)
+                                                      discriminator_optimizer)
             experiment.log_metric('train_epoch_loss', epoch_loss.model_loss, step=epoch)
             experiment.log_metric('train_discriminator_epoch_loss', epoch_loss.discriminator_loss, step=epoch)
             experiment.log_metric('train_tc_epoch_loss', epoch_loss.tc_loss, step=epoch)
@@ -505,11 +505,9 @@ class ModelRunner:
             log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
             # ------------ early stopping handler ------------
-            es_loss = val_epoch_loss.recon_loss + ((epoch_loss.tc_loss + epoch_loss.discriminator_loss +
-                                                    val_epoch_loss.discriminator_loss + val_epoch_loss.tc_loss) / 2)
-            experiment.log_metric('es_epoch_loss', es_loss, step=epoch)
-            should_stop = self._early_stopping_handler(es_loss, epoch, model, model_optimizer, model_checkpoint_path,
-                                                       discriminator, discriminator_optimizer, disc_checkpoint_path)
+            should_stop = self._early_stopping_handler(val_epoch_loss.model_loss, epoch, model, model_optimizer,
+                                                       model_checkpoint_path, discriminator, discriminator_optimizer,
+                                                       disc_checkpoint_path)
             if should_stop:
                 log.info(f' ___ early stopping at epoch {epoch} ___')
                 break
@@ -527,8 +525,7 @@ class ModelRunner:
                                 experiment: Experiment,
                                 epoch: int,
                                 discriminator: Discriminator = None,
-                                discriminator_optimizer: Optimizer = None,
-                                fig_folder: Path = None) -> EpochLoss:
+                                discriminator_optimizer: Optimizer = None) -> EpochLoss:
         """
         Function for epoch run on contrastive model
         :param model: model to be train on contrastive manner
@@ -545,20 +542,14 @@ class ModelRunner:
         tc_mean_loss = []
         recon_mean_loss = []
 
-        aux_logger = ContrastiveFeatureLogger(fig_folder) if fig_folder is not None else None
-
         model.train()
         for batch_idx, (target, background) in enumerate(dataloader):
             target_batch = target.to(self.device)
             background_batch = background.to(self.device)
             model_optimizer.zero_grad()
             model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput] = model(target_batch, background_batch)
-            loss, partial_loss, indices = model.loss_fn(target_batch, background_batch, model_output, discriminator)
+            loss, partial_loss = model.loss_fn(target_batch, background_batch, model_output, discriminator)
             recon_loss, disc_loss, tc_loss = partial_loss
-
-            q_log, q_bar_log = discriminator.variational_get_latent(model_output, indices=indices)
-            if aux_logger is not None:
-                aux_logger.batch_collect_aux(q_log.cpu(), q_bar_log.cpu())
 
             loss.backward()
             model_optimizer.step()
@@ -577,7 +568,9 @@ class ModelRunner:
                          f'-> batch loss: {loss_float}')
 
             if all([discriminator, discriminator_optimizer]):
-                dloss = discriminator.forward_with_loss(model_output, indices)
+                q_score, q_bar_score = discriminator(model_output.target_latent.squeeze(dim=1).clone().detach(),
+                                                     model_output.background_latent.squeeze(dim=1).clone().detach())
+                dloss = discriminator.loss_fn(q_score, q_bar_score)
                 dloss.backward()
                 discriminator_optimizer.step()
                 discriminator_loss_float = dloss.item()
@@ -591,9 +584,6 @@ class ModelRunner:
                                discriminator_loss=sum(discriminator_mean_loss) / len(discriminator_mean_loss),
                                tc_loss=sum(tc_mean_loss) / len(tc_mean_loss),
                                recon_loss=sum(recon_mean_loss) / len(recon_mean_loss))
-
-        if aux_logger is not None:
-            aux_logger.aux_data_flush(epoch)
 
         return epoch_loss
 
@@ -624,7 +614,7 @@ class ModelRunner:
                 model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput] = model(target_batch,
                                                                                             background_batch)
 
-                loss, partial_losses, _ = model.loss_fn(target_batch, background_batch, model_output, discriminator)
+                loss, partial_losses = model.loss_fn(target_batch, background_batch, model_output, discriminator)
                 recon_loss, disc_loss, tc_loss = partial_losses
                 loss_float = loss.item()
 

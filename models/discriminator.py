@@ -1,11 +1,5 @@
 import torch
-import torch.nn.functional as F
 from torch import nn
-
-from features.contrastive_feature_dataset import VaeContrastiveOutput, VanillaContrastiveOutput
-from typing import Union
-
-from models.variational.contrastive.contrastive_variational_base_model import latent_permutation
 
 
 class Discriminator(nn.Module):
@@ -21,68 +15,17 @@ class Discriminator(nn.Module):
         :param q_score:
         :return:
         """
-        # loss = F.binary_cross_entropy(probs, true_labels, reduction='mean')
-
-        q_score_max = torch.clip(q_score, min=1e-36, max=1e36)
-        q_bar_score_max = torch.clip(q_bar_score, min=1e-36, max=1e36)
-        loss = - torch.log(q_score_max) - torch.log(1 - q_bar_score_max)
-        loss = torch.mean(loss)
+        loss = -torch.mean(torch.log(q_score))
+        loss -= torch.mean(torch.log(1 - q_bar_score))
         return loss
 
-    def _vanilla_get_latent(self, model_output: VanillaContrastiveOutput):
-        """
-        Prepare latent data for
-        :param model_output:
-        :return:
-        """
-        target_latent = model_output.target_latent.clone().detach().squeeze()
-        background_latent = model_output.background_latent.clone().detach().squeeze()
-
-        latent_data = torch.vstack((target_latent, background_latent)).to(self.device)
-        latent_labels = torch.hstack((torch.ones(target_latent.shape[0]),
-                                      torch.zeros(background_latent.shape[0]))).reshape(-1, 1).to(self.device)
-
-        return latent_data, latent_labels
-
-    def variational_get_latent(self, model_output: VaeContrastiveOutput, indices=None):
-        q = torch.cat((model_output.target_latent.clone().detach().squeeze(dim=1),
-                       model_output.background_latent.clone().detach().squeeze(dim=1)), dim=-1)
-        q_bar, _ = latent_permutation(q, indices=indices)
-
-        # latent_data = torch.vstack((q, q_bar)).to(self.device)
-        # latent_labels = torch.hstack((torch.ones(q.shape[0]),
-        #                               torch.zeros(q_bar.shape[0]))).reshape(-1, 1).to(self.device)
-
-        return q, q_bar
-
-    def forward(self, p, q):
+    def forward(self, q, q_bar):
         """
         Method for forward pass
+        :param q_bar:
         :param q:
-        :param p:
         :return:
         """
-        p_class_probability = torch.sigmoid(self.linear(p))
         q_class_probability = torch.sigmoid(self.linear(q))
-        return p_class_probability, q_class_probability
-
-    def forward_with_loss(self, model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput], indices=None):
-        """
-        Method for forward pass with loss calculation for discriminator
-        :param indices:
-        :param model_output:
-        :return:
-        """
-        if isinstance(model_output, VanillaContrastiveOutput):
-            x, labels = self._vanilla_get_latent(model_output)
-
-            probs = self(x)
-            loss = self.loss_fn(labels, probs)
-        elif isinstance(model_output, VaeContrastiveOutput):
-            q, q_bar = self.variational_get_latent(model_output, indices)
-            q_score, q_bar_score = self(q, q_bar)
-            loss = self.loss_fn(q_score, q_bar_score)
-        else:
-            raise ValueError('Contrastive output not supported!')
-
-        return loss
+        q_bar_class_probability = torch.sigmoid(self.linear(q_bar))
+        return q_class_probability, q_bar_class_probability

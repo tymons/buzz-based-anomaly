@@ -8,8 +8,9 @@ from models.vanilla.conv2d_ae import Conv2DEncoderWithLatent, Conv2DDecoder
 
 class ContrastiveConv2DAE(ContrastiveBaseModel):
     def __init__(self, model_type: HiveModelType, features: List[int], dropout_probs: List[float], kernel_size: int,
-                 padding: int, max_pool: int, latent: int, input_size: tuple, alpha: float = 0.1):
-        super().__init__(model_type, alpha)
+                 padding: int, max_pool: int, latent: int, input_size: tuple, tc_alpha: float = 0.1,
+                 include_tc_loss: bool = False):
+        super().__init__(model_type, tc_alpha, include_tc_loss)
         self._feature_map = features
         self._dropout_probs = dropout_probs
         self._kernel_size = kernel_size
@@ -35,5 +36,6 @@ class ContrastiveConv2DAE(ContrastiveBaseModel):
             'model_padding': self._padding,
             'model_latent': self._latent,
             'model_max_pool': self._max_pool,
-            'model_alpha': self.alpha
+            'model_tc_alpha': self.tc_alpha,
+            'model_tc_loss': self.tc_component
         }

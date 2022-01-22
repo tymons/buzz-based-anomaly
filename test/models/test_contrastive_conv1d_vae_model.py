@@ -41,7 +41,7 @@ class TestContrastiveConv1dVAEModelMethods(unittest.TestCase):
         target, background = torch.empty(size=(32, 1, input_size)), torch.empty(size=(32, 1, input_size))
         self.assertEqual(model(target, background).target.shape[-1], input_size)
         self.assertEqual(model(target, background).background.shape[-1], input_size)
-        self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
+        self.assertEqual(model(target, background).target_latent.shape[-1], config['latent'])
 
     def test_contrastive_conv1d_vae_model_is_build_with_input_size_2049(self):
         config, _ = get_default_config()
@@ -62,7 +62,7 @@ class TestContrastiveConv1dVAEModelMethods(unittest.TestCase):
         target, background = torch.empty(size=(32, 1, input_size)), torch.empty(size=(32, 1, input_size))
         self.assertEqual(model(target, background).target.shape[-1], input_size)
         self.assertEqual(model(target, background).background.shape[-1], input_size)
-        self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
+        self.assertEqual(model(target, background).target_latent.shape[-1], config['latent'])
 
     def test_contrastive_conv1d_vae_model_is_build_with_max_pool_5(self):
         config, input_size = get_default_config()
@@ -82,7 +82,7 @@ class TestContrastiveConv1dVAEModelMethods(unittest.TestCase):
         target, background = torch.empty(size=(32, 1, input_size)), torch.empty(size=(32, 1, input_size))
         self.assertEqual(model(target, background).target.shape[-1], input_size)
         self.assertEqual(model(target, background).background.shape[-1], input_size)
-        self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
+        self.assertEqual(model(target, background).target_latent.shape[-1], config['latent'])
 
     def test_contrastive_conv1d_vae_model_is_build_with_kernel_6(self):
         config, input_size = get_default_config()
@@ -102,7 +102,7 @@ class TestContrastiveConv1dVAEModelMethods(unittest.TestCase):
         target, background = torch.empty(size=(32, 1, input_size)), torch.empty(size=(32, 1, input_size))
         self.assertEqual(model(target, background).target.shape[-1], input_size)
         self.assertEqual(model(target, background).background.shape[-1], input_size)
-        self.assertEqual(model(target, background).target_qs_latent.shape[-1], config['latent'])
+        self.assertEqual(model(target, background).target_latent.shape[-1], config['latent'])
 
     def test_contrastive_conv1d_vae_model_inference(self):
         config, input_size = get_default_config()

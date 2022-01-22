@@ -9,8 +9,9 @@ from torch import nn, Tensor
 from models.model_type import HiveModelType
 from models.variational.vae_base_model import kld_loss
 
-_fields = ['target', 'background', 'target_mean', 'target_log_var', 'target_latent', 'background_mean',
-           'background_log_var', 'background_latent']
+_fields = ['target', 'background',
+           'target_latent', 'target_mean', 'target_log_var',
+           'background_latent', 'background_mean', 'background_log_var']
 VaeContrastiveOutput = namedtuple('VaeContrastiveOutput', _fields, defaults=(None,) * len(_fields))
 
 
@@ -32,7 +33,7 @@ def kl_closed_form(means_p, covs_p, means_q, covs_q):
                   + (np.matmul(np.matmul(mean_diff.transpose(), np.linalg.inv(covs_q)), mean_diff))).squeeze()
 
 
-def latent_permutation(latent_batch: Tensor, inplace: bool = False, indices=None):
+def latent_permutation(latent_batch: Tensor, inplace: bool = False):
     """
     Function for latent permutation.
     :param indices: force indices
@@ -43,24 +44,29 @@ def latent_permutation(latent_batch: Tensor, inplace: bool = False, indices=None
     latent_batch = latent_batch.squeeze()
 
     data = latent_batch.clone().detach() if inplace is False else latent_batch
-    rand_indices = torch.randperm(latent_batch.shape[0]) if indices is None else indices
-    data[:, (latent_batch.shape[1] // 2):] = latent_batch[:, (latent_batch.shape[1] // 2):][rand_indices]
+    for column_idx in range(data.shape[1]):
+        data[:, column_idx] = data[torch.randperm(data.shape[0]), column_idx]
 
-    return data, rand_indices
+    return data
 
 
 class ContrastiveVariationalBaseModel(ABC, nn.Module):
-    encoder: nn.Module
+    s_encoder: nn.Module
+    z_encoder: nn.Module
     decoder: nn.Module
-    linear_means: nn.Module
-    linear_log_var: nn.Module
+    s_linear_means: nn.Module
+    s_linear_log_var: nn.Module
+    z_linear_means: nn.Module
+    z_linear_log_var: nn.Module
     model_type: HiveModelType
-    alpha: float
+    tc_alpha: float
+    tc_component: bool
 
-    def __init__(self, model_type, alpha):
+    def __init__(self, model_type, tc_alpha, include_tc_loss):
         super().__init__()
         self.model_type = model_type
-        self.alpha = alpha
+        self.tc_alpha = tc_alpha
+        self.tc_component = include_tc_loss
 
     def loss_fn(self, target, background, model_output: VaeContrastiveOutput, discriminator):
         """
@@ -77,20 +83,22 @@ class ContrastiveVariationalBaseModel(ABC, nn.Module):
 
         # KLD losses
         loss += kld_loss(model_output.target_mean.squeeze(dim=1), model_output.target_log_var.squeeze(dim=1))
-        loss += kld_loss(model_output.background_mean.squeeze(dim=1), model_output.background_log_var.squeeze(dim=1))
+        loss += kld_loss(model_output.background_mean.squeeze(dim=1),
+                         model_output.background_log_var.squeeze(dim=1))
 
-        # total correction loss
-        q = torch.cat((model_output.target_latent.squeeze(dim=1), model_output.background_latent.squeeze(dim=1)), dim=-1)
-        q_bar, indices = latent_permutation(q)
-
+        q = model_output.target_latent.squeeze(dim=1)
+        q_bar = model_output.background_latent.squeeze(dim=1)
         q_score, q_bar_score = discriminator(q, q_bar)
-        tc_loss = self.alpha * -torch.mean(torch.logit(q_score, eps=1e-34))
-        loss += tc_loss
 
+        tc_loss = -torch.mean(torch.logit(q_score, eps=1e-7))
         disc_loss = discriminator.loss_fn(q_score, q_bar_score)
+
+        if self.tc_component is True:
+            loss += self.tc_alpha * tc_loss
+
         loss += disc_loss
 
-        return loss, (recon_loss, disc_loss.item(), tc_loss.item()), indices
+        return loss, (recon_loss, disc_loss.item(), tc_loss.item())
 
     @abstractmethod
     def get_params(self) -> dict:

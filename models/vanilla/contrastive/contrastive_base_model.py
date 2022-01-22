@@ -16,12 +16,14 @@ class ContrastiveBaseModel(ABC, nn.Module):
     encoder: nn.Module
     decoder: nn.Module
     model_type: HiveModelType
-    alpha: float
+    tc_alpha: float
+    tc_component: bool
 
-    def __init__(self, model_type, alpha):
+    def __init__(self, model_type, tc_alpha, include_tc_loss):
         super().__init__()
         self.model_type = model_type
-        self.alpha = alpha
+        self.tc_alpha = tc_alpha
+        self.tc_component = include_tc_loss
 
     def loss_fn(self, target, background, model_output: VanillaContrastiveOutput, discriminator):
         """
@@ -37,19 +39,18 @@ class ContrastiveBaseModel(ABC, nn.Module):
         recon_loss = target_loss + background_loss
         loss = recon_loss.clone()
 
-        target_latent = model_output.target_latent.squeeze()
-        background_latent = model_output.background_latent.squeeze()
+        target_latent = model_output.target_latent.squeeze(dim=1)
+        background_latent = model_output.background_latent.squeeze(dim=1)
 
-        latent_data = torch.vstack((target_latent, background_latent))
-        latent_labels = torch.hstack((torch.ones(target_latent.shape[0]),
-                                      torch.zeros(background_latent.shape[0]))).reshape(-1, 1)
-
-        probs = discriminator(latent_data)
-        disc_loss = self.alpha * discriminator.loss_fn(latent_labels, probs.cpu())
-
+        q_score, q_bar_score = discriminator(target_latent, background_latent)
+        disc_loss = discriminator.loss_fn(q_score, q_bar_score)
         loss += disc_loss
 
-        return loss, (recon_loss, disc_loss, 0)
+        tc_loss = -torch.mean(torch.logit(q_score, eps=1e-7))
+        if self.tc_component is True:
+            loss += self.tc_alpha * tc_loss
+
+        return loss, (recon_loss.item(), disc_loss.item(), tc_loss.item())
 
     def forward(self, target, background) -> VanillaContrastiveOutput:
         """

@@ -2,4 +2,5 @@ model:
   layers: [256, 32, 8]
   dropout: [0.3, 0.3, 0.3]
   latent: 14
-  alpha: 0.1
+  tc_alpha: 0.1
+  tc_loss: False
