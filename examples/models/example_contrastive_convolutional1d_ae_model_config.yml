@@ -5,4 +5,5 @@ model:
   kernel: 3
   padding: 1
   max_pool: 2
-  alpha: 0.2
+  tc_alpha: 0.2
+  tc_loss: False

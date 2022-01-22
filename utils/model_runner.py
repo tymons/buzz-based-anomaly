@@ -21,8 +21,9 @@ from models.discriminator import Discriminator
 from models.model_type import HiveModelType
 from models.vanilla.base_model import BaseModel
 from models.variational.vae_base_model import VaeBaseModel
-from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel
+from models.vanilla.contrastive.contrastive_base_model import ContrastiveBaseModel, VanillaContrastiveOutput
 from models.variational.contrastive.contrastive_variational_base_model import ContrastiveVariationalBaseModel
+from models.variational.contrastive.contrastive_variational_base_model import VaeContrastiveOutput
 
 from typing import List, Callable, Union, Optional
 from torch import nn, device
@@ -30,7 +31,7 @@ from torch import nn, device
 from dataclasses import dataclass
 from torch.utils.data import DataLoader
 from torch.optim import Optimizer
-from features.contrastive_feature_dataset import VanillaContrastiveOutput
+from features.contrastive_feature_dataset import ContrastiveFeatureLogger
 from utils.model_factory import HiveModelFactory, build_optuna_model_config
 from utils.sm_data_parallel import SmDataParallel
 
@@ -44,6 +45,8 @@ BM = BaseModel
 class EpochLoss:
     model_loss: float
     discriminator_loss: Optional[float] = None
+    tc_loss: Optional[float] = None
+    recon_loss: Optional[float] = None
 
 
 log = logging.getLogger("smartula")
@@ -122,7 +125,7 @@ def _read_comet_key(path: Path) -> str:
 
 
 def model_save(model: Union[BM, VBM, CBM, CVBM, SmDataParallel],
-               output_path: Path, optimizer: Optimizer, epoch_no: int, loss: float) -> None:
+               output_path: Path, optimizer: Optimizer, epoch_no: int) -> None:
     """
     Function for saving model on disc
     :param model: model to be saved
@@ -132,8 +135,8 @@ def model_save(model: Union[BM, VBM, CBM, CVBM, SmDataParallel],
     :param loss:
     """
     torch.save(
-        {'epoch': epoch_no, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict(),
-         'loss': loss}, output_path)
+        {'epoch': epoch_no, 'model_state_dict': model.state_dict(), 'optimizer_state_dict': optimizer.state_dict()},
+        output_path)
 
 
 def model_load(checkpoint_filepath: Path, model: Union[BM, VBM, CVBM, CBM, SmDataParallel],
@@ -154,9 +157,8 @@ def model_load(checkpoint_filepath: Path, model: Union[BM, VBM, CVBM, CBM, SmDat
     if optimizer:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     epoch = checkpoint['epoch']
-    loss = checkpoint['loss']
 
-    return model, epoch, loss
+    return model, epoch
 
 
 def modify_optuna_learning_config(learning_config: dict, trial: optuna.Trial) -> Dict[str, Any]:
@@ -441,14 +443,14 @@ class ModelRunner:
             log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
             # ------------ early stopping handler ------------
-            should_stop = self._early_stopping_handler(val_epoch_loss, epoch, model, optimizer, checkpoint_path)
+            should_stop = self._early_stopping_handler(val_epoch_loss.model_loss,
+                                                       epoch, model, optimizer, checkpoint_path)
             if should_stop:
                 log.info(f' ___ early stopping at epoch {epoch} ___')
                 break
 
             if self._save_last_model_flag is True:
-                model_save(model, checkpoint_folder / f'{experiment.get_name()}-last-epoch.pth', optimizer,
-                           epoch, val_epoch_loss.model_loss)
+                model_save(model, checkpoint_folder / f'{experiment.get_name()}-last-epoch.pth', optimizer, epoch)
 
         return model
 
@@ -456,7 +458,7 @@ class ModelRunner:
                                               model: CVBM,
                                               train_dataloader: DataLoader,
                                               train_config: dict,
-                                              discriminator: nn.Module,
+                                              discriminator: Discriminator,
                                               val_dataloader: DataLoader = None,
                                               feature_config: dict = None) -> (CVBM, float):
         """
@@ -493,6 +495,7 @@ class ModelRunner:
                                                       discriminator_optimizer)
             experiment.log_metric('train_epoch_loss', epoch_loss.model_loss, step=epoch)
             experiment.log_metric('train_discriminator_epoch_loss', epoch_loss.discriminator_loss, step=epoch)
+            experiment.log_metric('train_tc_epoch_loss', epoch_loss.tc_loss, step=epoch)
             log.info(f'--- train epoch {epoch} end with train loss: {epoch_loss.model_loss}')
 
             # ------------ validation step ------------
@@ -502,7 +505,7 @@ class ModelRunner:
             log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
             # ------------ early stopping handler ------------
-            should_stop = self._early_stopping_handler(val_epoch_loss, epoch, model, model_optimizer,
+            should_stop = self._early_stopping_handler(val_epoch_loss.model_loss, epoch, model, model_optimizer,
                                                        model_checkpoint_path, discriminator, discriminator_optimizer,
                                                        disc_checkpoint_path)
             if should_stop:
@@ -511,7 +514,7 @@ class ModelRunner:
 
             if self._save_last_model_flag is True:
                 model_save(model, model_checkpoint_path / f'{experiment.get_name()}-last-epoch.pth', model_optimizer,
-                           epoch, epoch_loss.model_loss)
+                           epoch)
 
         return model
 
@@ -536,14 +539,17 @@ class ModelRunner:
         """
         mean_loss = []
         discriminator_mean_loss = []
+        tc_mean_loss = []
+        recon_mean_loss = []
+
         model.train()
         for batch_idx, (target, background) in enumerate(dataloader):
             target_batch = target.to(self.device)
             background_batch = background.to(self.device)
             model_optimizer.zero_grad()
-            model_output: VanillaContrastiveOutput = model(target_batch, background_batch)
+            model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput] = model(target_batch, background_batch)
             loss, partial_loss = model.loss_fn(target_batch, background_batch, model_output, discriminator)
-            recon_loss, disc_loss = partial_loss
+            recon_loss, disc_loss, tc_loss = partial_loss
 
             loss.backward()
             model_optimizer.step()
@@ -552,34 +558,39 @@ class ModelRunner:
 
             experiment.log_metric("batch_train_loss", loss_float, step=(epoch * len(dataloader)) + batch_idx)
             experiment.log_metric("batch_recon_loss", recon_loss, step=(epoch * len(dataloader)) + batch_idx)
+            experiment.log_metric("batch_tc_loss", tc_loss, step=(epoch * len(dataloader)) + batch_idx)
+            tc_mean_loss.append(tc_loss)
+            recon_mean_loss.append(recon_loss)
+            discriminator_mean_loss.append(disc_loss)
 
             if self._log_interval != -1 and batch_idx % self._log_interval == 0:
                 log.info(f'=== train epoch {epoch}, [{batch_idx * len(target)}/{len(dataloader.dataset)}] '
                          f'-> batch loss: {loss_float}')
 
             if all([discriminator, discriminator_optimizer]):
-                target_latent = model_output.target_latent.clone().detach().squeeze()
-                background_latent = model_output.background_latent.clone().detach().squeeze()
+                target_latent = model_output.target_latent.squeeze(dim=1).clone().detach()
+                background_latent = model_output.background_latent.squeeze(dim=1).clone().detach()
 
                 latent_data = torch.vstack((target_latent, background_latent)).to(self.device)
                 latent_labels = torch.hstack((torch.ones(target_latent.shape[0]),
                                               torch.zeros(background_latent.shape[0]))).reshape(-1, 1).to(self.device)
-                probs = discriminator(latent_data)
-                dloss = discriminator.loss_fn(latent_labels, probs)
+
+                scores = discriminator(latent_data)
+                dloss = discriminator.loss_fn(scores, latent_labels)
                 dloss.backward()
                 discriminator_optimizer.step()
-
                 discriminator_loss_float = dloss.item()
-                discriminator_mean_loss.append(discriminator_loss_float)
 
                 if self._log_interval != -1 and batch_idx % self._log_interval == 0:
                     log.info(f'-> discriminator loss: {discriminator_loss_float}')
                 experiment.log_metric("batch_disc_loss", discriminator_loss_float,
                                       step=(epoch * len(dataloader)) + batch_idx)
 
-        epoch_loss = EpochLoss(sum(mean_loss) / len(mean_loss))
-        if len(discriminator_mean_loss) > 0:
-            epoch_loss.discriminator_loss = sum(discriminator_mean_loss) / len(discriminator_mean_loss)
+        epoch_loss = EpochLoss(sum(mean_loss) / len(mean_loss),
+                               discriminator_loss=sum(discriminator_mean_loss) / len(discriminator_mean_loss),
+                               tc_loss=sum(tc_mean_loss) / len(tc_mean_loss),
+                               recon_loss=sum(recon_mean_loss) / len(recon_mean_loss))
+
         return epoch_loss
 
     def _val_contrastive_step(self,
@@ -600,16 +611,17 @@ class ModelRunner:
         """
         val_loss = []
         model.eval()
-        cat_target_latent, cat_background_latent = \
-            (torch.Tensor(), torch.Tensor()) if fig_folder is not None else (None, None)
+        contrastive_logger = ContrastiveFeatureLogger(fig_folder, type(model)) if fig_folder is not None else None
 
         with torch.no_grad():
             for batch_idx, (target, background) in enumerate(val_dataloader):
                 target_batch = target.to(self.device)
                 background_batch = background.to(self.device)
-                model_output = model(target_batch, background_batch)
+                model_output: Union[VaeContrastiveOutput, VanillaContrastiveOutput] = model(target_batch,
+                                                                                            background_batch)
 
-                loss, _ = model.loss_fn(target_batch, background_batch, model_output, discriminator)
+                loss, partial_losses = model.loss_fn(target_batch, background_batch, model_output, discriminator)
+                recon_loss, disc_loss, tc_loss = partial_losses
                 loss_float = loss.item()
 
                 val_loss.append(loss_float)
@@ -622,18 +634,14 @@ class ModelRunner:
                              f'[{batch_idx * len(target)}/{len(val_dataloader.dataset)}]'
                              f'-> batch loss: {loss.item()} ===')
 
-                if cat_target_latent is not None:
-                    cat_target_latent = torch.cat((cat_target_latent, model_output.target_latent.cpu()), dim=0)
-                if cat_background_latent is not None:
-                    cat_background_latent = torch.cat((cat_background_latent, model_output.background_latent.cpu()),
-                                                      dim=0)
+                if contrastive_logger is not None:
+                    contrastive_logger.batch_collect(model_output)
 
-        if fig_folder is not None:
-            f1 = fig_folder / Path('target-background')
-            f1.mkdir(exist_ok=True, parents=True)
-            util.plot_latent(cat_target_latent, f1, epoch_no, background=cat_background_latent, experiment=experiment)
+        if contrastive_logger is not None:
+            contrastive_logger.data_flush(epoch_no)
 
-        return EpochLoss(sum(val_loss) / len(val_loss))
+        return EpochLoss(sum(val_loss) / len(val_loss), discriminator_loss=disc_loss,
+                         tc_loss=tc_loss, recon_loss=recon_loss)
 
     T_train_step = Callable[[Union[BM, CBM, SmDataParallel], DataLoader, Optimizer,
                              Experiment, int], EpochLoss]
@@ -643,7 +651,7 @@ class ModelRunner:
                     dataloader: DataLoader,
                     optimizer: torch.optim.Optimizer,
                     experiment: Experiment,
-                    epoch_no: int,) -> EpochLoss:
+                    epoch_no: int, ) -> EpochLoss:
         """
         Function for performing epoch step on data
         :param model: model to be trained
@@ -735,17 +743,16 @@ class ModelRunner:
 
         return self._curr_patience
 
-    def _early_stopping_handler(self, current_loss, current_epoch, model, model_optimizer, model_checkpoint_path,
+    def _early_stopping_handler(self, loss, current_epoch, model, model_optimizer, model_checkpoint_path,
                                 discriminator=None, discriminator_optimizer=None, discriminator_checkpoint_path=None):
-        patience = self.early_stopping_callback(current_loss.model_loss)
+        patience = self.early_stopping_callback(loss)
         if patience == self._patience_init_val:
             log.debug(f'*** model checkpoint at epoch {current_epoch} ***')
-            model_save(model, model_checkpoint_path, model_optimizer, current_epoch, current_loss.model_loss)
+            model_save(model, model_checkpoint_path, model_optimizer, current_epoch)
             if all([discriminator, discriminator_checkpoint_path, discriminator_optimizer]):
-                model_save(discriminator, discriminator_checkpoint_path, discriminator_optimizer, current_epoch,
-                           current_loss.discriminator_loss)
+                model_save(discriminator, discriminator_checkpoint_path, discriminator_optimizer, current_epoch)
         elif patience == 0:
-            model, _, _ = model_load(model_checkpoint_path, model, model_optimizer, gpu_ids=self.gpu_ids)
+            model, _ = model_load(model_checkpoint_path, model, model_optimizer, gpu_ids=self.gpu_ids)
             return True
 
         return False

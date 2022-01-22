@@ -8,7 +8,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.linear = torch.nn.Linear(input_size, 1)
 
-    def loss_fn(self, true_labels: torch.Tensor, probs: torch.Tensor):
+    def loss_fn(self, probs, true_labels):
         """
         Method for loss calculation in discriminator model
         :param true_labels:
@@ -21,7 +21,7 @@ class Discriminator(nn.Module):
     def forward(self, x):
         """
         Method for forward pass
-        :param x - samples from distribution
+        :param x:
         :return:
         """
         class_probability = torch.sigmoid(self.linear(x))

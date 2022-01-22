@@ -8,15 +8,15 @@ from models.vanilla.conv1d_ae import Conv1DEncoderWithLatent, Conv1DDecoder
 
 class ContrastiveConv1DAE(ContrastiveBaseModel):
     def __init__(self, model_type: HiveModelType, features: List[int], dropout_probs: List[float],
-                 kernel_size: int, padding: int, max_pool: int, latent: int, input_size: int, alpha: float = 0.1):
-        super().__init__(model_type)
+                 kernel_size: int, padding: int, max_pool: int, latent: int, input_size: int, tc_alpha: float = 0.1,
+                 include_tc_loss: bool = False):
+        super().__init__(model_type, tc_alpha, include_tc_loss)
         self._feature_map = features
         self._dropout_probs = dropout_probs
         self._kernel_size = kernel_size
         self._padding = padding
         self._latent = latent
         self._max_pool = max_pool
-        self.alpha = alpha
 
         connector_size, conv_temporal = convolutional_to_mlp(input_size, len(features), kernel_size, padding, max_pool)
         self.encoder = Conv1DEncoderWithLatent(features, dropout_probs, kernel_size, padding, max_pool, latent,
@@ -36,5 +36,6 @@ class ContrastiveConv1DAE(ContrastiveBaseModel):
             'model_padding': self._padding,
             'model_latent': self._latent,
             'model_max_pool': self._max_pool,
-            'model_alpha': self.alpha
+            'model_tc_alpha': self.tc_alpha,
+            'model_tc_loss': self.tc_component
         }

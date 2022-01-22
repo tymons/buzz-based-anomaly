@@ -73,13 +73,10 @@ def main():
             log.error('sound list empty!')
             raise Exception('sound list empty!')
 
+        sound_list = utils.filter_path_list(sound_list, *args.hives)
         if args.filter_dates:
             sound_list = utils.filter_by_datetime(sound_list, args.filter_dates[0], args.filter_dates[1])
 
-        # prepare sound filenames
-        sound_list = utils.filter_path_list(sound_list, *args.hives)
-
-        # fingerprint filtering
         if args.fingerprint_main_hive is not None:
             sound_list = utils.filter_hive_fingerprint(args.fingerprint_feature_file,
                                                        args.fingerprint_main_hive,
@@ -122,7 +119,8 @@ def main():
             dataset = SoundFeatureFactory.build_contrastive_feature_dataset(dataset, background_dataset)
         train_loader, val_loader = SoundFeatureFactory.build_train_and_validation_dataloader(dataset,
                                                                                              learning_config.get(
-                                                                                                 'batch_size', 32))
+                                                                                                 'batch_size', 32),
+                                                                                             drop_last=True)
 
         model_runner = ModelRunner(args.output_folder, comet_config_file=args.comet_config,
                                    comet_project_name="bee-sound-anomaly", gpu_ids=args.gpu_ids)
@@ -133,6 +131,7 @@ def main():
             if args.model.num >= HiveModelType.CONTRASTIVE_AE.num:
                 model = HiveModelFactory.build_model(args.model, data_shape, model_config['model'])
                 discriminator = HiveModelFactory.get_discriminator(model_config['model']['latent'])
+
                 model = model_runner.train_contrastive_with_discriminator(model, train_loader, learning_config,
                                                                           discriminator, val_loader, feature_config)
             else:
