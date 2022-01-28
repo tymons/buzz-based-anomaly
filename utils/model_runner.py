@@ -505,7 +505,8 @@ class ModelRunner:
             log.info(f'--- validation epoch {epoch} end with val loss: {val_epoch_loss.model_loss} ---')
 
             # ------------ early stopping handler ------------
-            should_stop = self._early_stopping_handler(val_epoch_loss.model_loss, epoch, model, model_optimizer,
+            es_loss = val_epoch_loss.recon_loss + epoch_loss.tc_loss + epoch_loss.discriminator_loss
+            should_stop = self._early_stopping_handler(es_loss, epoch, model, model_optimizer,
                                                        model_checkpoint_path, discriminator, discriminator_optimizer,
                                                        disc_checkpoint_path)
             if should_stop:
