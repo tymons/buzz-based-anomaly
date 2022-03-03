@@ -56,15 +56,16 @@ def main():
 
         labels: List[int] = [1] * len(sound_list)
 
-        hive_dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, labels,
-                                                         feature_config)
+        hive_dataset = SoundFeatureFactory.build_dataset(args.feature, sound_list, labels, feature_config)
+        hive_sounds_datetimes = [hive_dataset.datetime_for_fileid(idx) for idx in range(len(hive_dataset))]
+
         if len(hive_dataset) <= 0:
             raise ValueError('Sound dataset is empty')
 
         hive_data_shape = hive_dataset[0][0].squeeze().shape
 
         logging.debug(f'got dataset of shape: {hive_data_shape}')
-        dataloader = DataLoader(hive_dataset, batch_size=32, shuffle=True, drop_last=False, num_workers=0)
+        dataloader = DataLoader(hive_dataset, batch_size=32, shuffle=False, drop_last=False, num_workers=0)
 
         model_type: HiveModelType = HiveModelType.from_name(args.model_path.stem.split('-')[0])
         model = HiveModelFactory.build_model(model_type, hive_data_shape, model_config['model'])
@@ -73,13 +74,14 @@ def main():
 
         model_runner = ModelRunner(comet_api_key='DEADBEEF')
         latent = model_runner.inference_latent(model, dataloader)
+        latent_data = dict(zip(hive_sounds_datetimes, latent.detach().numpy()))
 
         if args.save_data:
             output_data_folder = Path(args.output_folder)
             output_data_folder.mkdir(parents=True, exist_ok=True)
             data_file = output_data_folder / Path(
                 f'{args.data_folder.stem}-{"-".join(args.model_path.stem.split("-")[:3])}-{args.feature.value}.npy')
-            np.save(str(data_file), latent.detach().numpy())
+            np.save(str(data_file), latent_data)
 
 
 if __name__ == "__main__":
